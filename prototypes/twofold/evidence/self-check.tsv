@@ -1,0 +1,39 @@
+time	2026-11-15 00:53:28
+keep	lines	0	pinned	0
+briefword	a portal between	shown	evidence/play.png
+checklist	L1	unlisted	-	Look: *(provisional)* clean, minimal, orthographic shapes.	
+checklist	L2	unlisted	-	References: none named.	
+checklist	L3	unlisted	-	View: 2D · Camera: side view; follows the player, still when the level fits the window. *(provisional)*	
+checklist	F1	unlisted	-	Two overlaid lives per level, with different walls, gaps and doors	
+checklist	F2	unlisted	-	Portals you walk through, showing the other life inside their frame	
+checklist	F3	unlisted	-	Blocks you carry through portals	
+checklist	F4	unlisted	-	Switches and doors that share a colour and a mark, with the link animated	
+checklist	F5	unlisted	-	Five levels, one idea each: shown safe, then used, then twisted	
+checklist	F6	unlisted	-	Unlimited undo and a restart key, both taught on the title	
+checklist	F7	unlisted	-	Forgiving jumps that can never skip a puzzle	
+checklist	F8	unlisted	-	A clear sound and the exit lighting the moment a room is solved	
+checklist	S1	unlisted	-	teleport like a portal between the lifes · in the slice	
+checklist	S2	unlisted	-	simple puzzles · in the slice	
+checklist	M1	unlisted	-	You stand in a bright room with an exit door in sight and a wall too tall to jump in the way.	
+checklist	M2	unlisted	-	Beside you is a glowing frame, and through it the same room shows in red, with no wall.	
+checklist	M3	unlisted	-	You walk in, the world turns red, you walk past where the wall was, step through a second frame, and you are back in colour on the far side.	
+checklist	M4	unlisted	-	The exit lights.	
+checklist	M5	unlisted	-	Level 2 opens with a block and a switch.	
+checklist	C1	unlisted	-	*(provisional)* Level 3, around minute three, brings the first real puzzle.	
+checklist	C2	unlisted	-	A switch in the colourful life needs a block that exists only in the red one, and the obvious portal puts it on the wrong side of a door.	
+checklist	C3	unlisted	-	No death and nothing lost: undo takes back any move and restart resets the room.	
+checklist	C4	unlisted	-	Levels 4 and 5 chain two crossings and combine the tricks already learned.	
+browser	HeadlessChrome/157.0.0.0
+console	play	6359	[ProtocolLaunch] handler constructed; wiring port events.
+scene	play	0	title
+scene	play	1	play
+digits	log	22px "Trebuchet MS", "Segoe UI", sans-serif	tabular	0
+measure	step-time	play	0.017	0.700	190
+lane	play	stop	3.2	57
+uncaught	play	0
+text	play	canvas	29,672,394,692	31.5	19.32	inside	Room 1 of 5: A wall here, none there
+text	play	canvas	585,671,664,688	31.5	19.32	inside	Red life
+text	play	canvas	884,674,1252,691	25.5	12.63	inside	E carry   Z undo   R restart   P pause   M mute
+screen	play	drawn
+shot	play	prototypes/twofold/evidence/play.png
+responds	changed	4

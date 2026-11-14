@@ -1,0 +1,22 @@
+L1	pass	evidence/play.png	flat fills, one dark outline, blocky world, small rounded walker with a trailing scarf, portal frames show the other life; the scarf takes the other colour near a seam rather than passing through first
+L2	pass	evidence/play.png	no reference named, none used
+L3	pass	evidence/room1.png	2D side view; every room fits the window, so the camera stays still
+F1	broken	index.html:128	walls, bridges, steps, doors and crates differ between the lives; no gaps or pits were built
+F2	pass	evidence/play.png	walker walked through the first portal into the red life; frames show the other life
+F3	pass	index.html:271	pick up and put down with E, a carried crate changes life with the walker (index.html:347); built in code, not played by the check
+F4	pass	evidence/figures.png	switch and door share a colour and a shape; dotted line runs from a pressed switch to its door (index.html:521)
+F5	pass	evidence/room4.png	five rooms in index.html:128, each named for its one idea; shots of rooms 1 to 5 on disk
+F6	pass	evidence/title.png	title teaches Z and R; undo keeps up to 400 moves and restart can be undone (index.html:337)
+F7	not_assessed	index.html:366	late and early jump presses are forgiven in code; whether a jump can skip a puzzle needs a person playing
+F8	not_assessed	index.html:385	a sound cannot be shown in a screenshot; the exit lighting is in code and was not reached by the check
+S1	pass	evidence/play.png	walker crossed a portal and stands in the red life
+S2	pass	evidence/room5.png	switches, doors and crates in rooms 2 to 5
+M1	pass	evidence/room1.png	bright room, exit in sight on the right, tall wall between
+M2	pass	evidence/room1.png	glowing frame beside the start shows the red room, no wall in it
+M3	not_assessed	evidence/play.png	first crossing and the walk past the wall are in the shot; the second frame was not reached by the check
+M4	not_assessed	index.html:385	the check did not play as far as the exit lighting
+M5	pass	evidence/room2.png	room 2 opens with a switch beside the start and a crate seen through the portal
+C1	pass	evidence/room3.png	room 3 is the first room with a wrong and a right route; when a player reaches it was not timed
+C2	pass	evidence/room3.png	yellow switch and door in the colourful life, the only crate in the red one; the near portal leads back to the start side (index.html:133)
+C3	pass	index.html:337	no death anywhere; Z takes back a move, R restarts the room
+C4	pass	evidence/room5.png	rooms 4 and 5 each have two portals and reuse crates, switches and the step

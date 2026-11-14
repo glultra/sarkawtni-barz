@@ -1,0 +1,136 @@
+# The one-shot's small check (check-run/1).
+# Written by one-shot-check.sh --record: the results are /prototype's reading of
+# evidence/self-check.tsv; never edited by hand.
+kind: check-run/1
+engine: web
+browser: "HeadlessChrome/157.0.0.0"
+time: "2026-11-15 00:53:28"
+checks:
+  - id: boots
+    result: pass
+    evidence:
+      - "evidence/self-check.tsv"
+  - id: shot
+    result: pass
+    evidence:
+      - "evidence/play.png"
+  - id: outlines
+    result: pass
+    evidence:
+      - "evidence/figures.png"
+  - id: brief-words
+    result: pass
+    evidence:
+      - "evidence/brief-words.tsv"
+  - id: emoji
+    result: pass
+    evidence:
+      - "evidence/self-check.tsv"
+  - id: nearest-game
+    result: pass
+    evidence:
+      - "evidence/nearest-game.txt"
+brief_checklist:
+  - id: L1
+    result: pass
+    evidence: "evidence/play.png"
+    item: "Look: *(provisional)* clean, minimal, orthographic shapes."
+  - id: L2
+    result: pass
+    evidence: "evidence/play.png"
+    item: "References: none named."
+  - id: L3
+    result: pass
+    evidence: "evidence/room1.png"
+    item: "View: 2D · Camera: side view; follows the player, still when the level fits the window. *(provisional)*"
+  - id: F1
+    result: fail
+    why: broken
+    evidence: "index.html:128"
+    item: "Two overlaid lives per level, with different walls, gaps and doors"
+  - id: F2
+    result: pass
+    evidence: "evidence/play.png"
+    item: "Portals you walk through, showing the other life inside their frame"
+  - id: F3
+    result: pass
+    evidence: "index.html:271"
+    item: "Blocks you carry through portals"
+  - id: F4
+    result: pass
+    evidence: "evidence/figures.png"
+    item: "Switches and doors that share a colour and a mark, with the link animated"
+  - id: F5
+    result: pass
+    evidence: "evidence/room4.png"
+    item: "Five levels, one idea each: shown safe, then used, then twisted"
+  - id: F6
+    result: pass
+    evidence: "evidence/title.png"
+    item: "Unlimited undo and a restart key, both taught on the title"
+  - id: F7
+    result: not_run
+    mark: not assessed
+    why: "late and early jump presses are forgiven in code; whether a jump can skip a puzzle needs a person playing"
+    evidence: "index.html:366"
+    item: "Forgiving jumps that can never skip a puzzle"
+  - id: F8
+    result: not_run
+    mark: not assessed
+    why: "a sound cannot be shown in a screenshot; the exit lighting is in code and was not reached by the check"
+    evidence: "index.html:385"
+    item: "A clear sound and the exit lighting the moment a room is solved"
+  - id: S1
+    result: pass
+    evidence: "evidence/play.png"
+    item: "teleport like a portal between the lifes · in the slice"
+  - id: S2
+    result: pass
+    evidence: "evidence/room5.png"
+    item: "simple puzzles · in the slice"
+  - id: M1
+    result: pass
+    evidence: "evidence/room1.png"
+    item: "You stand in a bright room with an exit door in sight and a wall too tall to jump in the way."
+  - id: M2
+    result: pass
+    evidence: "evidence/room1.png"
+    item: "Beside you is a glowing frame, and through it the same room shows in red, with no wall."
+  - id: M3
+    result: not_run
+    mark: not assessed
+    why: "first crossing and the walk past the wall are in the shot; the second frame was not reached by the check"
+    evidence: "evidence/play.png"
+    item: "You walk in, the world turns red, you walk past where the wall was, step through a second frame, and you are back in colour on the far side."
+  - id: M4
+    result: not_run
+    mark: not assessed
+    why: "the check did not play as far as the exit lighting"
+    evidence: "index.html:385"
+    item: "The exit lights."
+  - id: M5
+    result: pass
+    evidence: "evidence/room2.png"
+    item: "Level 2 opens with a block and a switch."
+  - id: C1
+    result: pass
+    evidence: "evidence/room3.png"
+    item: "*(provisional)* Level 3, around minute three, brings the first real puzzle."
+  - id: C2
+    result: pass
+    evidence: "evidence/room3.png"
+    item: "A switch in the colourful life needs a block that exists only in the red one, and the obvious portal puts it on the wrong side of a door."
+  - id: C3
+    result: pass
+    evidence: "index.html:337"
+    item: "No death and nothing lost: undo takes back any move and restart resets the room."
+  - id: C4
+    result: pass
+    evidence: "evidence/room5.png"
+    item: "Levels 4 and 5 chain two crossings and combine the tricks already learned."
+measures:
+  - id: step-time
+    value: 0.700
+    unit: ms
+    by: browser
+    detail: "mean 0.017 ms, slowest 0.700 ms, 190 steps"
