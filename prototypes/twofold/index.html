@@ -10,11 +10,13 @@
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   body { font-variant-numeric: tabular-nums; }
-  canvas { display: block; margin: 0 auto; }
+  #stage { position: relative; margin: 0 auto; }
+  canvas { display: block; position: absolute; left: 0; top: 0; }
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+<div id="stage"><canvas id="gl"></canvas><canvas id="game"></canvas></div>
+<script src="vendor/three.js"></script>
 <script src="config.js"></script>
 <script>
 'use strict';
@@ -23,12 +25,11 @@
 const params = new URLSearchParams(location.search);
 const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
 const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
-const W = 1280, H = 720;        // logical size
-const PIXEL = false;
+const W = 1280, H = 720;        // logical size of the HUD canvas; the 3D canvas sits under it
 const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
 const TITLE = 'Twofold';
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
-const CHEAP = params.get('render') === 'cheap';
+const CHEAP = params.get('render') === 'cheap'; // a headless shot or check: 3D draws cheap; players never see it
 let seed;
 function rng() { // mulberry32; every gameplay random call reads this, never Math.random
   seed = (seed + 0x6D2B79F5) | 0;
@@ -38,20 +39,23 @@ function rng() { // mulberry32; every gameplay random call reads this, never Mat
 }
 const events = []; // window.game.events: anything the game wants a run to see
 
-// ---- Screen ---------------------------------------------------------------------------
+// ---- Screen: a WebGL canvas for the world, a 2D canvas over it for the HUD ------------------
+const stage = document.getElementById('stage');
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: !CHEAP, stencil: true });
+renderer.autoClear = false;
+renderer.shadowMap.enabled = false; // figures carry their own soft blob shadows
 function fit() { // fills the window at any size and pixel ratio
-  const k = Math.min(innerWidth / W, innerHeight / H);
-  const s = PIXEL ? Math.max(1, Math.floor(k)) : k;
-  const r = PIXEL ? 1 : s * (devicePixelRatio || 1);
+  const s = Math.min(innerWidth / W, innerHeight / H), r = s * (devicePixelRatio || 1);
+  const cw = Math.round(W * s), ch = Math.round(H * s);
+  stage.style.width = cw + 'px'; stage.style.height = ch + 'px';
+  stage.style.marginTop = Math.max(0, Math.floor((innerHeight - ch) / 2)) + 'px';
   canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
-  canvas.style.width = Math.round(W * s) + 'px'; canvas.style.height = Math.round(H * s) + 'px';
-  canvas.style.marginTop = Math.max(0, Math.floor((innerHeight - H * s) / 2)) + 'px';
-  canvas.style.imageRendering = PIXEL ? 'pixelated' : 'auto';
-  ctx.setTransform(r, 0, 0, r, 0, 0); ctx.imageSmoothingEnabled = !PIXEL;
+  canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+  ctx.setTransform(r, 0, 0, r, 0, 0);
+  renderer.setPixelRatio(CHEAP ? 0.5 : (devicePixelRatio || 1)); renderer.setSize(cw, ch, true);
 }
-addEventListener('resize', fit); fit();
 function text(s, x, y, size, c, align = 'center', weight = '') {
   ctx.fillStyle = c; ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align;
   ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
@@ -99,70 +103,58 @@ const SFX = {
   bonk: [[0, 110, 0.12, 'square', 0.15]],
   pick: [[0, 520, 0.08, 'triangle', 0.25], [0.05, 700, 0.08, 'triangle', 0.2]],
   put: [[0, 300, 0.08, 'triangle', 0.25], [0.05, 200, 0.1, 'triangle', 0.25]],
+  splash: [[0, 240, 0.1, 'sine', 0.25], [0.06, 160, 0.16, 'sine', 0.25], [0.14, 420, 0.12, 'triangle', 0.15]],
   press: [[0, 180, 0.07, 'square', 0.15], [0.06, 880, 0.2, 'sine', 0.2]],
   release: [[0, 440, 0.12, 'sine', 0.12]],
   lit: [[0, 523, 0.25, 'sine', 0.3], [0.1, 659, 0.25, 'sine', 0.3], [0.2, 784, 0.25, 'sine', 0.3], [0.3, 1047, 0.5, 'sine', 0.3]],
   done: [[0, 784, 0.2, 'triangle', 0.25], [0.12, 1047, 0.4, 'triangle', 0.25]],
   undo: [[0, 400, 0.08, 'sine', 0.2], [0.05, 300, 0.1, 'sine', 0.2]],
-  jump: [[0, 260, 0.08, 'sine', 0.12]],
 };
 function sfx(name) { for (const n of SFX[name]) state.sq.push({ at: state.t + n[0], n }); }
 
-// ---- The two lives -------------------------------------------------------------------------
-const T = 40, GW = 32, GH = 16, FLOOR = 13, PLAY_H = GH * T; // tiles; the floor's top is row 13
-const DOOR_TOP = 8, DOOR_H = 5;                              // a door fills rows 8 to 12 under a pillar
-const PAL = [
-  { name: 'Colourful life', bg: '#dff3f5', far: '#c8e8ea', far2: '#b3dcde', ground: '#2f9c95', cap: '#7bd8c9',
-    line: '#12343b', leg: '#12343b', body: '#ffffff', scarf: '#ff5a3c', eye: '#12343b', crate: '#ff9f43', crate2: '#ffd9a0',
-    key: { y: '#f6c833', u: '#3f7fe0', g: '#58c04a' }, exit: '#fff3b0', exitOff: '#9bc7c9', ghost: '#12343b', glow: '#35e0cf' },
-  { name: 'Red life', bg: '#140709', far: '#230a0e', far2: '#330d13', ground: '#b3202a', cap: '#ee4a4f',
-    line: '#050102', leg: '#ff9c9c', body: '#ffd6d6', scarf: '#3fd0c0', eye: '#3a0a10', crate: '#e2555b', crate2: '#ffb0b0',
-    key: { y: '#ffb347', u: '#ff5fa2', g: '#ffe3e3' }, exit: '#ffd0d0', exitOff: '#4a1219', ghost: '#ff9c9c', glow: '#ff3b4a' },
-];
-
-// A portal is a seam on the floor: floor on its far side is reached only in the other life.
-// Tile x positions; everything stands on the floor unless a level says otherwise.
-function l3Sink(life, tx, ty) { // the part of room 3 the bridge drops into, with no way back
-  return (life === 0 && tx > 10 && tx < 25) || (life === 1 && tx > 25) || (life === 1 && tx < 10 && ty >= 9);
-}
+// ---- The rooms -------------------------------------------------------------------------------
+// Each room is drawn twice, once per life, on the same grid. # wall  . floor  ~ water (red life: lava)
+// S start  X exit  O portal (stands in both lives)  c crate  r crate born red
+// y u g switch  Y U G its door.  Rows run north to south; the camera looks from the south.
 const LEVELS = [
-  { name: 'A wall here, none there', start: { x: 3, life: 0 }, portals: [9, 23], exit: { x: 28, life: 0 },
-    solidA: [[15, 5, 2, 8]], solidB: [[16, 12, 1, 1]], blocks: [], switches: [], doors: [] },
-  { name: 'Something to carry', start: { x: 2, life: 0 }, portals: [8], exit: { x: 27, life: 1 },
-    blocks: [{ x: 12, life: 1 }], switches: [{ x: 4, life: 0, c: 'y' }], doors: [{ x: 20, life: 1, c: 'y' }] },
-  { name: 'The long way round', start: { x: 28, life: 0, face: -1 }, portals: [10, 25], exit: { x: 22, life: 0 },
-    solidB: [[7, 8, 9, 1], [16, 9, 1, 4], [17, 10, 1, 3], [18, 11, 1, 2], [19, 12, 1, 1]],
-    blocks: [{ x: 22, life: 1 }], switches: [{ x: 14, life: 0, c: 'y' }], doors: [{ x: 19, life: 0, c: 'y' }],
-    stuck: s => s.p.carry < 0 && l3Sink(s.p.life, Math.floor((s.p.x + s.p.w / 2) / T), Math.floor(s.p.y / T)) &&
-      !l3Sink(s.blocks[0].life, Math.round(s.blocks[0].x / T), Math.round(s.blocks[0].y / T)) },
-  { name: 'A step up', start: { x: 3, life: 0 }, portals: [9, 21], exit: { x: 29, life: 0 },
-    solidB: [[16, 11, 1, 2], [17, 12, 1, 1]],
-    blocks: [{ x: 6, life: 0 }, { x: 12, life: 1 }], switches: [{ x: 23, life: 0, c: 'u' }], doors: [{ x: 28, life: 0, c: 'u' }] },
-  { name: 'Both lives at once', start: { x: 2, life: 0 }, portals: [7, 18], exit: { x: 28, life: 0 },
-    blocks: [{ x: 9, life: 1 }, { x: 21, life: 0 }],
-    switches: [{ x: 4, life: 0, c: 'y' }, { x: 14, life: 1, c: 'g' }],
-    doors: [{ x: 11, life: 1, c: 'y' }, { x: 25, life: 0, c: 'g' }] },
+  { name: 'A wall here, none there',
+    a: ['###########', '#....#....#', '#....#....#', '#.O..#..O.#', '#....#....#', '#.S..#..X.#', '###########'],
+    b: ['###########', '#.........#', '#.........#', '#.O.....O.#', '#....#....#', '#....#....#', '###########'] },
+  { name: 'Something to carry',
+    a: ['###########', '#.....#...#', '#.O...Y.X.#', '#.....#...#', '#.S.y.#...#', '#.....#...#', '###########'],
+    b: ['###########', '#.....#...#', '#.O.c.#...#', '#.....#...#', '#.....#...#', '#.....#...#', '###########'] },
+  { name: 'The long way round',
+    a: ['#############', '#X..Y.......#', '####........#', '#.y.....O...#', '#~~~~~~~~~~~#', '#...........#', '#.O.........#', '#.S.........#', '#############'],
+    b: ['#############', '#...#.......#', '#####.......#', '#.......O...#', '#########.###', '#...........#', '#.O..c......#', '#...........#', '#############'] },
+  { name: 'A bridge of your own',
+    a: ['#############', '#.....~...#X#', '#.O...~...#U#', '#.....~.....#', '#.S.c.~.....#', '#.....~.u...#', '#.....~..O..#', '#.....~.....#', '#############'],
+    b: ['#############', '#...~.....#.#', '#.O.~.....#.#', '#...~.......#', '#...~...c...#', '#...~.......#', '#...~....O..#', '#...~.......#', '#############'] },
+  { name: 'Both lives at once',
+    a: ['#############', '#.....#...#X#', '#.y...#...#G#', '#.....#.....#', '#.S...#..c..#', '#.....#.....#', '#..O..#..O..#', '#.....#.....#', '#############'],
+    b: ['#############', '#.....#...#.#', '#..c..#...#.#', '#.....#.....#', '#.....Y.g...#', '#.....#.....#', '#..O..#..O..#', '#.....#.....#', '#############'] },
 ];
+const FIGURES = { name: 'Figures', // every figure side by side, for the outline check
+  a: ['###########', '#.S.c.r...#', '#.........#', '#.........#', '#.y.Y.O.X.#', '#.........#', '###########'],
+  b: ['###########', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '###########'] };
 
-function buildLevel(i) {
-  const d = LEVELS[i];
-  const grid = [0, 1].map(() => Array.from({ length: GH }, () => Array(GW).fill(false)));
-  const fill = (life, [x, y, w, h]) => {
-    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++)
-      if (yy >= 0 && yy < GH && xx >= 0 && xx < GW) grid[life][yy][xx] = true;
-  };
-  for (const life of [0, 1]) { fill(life, [0, FLOOR, GW, GH - FLOOR]); fill(life, [0, 0, 1, GH]); fill(life, [GW - 1, 0, 1, GH]); }
-  // Out of reach, so the two lives never look like one room recoloured: islands above, roots hanging.
-  fill(0, [(5 + i * 5) % 22 + 3, 2, 3, 1]); fill(0, [(16 + i * 7) % 22 + 3, 3, 2, 1]);
-  for (let k = 0; k < 5; k++) fill(1, [2 + k * 6 + (i % 3), 0, 1, 2 + ((k + i) % 3)]);
-  (d.solidA || []).forEach(r => fill(0, r)); (d.solidB || []).forEach(r => fill(1, r));
-  const doors = d.doors.map(o => { fill(o.life, [o.x, 0, 1, DOOR_TOP]); return { tx: o.x, life: o.life, c: o.c, o: 0 }; });
-  return {
-    def: d, grid, doors,
-    portals: d.portals.map(x => (x + 0.5) * T),
-    exit: { tx: d.exit.x, life: d.exit.life },
-    switches: d.switches.map(s => ({ tx: s.x, life: s.life, c: s.c, on: false })),
-  };
+function parseLevel(def) {
+  const L = { def, w: def.a[0].length, d: def.a.length, grid: [[], []], portals: [], crates: [], switches: [], doors: [], exit: null, start: null };
+  [def.a, def.b].forEach((rows, life) => rows.forEach((row, z) => {
+    if (row.length !== L.w) console.error('room row width', def.name, life, z);
+    L.grid[life][z] = [];
+    [...row].forEach((ch, x) => {
+      let cell = '.';
+      if (ch === '#' || ch === '~') cell = ch;
+      else if (ch === 'S') L.start = { x, z, life };
+      else if (ch === 'X') L.exit = { x, z, life };
+      else if (ch === 'O') { if (!L.portals.some(p => p.x === x && p.z === z)) L.portals.push({ x, z, zc: z + 0.5 }); }
+      else if (ch === 'c' || ch === 'r') L.crates.push({ x, z, life, origin: ch === 'r' ? 1 : life });
+      else if ('yug'.includes(ch)) L.switches.push({ x, z, life, c: ch });
+      else if ('YUG'.includes(ch)) L.doors.push({ x, z, life, c: ch.toLowerCase() });
+      L.grid[life][z][x] = cell;
+    });
+  }));
+  return L;
 }
 
 // ---- Scenes ---------------------------------------------------------------------------------
@@ -172,148 +164,123 @@ function reset() {
   state = { t: 0, score: 0, gained: '', crossings: 0, undos: 0, sq: [] };
   loadLevel(Math.max(0, Math.min(LEVELS.length - 1, (Number(params.get('level')) || 1) - 1)));
 }
-function loadLevel(i) {
-  const L = buildLevel(i), d = L.def;
+function loadLevel(i, def) {
+  const L = parseLevel(def || LEVELS[i]);
   state.li = i; state.L = L; state.score = i;
-  state.p = { x: d.start.x * T + 8, y: FLOOR * T - 34, w: 24, h: 34, vy: 0, life: d.start.life, face: d.start.face || 1,
-    ground: true, carry: -1, coyote: 0, buffer: 0, walk: 0, moving: false };
-  state.blocks = d.blocks.map(b => ({ x: b.x * T, y: (FLOOR - 1) * T, vy: 0, life: b.life, origin: b.life, carried: false }));
-  state.undo = []; state.first = snap(); state.wipe = null; state.doneT = 0; state.idle = 0;
-  state.lit = false; state.litT = 0; state.bonkT = 0; state.scarf = null;
-  updateSwitches(true);
+  state.p = { x: L.start.x + 0.5, z: L.start.z + 0.5, life: L.start.life, fx: 0, fz: 1, ang: 0, carry: -1, walk: 0, moving: false };
+  state.crates = L.crates.map(c => ({ x: c.x, z: c.z, life: c.life, origin: c.origin, carried: false, sunk: false }));
+  state.switches = L.switches.map(s => ({ x: s.x, z: s.z, life: s.life, c: s.c, on: false }));
+  state.doors = L.doors.map(d => ({ x: d.x, z: d.z, life: d.life, c: d.c, o: 0 }));
+  state.bridges = [];
+  state.undo = []; state.first = snap(); state.flash = 0; state.doneT = 0; state.idle = 0;
+  state.lit = false; state.bonkT = 0;
+  state.cam = null;
+  updateSwitches(true); buildView(); updateCam(true);
 }
 function snap() {
   const p = state.p;
-  return { p: { x: p.x, y: p.y, vy: p.vy, life: p.life, face: p.face, carry: p.carry },
-    b: state.blocks.map(b => ({ x: b.x, y: b.y, vy: b.vy, life: b.life, carried: b.carried })) };
+  return { p: { x: p.x, z: p.z, life: p.life, fx: p.fx, fz: p.fz, ang: p.ang, carry: p.carry },
+    c: state.crates.map(c => ({ x: c.x, z: c.z, life: c.life, carried: c.carried, sunk: c.sunk })), b: state.bridges.slice() };
 }
 function pushUndo(s) {
   state.undo.push(s || snap()); state.idle = 0;
   while (state.undo.length > tune.undo_cap) state.undo.shift();
 }
 function restore(s) {
-  Object.assign(state.p, s.p); state.p.coyote = 0; state.p.buffer = 0;
-  state.blocks.forEach((b, i) => Object.assign(b, s.b[i]));
-  state.wipe = null; state.scarf = null; state.idle = 0;
+  Object.assign(state.p, s.p);
+  state.crates.forEach((c, i) => Object.assign(c, s.c[i]));
+  state.bridges = s.b.slice(); state.flash = 0; state.idle = 0;
   updateSwitches(true);
 }
 
-// Solid things in one life: its tiles, its closed doors, its crates on the ground.
-function tileSolid(life, tx, ty) {
-  if (tx < 0 || tx >= GW) return true;
-  if (ty < 0 || ty >= GH) return false;
-  return state.L.grid[life][ty][tx];
-}
-function overlap(ax, ay, aw, ah, bx, by, bw, bh) { return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by; }
-function rectHits(life, x, y, w, h, skip) {
-  const x0 = Math.floor(x / T), x1 = Math.floor((x + w - 0.001) / T), y0 = Math.floor(y / T), y1 = Math.floor((y + h - 0.001) / T);
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (tileSolid(life, tx, ty)) return true;
-  for (const d of state.L.doors)
-    if (d.life === life && d.o < 1 && overlap(x, y, w, h, d.tx * T, DOOR_TOP * T, T, DOOR_H * T * (1 - d.o))) return true;
-  for (const b of state.blocks)
-    if (b !== skip && b.life === life && !b.carried && overlap(x, y, w, h, b.x, b.y, T, T)) return true;
+// What stops the walker in one life: its walls, its water, its closed doors, its crates.
+const R = 0.28; // the walker's half width, in tiles
+function bridged(life, x, z) { return state.bridges.includes(life + ':' + x + ',' + z); }
+function solidCell(life, x, z, doorAt = 0.9) {
+  const L = state.L;
+  if (x < 0 || z < 0 || x >= L.w || z >= L.d) return true;
+  const ch = L.grid[life][z][x];
+  if (ch === '#' || (ch === '~' && !bridged(life, x, z))) return true;
+  for (const d of state.doors) if (d.life === life && d.x === x && d.z === z && d.o < doorAt) return true;
+  for (const c of state.crates) if (c.life === life && !c.carried && !c.sunk && c.x === x && c.z === z) return true;
   return false;
 }
-function slide(obj, w, h, dx, dy, skip) { // move up to a pixel at a time; false when something stops it
-  const s = Math.sign(dx || dy); let rem = Math.abs(dx || dy);
-  while (rem > 0) {
-    const st = Math.min(1, rem) * s, nx = obj.x + (dx ? st : 0), ny = obj.y + (dy ? st : 0);
-    if (rectHits(obj.life, nx, ny, w, h, skip)) return false;
-    obj.x = nx; obj.y = ny; rem -= Math.abs(st);
-  }
-  return true;
+function blocked(life, x, z) {
+  return solidCell(life, Math.floor(x - R), Math.floor(z - R)) || solidCell(life, Math.floor(x + R), Math.floor(z - R)) ||
+    solidCell(life, Math.floor(x - R), Math.floor(z + R)) || solidCell(life, Math.floor(x + R), Math.floor(z + R));
 }
 
 function updateSwitches(instant) {
-  const p = state.p, floorY = FLOOR * T;
-  for (const s of state.L.switches) {
-    const x0 = s.tx * T, x1 = x0 + 2 * T, pc = p.x + p.w / 2;
-    let on = p.life === s.life && p.ground && Math.abs(p.y + p.h - floorY) < 2 && pc > x0 && pc < x1;
-    for (const b of state.blocks)
-      if (b.life === s.life && !b.carried && Math.abs(b.y + T - floorY) < 2 && b.x + T / 2 > x0 && b.x + T / 2 < x1) on = true;
+  const p = state.p, px = Math.floor(p.x), pz = Math.floor(p.z);
+  for (const s of state.switches) {
+    let on = p.life === s.life && px === s.x && pz === s.z;
+    for (const c of state.crates) if (c.life === s.life && !c.carried && !c.sunk && c.x === s.x && c.z === s.z) on = true;
     if (on !== s.on && !instant) sfx(on ? 'press' : 'release');
     s.on = on;
   }
-  for (const d of state.L.doors) {
-    let want = state.L.switches.some(s => s.c === d.c && s.on) ? 1 : 0;
-    if (!want && d.o > 0) { // never closes on the walker or a crate
-      const x = d.tx * T, y = DOOR_TOP * T;
-      if (p.life === d.life && overlap(p.x, p.y, p.w, p.h, x, y, T, DOOR_H * T)) want = d.o;
-      for (const b of state.blocks) if (b.life === d.life && !b.carried && overlap(b.x, b.y, T, T, x, y, T, DOOR_H * T)) want = d.o;
-    }
+  for (const d of state.doors) {
+    let want = state.switches.some(s => s.c === d.c && s.on) ? 1 : 0;
+    if (!want && d.o > 0 && p.life === d.life && // never closes on the walker
+      p.x + R > d.x && p.x - R < d.x + 1 && p.z + R > d.z && p.z - R < d.z + 1) want = d.o;
     if (instant) d.o = want;
     else if (d.o < want) d.o = Math.min(want, d.o + tune.door_open_speed * STEP);
     else if (d.o > want) d.o = Math.max(want, d.o - tune.door_close_speed * STEP);
   }
 }
 
-// The exit lights when the walker could walk to it: a flood over cells with footing near below.
+// The exit lights when the walker could walk to it in this life.
 function exitReachable() {
-  const p = state.p, e = state.L.exit, life = e.life;
-  if (p.life !== life) return false;
-  const solid = (x, y) => x < 0 || x >= GW || y < 0 || y >= GH || state.L.grid[life][y][x] ||
-    state.L.doors.some(d => d.life === life && d.o < 0.5 && d.tx === x && y >= DOOR_TOP && y < DOOR_TOP + DOOR_H) ||
-    state.blocks.some(b => b.life === life && !b.carried && Math.round(b.x / T) === x && Math.round(b.y / T) === y) ||
-    (y >= FLOOR - tune.portal_tall && state.L.portals.some(px => Math.floor(px / T) === x)); // a seam is not this life's floor
-  const ok = (x, y) => !solid(x, y) && (solid(x, y + 1) || solid(x, y + 2));
-  const sx = Math.floor((p.x + p.w / 2) / T), sy = Math.floor((p.y + p.h - 1) / T);
-  if (!ok(sx, sy)) return state.lit;
-  const seen = new Set([sx + sy * GW]), q = [[sx, sy]];
+  const p = state.p, e = state.L.exit, L = state.L;
+  if (p.life !== e.life) return false;
+  const sx = Math.floor(p.x), sz = Math.floor(p.z), seen = new Set([sx + sz * L.w]), q = [[sx, sz]];
   while (q.length) {
-    const [x, y] = q.pop();
-    if (x === e.tx && y === FLOOR - 1) return true;
-    for (const [ax, ay] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]])
-      if (!seen.has(ax + ay * GW) && ok(ax, ay)) { seen.add(ax + ay * GW); q.push([ax, ay]); }
+    const [x, z] = q.pop();
+    if (x === e.x && z === e.z) return true;
+    for (const [ax, az] of [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]])
+      if (!seen.has(ax + az * L.w) && !solidCell(e.life, ax, az, 0.5)) { seen.add(ax + az * L.w); q.push([ax, az]); }
   }
   return false;
 }
 
+function reachable() { // the crate the walker could pick up now, or -1: the one faced first, then one beside
+  const p = state.p, px = Math.floor(p.x), pz = Math.floor(p.z);
+  if (p.carry >= 0) return -1;
+  for (const [dx, dz] of [[p.fx, p.fz], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const i = state.crates.findIndex(c => c.life === p.life && !c.carried && !c.sunk && c.x === px + dx && c.z === pz + dz);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
 function tryCarry() {
-  const p = state.p, pc = p.x + p.w / 2;
-  if (!p.ground) return;
-  if (p.carry >= 0) { // put down in the tile ahead
-    const b = state.blocks[p.carry], col = Math.floor(pc / T) + p.face, row = Math.floor((p.y + p.h - 1) / T);
-    let ok = col > 0 && col < GW - 1 && !rectHits(p.life, col * T + 1, row * T + 1, T - 2, T - 2);
-    if (state.L.portals.some(px => Math.floor(px / T) === col)) ok = false;       // never on a seam
-    if (state.L.doors.some(d => d.life === p.life && d.tx === col)) ok = false;     // never in a doorway
-    let footing = false;
-    for (let y = row + 1; y < GH && !footing; y++) footing = rectHits(p.life, col * T + 1, y * T + 1, T - 2, T - 2);
-    if (!footing) ok = false;
-    let nx = p.x;
-    if (ok && overlap(p.x, p.y, p.w, p.h, col * T, row * T, T, T)) { // make room
-      nx = p.face > 0 ? col * T - p.w - 0.01 : (col + 1) * T + 0.01;
-      if (rectHits(p.life, nx, p.y, p.w, p.h)) ok = false;
-    }
-    if (!ok) { sfx('bonk'); return; }
-    pushUndo(); p.x = nx;
-    b.carried = false; b.x = col * T; b.y = row * T; b.vy = 0; b.life = p.life; p.carry = -1; sfx('put');
+  const p = state.p, L = state.L, px = Math.floor(p.x), pz = Math.floor(p.z);
+  if (p.carry < 0) {
+    const i = reachable();
+    if (i >= 0) { pushUndo(); state.crates[i].carried = true; p.carry = i; sfx('pick'); }
     return;
   }
-  const i = reachable();
-  if (i >= 0) { pushUndo(); state.blocks[i].carried = true; p.carry = i; sfx('pick'); }
-}
-function reachable() { // the crate the walker could pick up now, or -1
-  const p = state.p, pc = p.x + p.w / 2, py = p.y + p.h / 2;
-  let best = -1, bd = 1e9;
-  if (p.carry >= 0 || !p.ground) return -1;
-  state.blocks.forEach((b, i) => {
-    if (b.life !== p.life || b.carried) return;
-    const dx = b.x + T / 2 - pc, dy = b.y + T / 2 - py;
-    if (Math.abs(dx) > tune.pickup_reach * T || Math.abs(dy) > 0.9 * T) return;
-    const score = Math.abs(dx) + (Math.sign(dx) === p.face ? 0 : T); // the one faced first
-    if (score < bd) { bd = score; best = i; }
-  });
-  return best;
+  const c = state.crates[p.carry], tx = px + p.fx, tz = pz + p.fz; // put down in the tile ahead
+  let ok = tx >= 0 && tz >= 0 && tx < L.w && tz < L.d && L.grid[p.life][tz][tx] !== '#';
+  if (ok && state.crates.some(o => o !== c && o.life === p.life && !o.sunk && !o.carried && o.x === tx && o.z === tz)) ok = false;
+  if (ok && state.doors.some(d => d.life === p.life && d.x === tx && d.z === tz)) ok = false;   // never in a doorway
+  if (ok && L.portals.some(o => o.x === tx && o.z === tz)) ok = false;                          // never under an arch
+  if (ok && L.exit.life === p.life && L.exit.x === tx && L.exit.z === tz) ok = false;
+  let nx = p.x, nz = p.z; // step back so the crate has room
+  if (p.fx > 0) nx = Math.min(nx, tx - R - 0.001); if (p.fx < 0) nx = Math.max(nx, tx + 1 + R + 0.001);
+  if (p.fz > 0) nz = Math.min(nz, tz - R - 0.001); if (p.fz < 0) nz = Math.max(nz, tz + 1 + R + 0.001);
+  if (ok && blocked(p.life, nx, nz)) ok = false;
+  if (!ok) { sfx('bonk'); return; }
+  pushUndo(); p.x = nx; p.z = nz;
+  c.carried = false; c.x = tx; c.z = tz; c.life = p.life; p.carry = -1;
+  if (L.grid[p.life][tz][tx] === '~' && !bridged(p.life, tx, tz)) { // into the water: it becomes a bridge
+    c.sunk = true; state.bridges.push(p.life + ':' + tx + ',' + tz); sfx('splash'); events.push({ type: 'bridge', t: state.t });
+  } else sfx('put');
 }
 
-function updateScarf() {
-  const p = state.p, nx = p.x + p.w / 2 - p.face * 9, ny = p.y + 13;
-  if (!state.scarf) state.scarf = Array.from({ length: 6 }, (_, i) => ({ x: nx - p.face * i * 5, y: ny + i * 2 }));
-  const s = state.scarf; s[0].x = nx; s[0].y = ny;
-  for (let i = 1; i < s.length; i++) {
-    const tx = s[i - 1].x - p.face * 5, ty = s[i - 1].y + 2.5 + Math.sin(state.t * 9 + i) * (p.moving ? 1.5 : 0.4);
-    s[i].x += (tx - s[i].x) * 0.35; s[i].y += (ty - s[i].y) * 0.35;
-  }
+function updateCam(snapTo) {
+  const p = state.p, L = state.L, k = tune.cam_follow;
+  const tx = L.w / 2 + (p.x - L.w / 2) * k, tz = L.d / 2 + (p.z - L.d / 2) * k;
+  if (snapTo || !state.cam) state.cam = { x: tx, z: tz };
+  else { state.cam.x += (tx - state.cam.x) * 0.08; state.cam.z += (tz - state.cam.z) * 0.08; }
 }
 
 function updatePlay(dt) {
@@ -321,11 +288,10 @@ function updatePlay(dt) {
   state.t += dt;
   for (let i = state.sq.length - 1; i >= 0; i--)
     if (state.sq[i].at <= state.t) { const n = state.sq[i].n; tone(n[1], n[2], n[3], n[4]); state.sq.splice(i, 1); }
-  if (state.wipe) { state.wipe.t += dt; if (state.wipe.t >= tune.wipe_s) state.wipe = null; }
-  if (state.lit) state.litT += dt;
+  state.flash = Math.max(0, state.flash - dt);
   state.bonkT = Math.max(0, state.bonkT - dt);
   if (state.doneT > 0) { // on the lit exit: a beat, then the next room
-    state.doneT -= dt; updateScarf();
+    state.doneT -= dt;
     if (state.doneT <= 0) {
       if (state.li + 1 < LEVELS.length) loadLevel(state.li + 1);
       else { state.score = LEVELS.length; state.gained = 'You walked both lives'; scene = 'results'; }
@@ -336,298 +302,298 @@ function updatePlay(dt) {
 
   if (pressed('KeyZ') && state.undo.length) { restore(state.undo.pop()); state.undos++; sfx('undo'); return; }
   if (pressed('KeyR')) { pushUndo(); restore(state.first); sfx('undo'); return; }
-  if (pressed('KeyE')) tryCarry();
+  if (pressed('KeyE') || pressed('Space')) tryCarry();
 
-  // Walk
-  const dir = (down.has('ArrowRight') || down.has('KeyD') ? 1 : 0) - (down.has('ArrowLeft') || down.has('KeyA') ? 1 : 0);
-  p.moving = dir !== 0;
-  if (dir) { p.face = dir; p.walk += dt * 12; }
-  const oldX = p.x, c0 = p.x + p.w / 2;
-  if (dir) slide(p, p.w, p.h, dir * tune.move_speed * dt, 0);
-  // Cross a seam: the middle of the walker passes the portal's line
-  const c1 = p.x + p.w / 2, base = FLOOR * T;
-  for (const px of L.portals) {
-    if (p.y + p.h <= base - tune.portal_tall * T || p.y >= base) continue;
-    const to = c0 < px && c1 >= px ? 1 : c0 > px && c1 <= px ? -1 : 0;
-    if (!to) continue;
-    const nx = px + to * Math.max(Math.abs(c1 - px), 0.5) - p.w / 2, other = 1 - p.life;
-    if (rectHits(other, nx, p.y, p.w, p.h)) { // the other life is solid here
-      p.x = oldX; if (!state.bonkT) { sfx('bonk'); state.bonkT = 0.4; }
-    } else {
-      p.x = oldX; pushUndo(); p.x = nx;
-      state.wipe = { x: px, y: p.y + p.h / 2, t: 0, from: p.life };
-      p.life = other; if (p.carry >= 0) state.blocks[p.carry].life = other;
-      state.crossings++; sfx('cross'); events.push({ type: 'cross', life: other, t: state.t });
+  // Walk: up the screen is north
+  let ix = (down.has('ArrowRight') || down.has('KeyD') ? 1 : 0) - (down.has('ArrowLeft') || down.has('KeyA') ? 1 : 0);
+  let iz = (down.has('ArrowDown') || down.has('KeyS') ? 1 : 0) - (down.has('ArrowUp') || down.has('KeyW') ? 1 : 0);
+  p.moving = ix !== 0 || iz !== 0;
+  if (p.moving) {
+    if (ix && iz) { if (p.fx && !p.fz) { p.fx = ix; } else { p.fx = 0; p.fz = iz; } } // on a diagonal, keep the axis faced
+    else { p.fx = ix; p.fz = iz; }
+    const n = Math.hypot(ix, iz), dx = ix / n * tune.move_speed * dt, dz = iz / n * tune.move_speed * dt;
+    const want = Math.atan2(ix, iz); let da = want - p.ang;
+    while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    p.ang += da * Math.min(1, tune.turn_speed * dt); p.walk += dt * 13;
+    if (dx && !blocked(p.life, p.x + dx, p.z)) p.x += dx;
+    if (dz && !blocked(p.life, p.x, p.z + dz)) {
+      const oz = p.z; let nz = p.z + dz;
+      // Through an arch: the walker's middle passes the portal's line, and the life swaps
+      const pt = L.portals.find(o => Math.floor(p.x) === o.x && ((oz < o.zc && nz >= o.zc) || (oz > o.zc && nz <= o.zc)));
+      if (!pt) p.z = nz;
+      else {
+        nz = pt.zc + Math.sign(dz) * Math.max(Math.abs(nz - pt.zc), 0.02);
+        const other = 1 - p.life;
+        if (blocked(other, p.x, nz)) { if (!state.bonkT) { sfx('bonk'); state.bonkT = 0.4; } } // the other life is solid here
+        else {
+          pushUndo(); p.z = nz; p.life = other; if (p.carry >= 0) state.crates[p.carry].life = other;
+          state.flash = tune.flash_s; state.crossings++; sfx('cross'); events.push({ type: 'cross', life: other, t: state.t });
+        }
+      }
     }
-    break;
   }
-
-  // Jump and fall
-  p.coyote = p.ground ? tune.coyote_s : Math.max(0, p.coyote - dt);
-  p.buffer = pressed('Space') || pressed('ArrowUp') || pressed('KeyW') ? tune.jump_buffer_s : Math.max(0, p.buffer - dt);
-  if (p.buffer > 0 && p.coyote > 0) {
-    p.vy = -Math.sqrt(2 * tune.gravity * tune.jump_height * T); p.buffer = 0; p.coyote = 0; sfx('jump');
-  }
-  p.vy = Math.min(p.vy + tune.gravity * dt, 1400);
-  p.ground = false;
-  if (!slide(p, p.w, p.h, 0, p.vy * dt)) { if (p.vy > 0) p.ground = true; p.vy = 0; }
-  if (p.y > PLAY_H + 200) restore(state.undo.length ? state.undo[state.undo.length - 1] : state.first); // fell out: back, nothing lost
-
-  // Crates fall; a carried one rides overhead
-  state.blocks.forEach(b => {
-    if (b.carried) { b.x = p.x + p.w / 2 - T / 2; b.y = p.y - T + 2; b.vy = 0; return; }
-    b.vy = Math.min(b.vy + tune.gravity * dt, 1400);
-    if (!slide(b, T, T, 0, b.vy * dt, b)) b.vy = 0;
-  });
 
   updateSwitches(false);
   const lit = exitReachable();
-  if (lit && !state.lit) { sfx('lit'); state.litT = 0; events.push({ type: 'lit', t: state.t }); }
+  if (lit && !state.lit) { sfx('lit'); events.push({ type: 'lit', t: state.t }); }
   state.lit = lit;
-  if (p.life === L.exit.life && overlap(p.x, p.y, p.w, p.h, L.exit.tx * T + 6, (FLOOR - 2) * T, T - 12, 2 * T)) {
+  if (p.life === L.exit.life && Math.floor(p.x) === L.exit.x && Math.floor(p.z) === L.exit.z) {
     state.doneT = tune.level_done_s; state.lit = true; sfx('done'); events.push({ type: 'solved', level: state.li + 1, t: state.t });
   }
-  updateScarf();
+  updateCam(false);
 }
 
-// ---- Drawing: flat fills, one dark outline weight, glow on portals only ----------------------
-const OUT = 3;
-function mark(c, x, y, s, col, line) { // each switch and its door share a colour and a shape
-  ctx.fillStyle = col; ctx.strokeStyle = line; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
-  if (c === 'y') { ctx.moveTo(x, y - s); ctx.lineTo(x + s, y + s * 0.8); ctx.lineTo(x - s, y + s * 0.8); }
-  else if (c === 'u') { ctx.rect(x - s * 0.8, y - s * 0.8, s * 1.6, s * 1.6); }
-  else { ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); }
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-  if (c === 'u') { ctx.fillStyle = line; ctx.fillRect(x - s * 0.25, y - s * 0.25, s * 0.5, s * 0.5); }
+// ---- The 3D view: one scene per life, the other one seen through each portal ---------------
+const LOOK = [ // the colourful life, the red life
+  { name: 'Colourful life', bg: 0xbfe9ff, floor: [0x9be07a, 0x8ed56d], out: 0x84cc66, wall: 0xf6e2c3, cap: 0xffb3c7, water: 0x62c9f2, waterGlow: 0x0a3a55,
+    hemi: [0xffffff, 0x9ad68a, 2.3], sun: [0xfff4e0, 2.1], hud: '#35e0cf', ground: '#58c04a' },
+  { name: 'Red life', bg: 0x1d070c, floor: [0xb02a3c, 0x8a1c2b], out: 0x3a0b14, wall: 0x5a1626, cap: 0xff5c72, water: 0xff6a2a, waterGlow: 0xb02a00,
+    hemi: [0xffd0d0, 0x2a050b, 1.15], sun: [0xffb0a0, 1.5], hud: '#ff3b4a', ground: '#b3202a' },
+];
+const KEYCOL = { y: 0xffd23f, u: 0x4f8cff, g: 0x5fd068 };
+const GEO = {
+  box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(0.5, 18, 14), ico: new THREE.IcosahedronGeometry(0.5, 1),
+  cone: new THREE.ConeGeometry(0.5, 1, 7), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 22), cyl4: new THREE.CylinderGeometry(0.5, 0.5, 1, 4),
+  cyl3: new THREE.CylinderGeometry(0.5, 0.5, 1, 3), oct: new THREE.OctahedronGeometry(0.5), disc: new THREE.CircleGeometry(0.5, 20),
+  arch: new THREE.TorusGeometry(0.47, 0.07, 8, 20, Math.PI), ring: new THREE.TorusGeometry(0.5, 0.12, 8, 20),
+};
+const SHAPE = { y: GEO.cyl, u: GEO.cyl4, g: GEO.cyl3 }; // a switch and its door share a colour and a shape
+const maskShape = new THREE.Shape();
+maskShape.moveTo(-0.41, 0); maskShape.lineTo(-0.41, 1.9); maskShape.absarc(0, 1.9, 0.41, Math.PI, 0, true); maskShape.lineTo(0.41, 0); maskShape.closePath();
+GEO.mask = new THREE.ShapeGeometry(maskShape, 12);
+const matCache = {};
+function M(color, opts) { // shared, lit, flat-coloured
+  const k = color + JSON.stringify(opts || 0);
+  return matCache[k] || (matCache[k] = new THREE.MeshLambertMaterial(Object.assign({ color }, opts)));
 }
-function drawDoor(x, top, hFull, o, c, P) {
-  const h = hFull * (1 - o);
-  ctx.fillStyle = P.line; ctx.fillRect(x + 2, top - 6, T - 4, 8); // the lintel it slides into
-  if (h < 2) return;
-  ctx.fillStyle = P.key[c]; ctx.strokeStyle = P.line; ctx.lineWidth = OUT;
-  rr(x + 6, top, T - 12, h, 4); ctx.fill(); ctx.stroke();
-  ctx.save(); rr(x + 6, top, T - 12, h, 4); ctx.clip();
-  for (let y = top + hFull - 24 - o * hFull; y > top - 20; y -= 44) mark(c, x + T / 2, y, 8, P.line, P.line);
-  ctx.restore();
+const own = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts)); // for figures that show through a portal
+const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false });
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
+function add(parent, geo, mat, x, y, z, sx = 1, sy = sx, sz = sx) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m;
 }
-function drawSwitch(x0, floorY, c, on, P) {
-  ctx.fillStyle = P.line; ctx.fillRect(x0 + 4, floorY - 5, 2 * T - 8, 5);
-  ctx.fillStyle = P.key[c]; ctx.strokeStyle = P.line; ctx.lineWidth = OUT;
-  rr(x0 + 10, floorY - (on ? 7 : 13), 2 * T - 20, on ? 5 : 11, 3); ctx.fill(); ctx.stroke();
-  mark(c, x0 + T, floorY - (on ? 26 : 34), 9, P.key[c], P.line);
-}
-function drawExit(cx, floorY, lit, t, P) {
-  const w = 46, h = 74, x = cx - w / 2, y = floorY - h;
-  if (lit) { // flat rays, turning slowly
-    ctx.save(); ctx.translate(cx, y + h / 2); ctx.rotate(t * 0.6); ctx.fillStyle = P.exit; ctx.globalAlpha = 0.55;
-    for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(-7, -44); ctx.lineTo(7, -44); ctx.lineTo(0, -70 - 6 * Math.sin(t * 5 + i)); ctx.fill(); }
-    ctx.restore();
-  }
-  const path = () => { ctx.beginPath(); ctx.moveTo(x, floorY); ctx.lineTo(x, y + w / 2); ctx.arc(cx, y + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x + w, floorY); ctx.closePath(); };
-  ctx.fillStyle = P.line; ctx.strokeStyle = P.line; ctx.lineWidth = OUT + 6; ctx.lineJoin = 'round'; path(); ctx.stroke();
-  ctx.fillStyle = lit ? P.exit : P.exitOff; path(); ctx.fill();
-  ctx.strokeStyle = P.line; ctx.lineWidth = OUT;
-  if (lit) { ctx.beginPath(); ctx.moveTo(cx, y + 20); ctx.lineTo(cx + 10, y + 34); ctx.lineTo(cx, y + 48); ctx.lineTo(cx - 10, y + 34); ctx.closePath(); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.stroke(); }
-  else { ctx.beginPath(); ctx.moveTo(cx, y + 6); ctx.lineTo(cx, floorY); ctx.stroke(); ctx.fillStyle = P.line; ctx.fillRect(cx - 9, y + 40, 5, 5); ctx.fillRect(cx + 4, y + 40, 5, 5); }
-}
-function drawCrate(x, y, origin, P) {
-  ctx.fillStyle = P.crate; ctx.strokeStyle = P.line; ctx.lineWidth = OUT; ctx.lineJoin = 'round';
-  rr(x + 2, y + 2, T - 4, T - 2, 5); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = P.crate2; ctx.lineWidth = 3; ctx.beginPath();
-  if (origin === 0) { ctx.moveTo(x + 10, y + 10); ctx.lineTo(x + 30, y + 30); ctx.moveTo(x + 30, y + 10); ctx.lineTo(x + 10, y + 30); } // born colourful: a cross brace
-  else { ctx.moveTo(x + 20, y + 8); ctx.lineTo(x + 32, y + 20); ctx.lineTo(x + 20, y + 32); ctx.lineTo(x + 8, y + 20); ctx.closePath(); } // born red: a diamond
-  ctx.stroke();
-}
-function drawWalker(cx, footY, face, phase, moving, air, P, scarf, scarfCol) {
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  if (scarf) { // the trailing end
-    ctx.beginPath(); ctx.moveTo(scarf[0].x, scarf[0].y); for (const s of scarf) ctx.lineTo(s.x, s.y);
-    ctx.strokeStyle = P.line; ctx.lineWidth = 10; ctx.stroke(); ctx.strokeStyle = scarfCol; ctx.lineWidth = 5; ctx.stroke();
-  }
-  const sw = moving && !air ? Math.sin(phase) * 5 : 0, lift = air ? 4 : 0; // legs
-  ctx.strokeStyle = P.leg; ctx.lineWidth = 6;
-  ctx.beginPath(); ctx.moveTo(cx - 5, footY - 12); ctx.lineTo(cx - 5 + sw, footY - 2 - lift);
-  ctx.moveTo(cx + 5, footY - 12); ctx.lineTo(cx + 5 - sw, footY - 2 - lift); ctx.stroke();
-  const bob = moving && !air ? Math.abs(Math.sin(phase)) * 1.5 : 0;
-  ctx.fillStyle = P.body; ctx.strokeStyle = P.line; ctx.lineWidth = OUT;
-  rr(cx - 12, footY - 35 - bob, 24, 27, 11); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = scarfCol; rr(cx - 13, footY - 23 - bob, 26, 7, 3); ctx.fill(); ctx.stroke(); // the scarf's wrap
-  ctx.fillStyle = P.eye; ctx.fillRect(cx + face * 3 - 4, footY - 31 - bob, 3, 5); ctx.fillRect(cx + face * 3 + 3, footY - 31 - bob, 3, 5);
-}
-function archPath(px, base) {
-  const hw = 38, h = 118;
-  ctx.beginPath(); ctx.moveTo(px - hw, base); ctx.lineTo(px - hw, base - h + hw);
-  ctx.arc(px, base - h + hw, hw, Math.PI, 0); ctx.lineTo(px + hw, base); ctx.closePath();
-}
-function drawPortalFrame(px, base, P, O, t) { // P: the life it stands in, O: the life it shows
-  ctx.save(); archPath(px, base); ctx.clip(); // the seam itself, a line of light
-  ctx.strokeStyle = O.glow; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.setLineDash([5, 7]); ctx.lineDashOffset = -t * 22;
-  ctx.beginPath(); ctx.moveTo(px, base); ctx.lineTo(px, base - 120); ctx.stroke(); ctx.restore();
-  ctx.lineJoin = 'round';
-  archPath(px, base); ctx.strokeStyle = P.line; ctx.lineWidth = 11; ctx.stroke();
-  ctx.save(); if (!CHEAP) { ctx.shadowColor = O.glow; ctx.shadowBlur = 16 + 5 * Math.sin(t * 3); }
-  archPath(px, base); ctx.strokeStyle = '#fff6d8'; ctx.lineWidth = 5; ctx.stroke(); ctx.restore();
-  ctx.fillStyle = P.line; ctx.fillRect(px - 46, base - 6, 16, 6); ctx.fillRect(px + 30, base - 6, 16, 6);
-}
-function drawBackdrop(life, li) {
-  const P = PAL[life];
-  if (life === 0) { // a square sun on its corner, stepped clouds, far hills
-    ctx.fillStyle = '#fff6d8'; ctx.save(); ctx.translate(1010 - li * 150, 150); ctx.rotate(Math.PI / 4); ctx.fillRect(-48, -48, 96, 96); ctx.restore();
-    ctx.fillStyle = P.far;
-    for (let k = 0; k < 4; k++) { const x = (k * 340 + li * 90) % 1200 + 20, y = 210 + (k * 53 % 90); ctx.fillRect(x, y, 120, 22); ctx.fillRect(x + 24, y - 18, 64, 18); }
-    ctx.beginPath(); ctx.moveTo(0, FLOOR * T);
-    for (let k = 0; k <= 8; k++) ctx.lineTo(k * 160, FLOOR * T - 60 - ((k * 37 + li * 23) % 90));
-    ctx.lineTo(W, FLOOR * T); ctx.fill();
-    ctx.fillStyle = P.far2; ctx.beginPath(); ctx.moveTo(0, FLOOR * T);
-    for (let k = 0; k <= 10; k++) ctx.lineTo(k * 128, FLOOR * T - 20 - ((k * 53 + li * 31) % 50));
-    ctx.lineTo(W, FLOOR * T); ctx.fill();
-  } else { // a dark moon on its corner, shards rising from the floor
-    ctx.fillStyle = P.far2; ctx.save(); ctx.translate(250 + li * 150, 190); ctx.rotate(Math.PI / 4); ctx.fillRect(-56, -56, 112, 112); ctx.restore();
-    ctx.fillStyle = P.far;
-    for (let k = 0; k < 9; k++) { const x = k * 150 + (li * 40) % 90, h = 120 + ((k * 71 + li * 29) % 190); ctx.beginPath(); ctx.moveTo(x - 46, FLOOR * T); ctx.lineTo(x + 10, FLOOR * T - h); ctx.lineTo(x + 40, FLOOR * T); ctx.fill(); }
-    ctx.fillStyle = P.far2;
-    for (let k = 0; k < 12; k++) { const x = k * 112 + 30, h = 40 + ((k * 43 + li * 17) % 70); ctx.beginPath(); ctx.moveTo(x - 24, FLOOR * T); ctx.lineTo(x, FLOOR * T - h); ctx.lineTo(x + 24, FLOOR * T); ctx.fill(); }
+const camera = new THREE.PerspectiveCamera(44, W / H, 0.1, 140);
+const scenes = LOOK.map(P => {
+  const s = new THREE.Scene(); s.fog = new THREE.Fog(P.bg, 20, 46);
+  s.add(new THREE.HemisphereLight(P.hemi[0], P.hemi[1], P.hemi[2]));
+  const sun = new THREE.DirectionalLight(P.sun[0], P.sun[1]); sun.position.set(-4, 10, 6); s.add(sun);
+  add(s, GEO.sph, new THREE.MeshBasicMaterial({ color: P.bg, side: THREE.BackSide, fog: false }), 6, 0, 4, 120); // the sky, so a portal has one to show
+  return s;
+});
+const maskScene = new THREE.Scene();
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0), NOCLIP = [];
+const view = { worlds: [null, null], masks: [], crates: [], doors: [], switches: [], walker: null, exit: null };
+const hash = (x, z, k) => { let h = (x * 374761393 + z * 668265263 + k * 2246822519) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+
+function decor(g, life, x, z, y, r, tall) { // small things that make each life its own place
+  if (life === 0) {
+    if (tall && r < 0.4) { // a round tree, some in blossom
+      add(g, GEO.cyl, M(0x9a6b4a), x, y + 0.3, z, 0.16, 0.6, 0.16);
+      add(g, GEO.ico, M(r < 0.13 ? 0xffa6c9 : 0x5fc46a, { flatShading: true }), x, y + 0.95, z, 0.95);
+      add(g, GEO.ico, M(r < 0.13 ? 0xffc4dc : 0x7ad67c, { flatShading: true }), x + 0.12, y + 1.45, z - 0.05, 0.6);
+    } else if (r < 0.75) add(g, GEO.ico, M(0x6fcf72, { flatShading: true }), x, y + 0.14, z, 0.55, 0.36, 0.55); // a bush
+    else for (let i = 0; i < 3; i++) add(g, GEO.sph, M([0xfff06a, 0xff9ac1, 0xffffff][i]), x - 0.25 + i * 0.25, y + 0.08, z + (i % 2) * 0.2 - 0.1, 0.16); // flowers
+  } else {
+    if (tall && r < 0.4) { // a crystal spire
+      add(g, GEO.oct, M(0xff4d6d, { emissive: 0x7a0f24, flatShading: true }), x, y + 0.7, z, 0.5, 1.5, 0.5);
+      add(g, GEO.oct, M(0xff8a9c, { emissive: 0x7a0f24, flatShading: true }), x + 0.28, y + 0.3, z + 0.1, 0.28, 0.7, 0.28);
+    } else if (r < 0.75) { // a mushroom
+      add(g, GEO.cyl, M(0xffe3d6), x, y + 0.14, z, 0.14, 0.28, 0.14);
+      add(g, GEO.sph, M(0xff5066), x, y + 0.3, z, 0.5, 0.3, 0.5);
+    } else add(g, GEO.cone, M(0x7a1a2a, { flatShading: true }), x, y + 0.2, z, 0.3, 0.4, 0.3); // a thorn
   }
 }
-function drawLife(life) { // one whole life, as it is now, without the walker
-  const P = PAL[life], L = state.L, g = L.grid[life];
-  ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, PLAY_H);
-  drawBackdrop(life, state.li);
-  ctx.fillStyle = P.ground;
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (g[y][x]) ctx.fillRect(x * T, y * T, T + 0.5, T + 0.5);
-  const s = (x, y) => x < 0 || x >= GW || y >= GH || (y >= 0 && g[y][x]);
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (g[y][x] && !s(x, y - 1)) { ctx.fillStyle = P.cap; ctx.fillRect(x * T, y * T, T + 0.5, 9); }
-  ctx.fillStyle = P.line;
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (g[y][x]) {
-    if (y > 0 && !s(x, y - 1)) ctx.fillRect(x * T, y * T - OUT / 2, T, OUT);
-    if (!s(x, y + 1)) ctx.fillRect(x * T, y * T + T - OUT / 2, T, OUT);
-    if (!s(x - 1, y)) ctx.fillRect(x * T - OUT / 2, y * T, OUT, T);
-    if (!s(x + 1, y)) ctx.fillRect(x * T + T - OUT / 2, y * T, OUT, T);
+function buildWorld(life) {
+  const L = state.L, P = LOOK[life], g = new THREE.Group();
+  add(g, GEO.box, M(P.out), L.w / 2, -0.75, L.d / 2, 90, 0.4, 90); // the land around the room
+  for (let z = 0; z < L.d; z++) for (let x = 0; x < L.w; x++) {
+    const ch = L.grid[life][z][x], cx = x + 0.5, cz = z + 0.5, r = hash(x, z, life + state.li * 7);
+    if (ch === '~') { add(g, GEO.box, M(P.water, { emissive: P.waterGlow }), cx, -0.42, cz, 1, 0.2, 1); continue; }
+    add(g, GEO.box, M(P.floor[(x + z) % 2]), cx, -0.2, cz, 1, 0.4, 1);
+    if (ch === '#') {
+      const front = z === L.d - 1, h = front ? 0.25 : 0.8; // the wall nearest the camera is a low kerb
+      add(g, GEO.box, M(P.wall), cx, h / 2, cz, 1, h, 1); add(g, GEO.box, M(P.cap), cx, h + 0.05, cz, 1.04, 0.1, 1.04);
+      const edge = x === 0 || z === 0 || x === L.w - 1;
+      if (!front && r < 0.6) decor(g, life, cx, cz, h + 0.1, hash(x, z, 9 + life), edge);
+    } else if (r < 0.1 && !L.portals.some(o => o.x === x && o.z === z)) decor(g, life, cx, cz, 0, 0.8 + r, false);
   }
-  for (const d of L.doors) if (d.life === life) drawDoor(d.tx * T, DOOR_TOP * T, DOOR_H * T, d.o, d.c, P);
-  for (const w of L.switches) if (w.life === life) drawSwitch(w.tx * T, FLOOR * T, w.c, w.on, P);
-  if (L.exit.life === life) drawExit((L.exit.tx + 0.5) * T, FLOOR * T, state.lit, state.litT, P);
-  for (const b of state.blocks) if (b.life === life && !b.carried) drawCrate(b.x, b.y, b.origin, P);
-}
-function drawGhosts(life, P) { // what matters in the other life, as dashed outlines in this one
-  const L = state.L;
-  ctx.save(); ctx.globalAlpha = 0.45; ctx.strokeStyle = P.ghost; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
-  for (const d of L.doors) if (d.life === life && d.o < 1) { ctx.strokeRect(d.tx * T + 6, DOOR_TOP * T, T - 12, DOOR_H * T * (1 - d.o)); }
-  for (const w of L.switches) if (w.life === life) ctx.strokeRect(w.tx * T + 10, FLOOR * T - 13, 2 * T - 20, 11);
-  for (const b of state.blocks) if (b.life === life && !b.carried) { rr(b.x + 2, b.y + 2, T - 4, T - 2, 5); ctx.stroke(); }
-  if (L.exit.life === life) { const cx = (L.exit.tx + 0.5) * T; ctx.beginPath(); ctx.moveTo(cx - 23, FLOOR * T); ctx.lineTo(cx - 23, FLOOR * T - 51); ctx.arc(cx, FLOOR * T - 51, 23, Math.PI, 0); ctx.lineTo(cx + 23, FLOOR * T); ctx.stroke(); }
-  ctx.restore();
-}
-function drawLinks(P) { // a pressed switch sends dots along a line to its door
-  const L = state.L;
-  ctx.save(); ctx.lineWidth = 4; ctx.setLineDash([3, 13]); ctx.lineCap = 'round'; ctx.lineDashOffset = -state.t * 60;
-  for (const w of L.switches) if (w.on) for (const d of L.doors) if (d.c === w.c) {
-    const x0 = (w.tx + 1) * T, y0 = FLOOR * T - 50, x1 = (d.tx + 0.5) * T, y1 = DOOR_TOP * T - 14, my = Math.min(y0, y1) - 60;
-    for (const [col, lw] of [[P.line, 7], [P.key[w.c], 4]]) {
-      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.bezierCurveTo(x0, my, x1, my, x1, y1); ctx.stroke();
-    }
+  for (let i = 0; i < 46; i++) { // scenery beyond the walls, never in the way
+    const a = hash(i, life, 31) * Math.PI * 2, d = 2 + hash(i, life, 47) * 9;
+    const x = L.w / 2 + Math.cos(a) * (L.w / 2 + d), z = L.d / 2 + Math.sin(a) * (L.d / 2 + d) - 3;
+    if (x > -1.5 && x < L.w + 1.5 && z > -1.5 && z < L.d + 1.5) continue;
+    decor(g, life, x, z, -0.55, hash(i, life, 5) * 0.75, true);
   }
-  ctx.restore();
+  for (const o of L.portals) { // the arch stands in both lives
+    const m = M(0xfff3c4, { emissive: 0x6b5a2a });
+    add(g, GEO.box, m, o.x + 0.03, 0.95, o.zc, 0.12, 1.9, 0.14); add(g, GEO.box, m, o.x + 0.97, 0.95, o.zc, 0.12, 1.9, 0.14);
+    add(g, GEO.arch, m, o.x + 0.5, 1.9, o.zc, 1);
+    add(g, GEO.box, M(P.cap), o.x + 0.03, 0.06, o.zc, 0.26, 0.12, 0.3); add(g, GEO.box, M(P.cap), o.x + 0.97, 0.06, o.zc, 0.26, 0.12, 0.3);
+  }
+  return g;
 }
+function heroic(obj) { obj.traverse(o => { if (o.isMesh && o.material !== shadowMat) o.userData.hero = true; }); return obj; }
+function buildWalker() {
+  const g = new THREE.Group(), body = [own(0xffffff), own(0xffd6d6)], scarf = [own(0xff5a3c), own(0x3fd0c0)], dark = own(0x2b2233), leaf = own(0x6fcf72);
+  const part = (geo, m, x, y, z, sx, sy, sz) => { const o = add(g, geo, Array.isArray(m) ? m[0] : m, x, y, z, sx, sy, sz); if (Array.isArray(m)) o.userData.m = m; return o; };
+  part(GEO.sph, body, 0, 0.44, 0, 0.6, 0.66, 0.6);
+  part(GEO.sph, dark, -0.11, 0.52, 0.26, 0.09, 0.12, 0.06); part(GEO.sph, dark, 0.11, 0.52, 0.26, 0.09, 0.12, 0.06); // eyes
+  g.userData.feet = [part(GEO.sph, dark, -0.14, 0.07, 0.03, 0.2, 0.14, 0.26), part(GEO.sph, dark, 0.14, 0.07, 0.03, 0.2, 0.14, 0.26)];
+  const wrap = part(GEO.ring, scarf, 0, 0.3, 0, 0.5, 0.5, 0.5); wrap.rotation.x = Math.PI / 2;
+  g.userData.tail = part(GEO.box, scarf, 0.12, 0.3, -0.36, 0.12, 0.07, 0.34);
+  part(GEO.cone, leaf, 0, 0.84, 0, 0.12, 0.22, 0.12); // a sprout on its head
+  heroic(g);
+  const sh = add(g, GEO.disc, shadowMat, 0, 0.02, 0, 0.62); sh.rotation.x = -Math.PI / 2;
+  return g;
+}
+function buildCrate(origin) {
+  const g = new THREE.Group(), col = origin ? 0xe0455a : 0xffa94d, lite = origin ? 0xffa3ad : 0xffd9a0;
+  add(g, GEO.box, own(col), 0, 0.36, 0, 0.72); add(g, GEO.box, own(lite), 0, 0.73, 0, 0.5, 0.05, 0.5);
+  if (origin) add(g, GEO.oct, own(lite), 0, 0.86, 0, 0.22);                         // born red: a gem on top
+  else add(g, GEO.box, own(col), 0, 0.78, 0, 0.2, 0.08, 0.2).rotation.y = Math.PI / 4; // born colourful: a stud on top
+  heroic(g);
+  const sh = add(g, GEO.disc, shadowMat, 0, 0.02, 0, 0.95); sh.rotation.x = -Math.PI / 2;
+  return g;
+}
+function buildView() {
+  view.worlds.forEach((w, i) => { if (w) scenes[i].remove(w); view.worlds[i] = buildWorld(i); scenes[i].add(view.worlds[i]); });
+  view.masks.forEach(m => maskScene.remove(m));
+  view.masks = state.L.portals.map((o, i) => add(maskScene, GEO.mask, new THREE.MeshBasicMaterial({
+    colorWrite: false, depthWrite: false, side: THREE.DoubleSide, stencilWrite: true, stencilRef: i + 1,
+    stencilFunc: THREE.EqualStencilFunc, stencilFuncMask: 0x80, stencilZPass: THREE.ReplaceStencilOp }), o.x + 0.5, 0, o.zc));
+  view.walker = buildWalker();
+  view.crates = state.crates.map(c => ({ g: buildCrate(c.origin), ghost: new THREE.Mesh(GEO.box, ghostMat) }));
+  view.crates.forEach(v => v.ghost.scale.setScalar(0.72));
+  view.doors = state.doors.map(d => {
+    const g = new THREE.Group(), w = view.worlds[d.life];
+    add(g, GEO.box, M(KEYCOL[d.c]), 0, 0.6, 0, 0.9, 1.2, 0.9); add(g, GEO.box, M(0xffffff), 0, 0.6, 0, 0.94, 0.1, 0.94);
+    add(g, SHAPE[d.c], M(KEYCOL[d.c]), 0, 1.3, 0, 0.5, 0.2, 0.5);
+    g.position.set(d.x + 0.5, 0, d.z + 0.5); w.add(g);
+    add(w, GEO.box, M(0x3a3340), d.x + 0.5, 0.01, d.z + 0.5, 1, 0.04, 1); // the slot it sinks into
+    const ghost = add(view.worlds[1 - d.life], GEO.box, ghostMat, d.x + 0.5, 0.6, d.z + 0.5, 0.9, 1.2, 0.9);
+    return { g, ghost };
+  });
+  view.switches = state.switches.map(s => {
+    const w = view.worlds[s.life];
+    add(w, GEO.cyl, M(0x3a3340), s.x + 0.5, 0.03, s.z + 0.5, 0.92, 0.06, 0.92);
+    const plate = add(w, SHAPE[s.c], M(KEYCOL[s.c]), s.x + 0.5, 0.1, s.z + 0.5, 0.74, 0.12, 0.74);
+    add(view.worlds[1 - s.life], SHAPE[s.c], ghostMat, s.x + 0.5, 0.08, s.z + 0.5, 0.74, 0.1, 0.74);
+    return { plate };
+  });
+  const e = state.L.exit, w = view.worlds[e.life];
+  add(w, GEO.cyl, M(0xf3ead8), e.x + 0.5, 0.08, e.z + 0.5, 0.8, 0.16, 0.8);
+  view.exit = { star: add(w, GEO.oct, new THREE.MeshBasicMaterial({ color: 0x8a8fa0 }), e.x + 0.5, 0.85, e.z + 0.5, 0.5, 0.75, 0.5),
+    halo: add(w, GEO.ring, new THREE.MeshBasicMaterial({ color: 0xfff6a8 }), e.x + 0.5, 0.2, e.z + 0.5, 0.75, 0.75, 0.3) };
+  view.exit.halo.rotation.x = Math.PI / 2;
+  add(view.worlds[1 - e.life], GEO.oct, ghostMat, e.x + 0.5, 0.85, e.z + 0.5, 0.5, 0.75, 0.5);
+}
+function syncView() { // put every figure where the state says it is
+  const p = state.p, t = state.t, wk = view.walker;
+  view.worlds[p.life].add(wk);
+  const hop = p.moving ? Math.abs(Math.sin(p.walk)) * 0.09 : Math.sin(t * 3) * 0.012;
+  wk.position.set(p.x, hop, p.z); wk.rotation.y = p.ang;
+  wk.traverse(o => { if (o.userData.m) o.material = o.userData.m[p.life]; });
+  wk.userData.feet.forEach((f, i) => { f.position.z = 0.03 + (p.moving ? Math.sin(p.walk + i * Math.PI) * 0.1 : 0); });
+  wk.userData.tail.rotation.x = p.moving ? -0.5 + Math.sin(t * 16) * 0.15 : Math.sin(t * 2) * 0.08;
+  state.crates.forEach((c, i) => {
+    const v = view.crates[i];
+    view.worlds[c.life].add(v.g); view.worlds[1 - c.life].add(v.ghost);
+    if (c.carried) v.g.position.set(p.x, 0.98 + hop, p.z);
+    else v.g.position.set(c.x + 0.5, c.sunk ? -0.8 : 0, c.z + 0.5);
+    v.g.rotation.y = c.carried ? p.ang : 0;
+    v.g.children[v.g.children.length - 1].visible = !c.carried && !c.sunk; // its shadow
+    v.ghost.visible = !c.carried && !c.sunk; v.ghost.position.set(c.x + 0.5, 0.36, c.z + 0.5);
+  });
+  state.doors.forEach((d, i) => { const v = view.doors[i]; v.g.position.y = -d.o * 1.42; v.ghost.position.y = 0.6 - d.o * 1.42; v.ghost.visible = d.o < 0.9; });
+  state.switches.forEach((s, i) => { view.switches[i].plate.position.y = s.on ? 0.05 : 0.1; });
+  const ex = view.exit, lit = state.lit;
+  ex.star.material.color.setHex(lit ? 0xfff06a : 0x8a8fa0); ex.star.rotation.y = t * (lit ? 2.4 : 0.5);
+  ex.star.position.y = 0.85 + (lit ? Math.sin(t * 4) * 0.1 : 0); ex.halo.visible = lit; ex.halo.scale.setScalar(0.75 + Math.sin(t * 5) * 0.06);
+  const c = state.cam;
+  camera.fov = tune.cam_fov; camera.updateProjectionMatrix();
+  camera.position.set(c.x, tune.cam_height, c.z + tune.cam_back); camera.lookAt(c.x, 0.3, c.z - 0.4);
+}
+function setStencil(sc, ref) {
+  sc.traverse(o => {
+    const m = o.material; if (!m) return;
+    if (ref) { m.stencilWrite = true; m.stencilFunc = THREE.EqualStencilFunc; m.stencilRef = ref; m.stencilFuncMask = 0xff; m.stencilZPass = THREE.KeepStencilOp; } // only inside a portal
+    else if (o.userData.hero) { m.stencilWrite = true; m.stencilFunc = THREE.AlwaysStencilFunc; m.stencilRef = 0x80; m.stencilFuncMask = 0xff; m.stencilZPass = THREE.ReplaceStencilOp; } // never hidden by a portal
+    else m.stencilWrite = false;
+  });
+}
+function render3d() {
+  const cur = state.p.life, oth = 1 - cur;
+  syncView();
+  renderer.clippingPlanes = NOCLIP; setStencil(scenes[cur], 0);
+  renderer.setClearColor(LOOK[cur].bg, 1); renderer.clear(true, true, true);
+  renderer.render(scenes[cur], camera);                                   // this life
+  view.masks.forEach((m, i) => { view.masks.forEach((k, j) => { k.visible = i === j; }); renderer.render(maskScene, camera); }); // mark each arch's opening
+  renderer.clearDepth();
+  const hidden = []; view.worlds[oth].traverse(o => { if (o.material === ghostMat && o.visible) { o.visible = false; hidden.push(o); } });
+  state.L.portals.forEach((o, i) => {                                     // the other life, only inside the arch and only beyond it
+    const s = camera.position.z >= o.zc ? 1 : -1;
+    clip.normal.set(0, 0, -s); clip.constant = s * o.zc; renderer.clippingPlanes = [clip];
+    setStencil(scenes[oth], i + 1); renderer.render(scenes[oth], camera);
+  });
+  hidden.forEach(o => { o.visible = true; }); renderer.clippingPlanes = NOCLIP;
+}
+const v3 = new THREE.Vector3();
+function toScreen(x, y, z) { v3.set(x, y, z).project(camera); return [(v3.x + 1) / 2 * W, (1 - v3.y) / 2 * H]; }
+
+// ---- The HUD, over the world ------------------------------------------------------------------
 function keycap(label, x, y) {
-  ctx.fillStyle = '#12161c'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; rr(x - 15, y - 15, 30, 30, 6); ctx.fill(); ctx.stroke();
-  text(label, x, y + 1, 20, '#ffffff', 'center', 'bold');
+  ctx.fillStyle = '#12161c'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; rr(x - 16, y - 16, 32, 32, 7); ctx.fill(); ctx.stroke();
+  text(label, x, y + 1, 21, '#ffffff', 'center', 'bold');
 }
 function pill(s, x, y, size) {
-  ctx.font = `${size}px ${FONT}`; const w = ctx.measureText(s).width + 36;
+  ctx.font = ` ${size}px ${FONT}`; const w = ctx.measureText(s).width + 40;
   ctx.fillStyle = 'rgba(12,14,18,0.92)'; rr(x - w / 2, y - size, w, size * 2, size); ctx.fill();
   text(s, x, y + 1, size, '#ffffff');
 }
 function drawHud() {
-  const P = PAL[state.p.life];
-  ctx.fillStyle = '#0c0e12'; ctx.fillRect(0, PLAY_H, W, H - PLAY_H);
-  ctx.fillStyle = P.glow; ctx.fillRect(0, PLAY_H, W, 4);
-  text(`Room ${state.li + 1} of ${LEVELS.length}: ${state.L.def.name}`, 28, PLAY_H + 42, 22, '#ffffff', 'left');
-  // which life: a square on its corner, filled in the life's ground colour
-  ctx.save(); ctx.translate(560, PLAY_H + 42); ctx.rotate(Math.PI / 4); ctx.fillStyle = P.ground; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  const P = LOOK[state.p.life], y = H - 32;
+  ctx.fillStyle = '#0c0e12'; ctx.fillRect(0, H - 64, W, 64);
+  ctx.fillStyle = P.hud; ctx.fillRect(0, H - 64, W, 4);
+  text(`Room ${state.li + 1} of ${LEVELS.length}: ${state.L.def.name}`, 28, y + 2, 22, '#ffffff', 'left');
+  ctx.save(); ctx.translate(560, y + 2); ctx.rotate(Math.PI / 4); ctx.fillStyle = P.ground; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
   ctx.fillRect(-10, -10, 20, 20); ctx.strokeRect(-10, -10, 20, 20); ctx.restore();
-  text(P.name, 584, PLAY_H + 42, 22, '#ffffff', 'left', 'bold');
-  text('E carry   Z undo   R restart   P pause   M ' + (muted ? 'sound on' : 'mute'), W - 28, PLAY_H + 42, 18, '#c9d2dc', 'right');
+  text(P.name, 584, y + 2, 22, '#ffffff', 'left', 'bold');
+  text('E carry   Z undo   R restart   P pause   M ' + (muted ? 'sound on' : 'mute'), W - 28, y + 2, 18, '#c9d2dc', 'right');
 }
 function drawPlay() {
-  const p = state.p, L = state.L, cur = p.life, other = 1 - cur, P = PAL[cur], base = FLOOR * T;
-  drawLife(cur);
-  for (const px of L.portals) { // each portal is a window: the other life, live
-    ctx.save(); archPath(px, base); ctx.clip(); drawLife(other); ctx.restore();
-    drawPortalFrame(px, base, P, PAL[other], state.t);
+  render3d();
+  ctx.clearRect(0, 0, W, H);
+  if (state.flash > 0) { // the crossing: the life just entered blooms over the screen and clears
+    ctx.fillStyle = LOOK[state.p.life].hud; ctx.globalAlpha = 0.55 * (state.flash / tune.flash_s) ** 2; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
   }
-  drawGhosts(other, P);
-  drawLinks(P);
-  if (state.wipe) { // the life just left shrinks away from the portal crossed
-    const w = state.wipe, k = w.t / tune.wipe_s, r = (1 - Math.pow(1 - k, 3)) * 1500;
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, PLAY_H); ctx.arc(w.x, w.y, r, 0, Math.PI * 2, true); ctx.clip('evenodd');
-    drawLife(w.from); ctx.restore();
-    ctx.strokeStyle = '#fff6d8'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(w.x, w.y, r, 0, Math.PI * 2); ctx.stroke();
-  }
-  // the walker; near a seam the scarf already takes the other life's colour
-  const pc = p.x + p.w / 2, near = L.portals.some(px => Math.abs(px - pc) < 0.9 * T && p.y + p.h > base - tune.portal_tall * T);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, PLAY_H); ctx.clip();
-  if (p.carry >= 0) { const b = state.blocks[p.carry]; drawCrate(b.x, b.y, b.origin, P); }
-  drawWalker(pc, p.y + p.h, p.face, p.walk, p.moving, !p.ground, P, state.scarf, near ? PAL[other].scarf : P.scarf);
-  ctx.restore();
   const r = reachable();
-  if (r >= 0 && !state.doneT) keycap('E', state.blocks[r].x + T / 2, state.blocks[r].y - 26);
-  const stuck = L.def.stuck && L.def.stuck(state);
-  if (stuck) pill('No way back from here without the crate: Z takes a move back', W / 2, 44, 20);
+  if (r >= 0 && !state.doneT) { const c = state.crates[r], [sx, sy] = toScreen(c.x + 0.5, 1.25, c.z + 0.5); keycap('E', sx, sy); }
+  if (state.crates.filter(c => !c.sunk).length < state.switches.length) pill('That crate was needed for a switch: Z takes a move back', W / 2, 44, 20);
   else if (state.idle > tune.stuck_prompt_s) pill('Stuck? Z takes a move back, R restarts the room', W / 2, 44, 20);
-  if (state.doneT > 0) { ctx.fillStyle = PAL[L.exit.life].exit; ctx.globalAlpha = 0.5 * (1 - state.doneT / tune.level_done_s); ctx.fillRect(0, 0, W, PLAY_H); ctx.globalAlpha = 1; }
+  if (state.doneT > 0) { ctx.fillStyle = '#fff6a8'; ctx.globalAlpha = 0.6 * (1 - state.doneT / tune.level_done_s); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   drawHud();
 }
 
-const scenes = {
+const scenes2d = {
   figures: { // everything that acts in the game, side by side, each with its name
     update(dt) { state.t += dt; },
     draw() {
-      const A = PAL[0], B = PAL[1], y = 400;
-      ctx.fillStyle = A.bg; ctx.fillRect(0, 0, W / 2, H); ctx.fillStyle = B.bg; ctx.fillRect(W / 2, 0, W / 2, H);
-      ctx.fillStyle = A.ground; ctx.fillRect(0, y, W / 2, 60); ctx.fillStyle = A.cap; ctx.fillRect(0, y, W / 2, 9);
-      ctx.fillStyle = B.ground; ctx.fillRect(W / 2, y, W / 2, 60); ctx.fillStyle = B.cap; ctx.fillRect(W / 2, y, W / 2, 9);
-      const items = [
-        ['Walker', (x, P) => drawWalker(x, y, 1, 1, false, false, P, null, P.scarf)],
-        ['Crate, born colourful', (x, P) => drawCrate(x - 20, y - 40, 0, P)],
-        ['Crate, born red', (x, P) => drawCrate(x - 20, y - 40, 1, P)],
-        ['Switch', (x, P) => drawSwitch(x - 40, y, 'y', false, P)],
-        ['Door', (x, P) => drawDoor(x - 20, y - 200, 200, 0, 'y', P)],
-        ['Portal', (x, P, O) => { ctx.save(); archPath(x, y); ctx.clip(); ctx.fillStyle = O.bg; ctx.fillRect(x - 50, y - 130, 100, 130); ctx.fillStyle = O.ground; ctx.fillRect(x - 50, y - 30, 100, 30); ctx.restore(); drawPortalFrame(x, y, P, O, state.t); }],
-        ['Exit, lit', (x, P) => drawExit(x, y, true, 1, P)],
-      ];
-      [[A, B, 0], [B, A, W / 2]].forEach(([P, O, ox]) => {
-        text(P.name, ox + W / 4, 60, 30, P === A ? A.line : '#ffffff', 'center', 'bold');
-        items.forEach(([name, fn], i) => {
-          const x = ox + 60 + i * 88; fn(x, P, O);
-          ctx.save(); ctx.translate(x, y + 76); ctx.rotate(Math.PI / 5); text(name, 0, 0, 18, P === A ? A.line : '#ffffff', 'left'); ctx.restore();
-        });
-      });
+      render3d(); ctx.clearRect(0, 0, W, H);
+      const row = [[2, 2.4, 'Walker'], [4, 2.4, 'Crate, born colourful'], [6.4, 2.4, 'Crate, born red'], [2, 5.5, 'Switch'], [4, 5.5, 'Door'], [6, 5.5, 'Portal'], [8, 5.5, 'Exit']];
+      row.forEach(([x, z, name]) => { const [sx, sy] = toScreen(x + 0.5, 0, z); pill(name, sx, sy, 18); });
+      pill('Colourful life; the red life shows through the portal', W / 2, 40, 22);
     },
   },
   title: {
     update(dt) { state.t += dt; if (pressed('Enter') || pressed('Space')) { reset(); scene = 'play'; } },
     draw() {
-      const A = PAL[0], B = PAL[1], gy = 560;
-      ctx.fillStyle = A.bg; ctx.fillRect(0, 0, W / 2, H); ctx.fillStyle = B.bg; ctx.fillRect(W / 2, 0, W / 2, H);
-      ctx.fillStyle = '#fff6d8'; ctx.save(); ctx.translate(170, 130); ctx.rotate(Math.PI / 4); ctx.fillRect(-40, -40, 80, 80); ctx.restore();
-      ctx.fillStyle = B.far2; ctx.save(); ctx.translate(1110, 130); ctx.rotate(Math.PI / 4); ctx.fillRect(-46, -46, 92, 92); ctx.restore();
-      ctx.fillStyle = A.ground; ctx.fillRect(0, gy, W / 2, H - gy); ctx.fillStyle = A.cap; ctx.fillRect(0, gy, W / 2, 9);
-      ctx.fillStyle = B.ground; ctx.fillRect(W / 2, gy, W / 2, H - gy); ctx.fillStyle = B.cap; ctx.fillRect(W / 2, gy, W / 2, 9);
-      ctx.fillStyle = A.line; ctx.fillRect(0, gy - 1, W / 2, OUT); ctx.fillStyle = B.line; ctx.fillRect(W / 2, gy - 1, W / 2, OUT);
-      // the seam down the middle, and a portal on it
-      ctx.save(); archPath(W / 2, gy); ctx.clip(); ctx.fillStyle = B.bg; ctx.fillRect(W / 2 - 40, gy - 120, 40, 120); ctx.fillStyle = A.bg; ctx.fillRect(W / 2, gy - 120, 40, 120); ctx.restore();
-      drawPortalFrame(W / 2, gy, A, B, state.t);
-      drawWalker(W / 2 - 110, gy, 1, state.t * 6, false, false, A, null, A.scarf);
-      drawCrate(W / 2 - 220, gy - 40, 0, A);
-      drawWalker(W / 2 + 110, gy, -1, state.t * 6, false, false, B, null, B.scarf);
-      drawCrate(W / 2 + 180, gy - 40, 1, B);
-      text('Two', W / 2 - 6, 130, 110, A.line, 'right', 'bold'); text('fold', W / 2 + 6, 130, 110, '#ffffff', 'left', 'bold');
-      text('one room, two lives', W / 2 - 16, 210, 26, A.line, 'right'); text('walk between them', W / 2 + 16, 210, 26, '#ffd6d6', 'left');
-      ['A / D or arrows: walk', 'W, Up or Space: jump', 'E: pick up or put down a crate'].forEach((c, i) => text(c, 300, 290 + i * 40, 24, A.line));
-      ['Z: undo, as often as you like', 'R: restart the room (Z brings it back)', 'P: pause     M: mute'].forEach((c, i) => text(c, 980, 290 + i * 40, 24, '#ffffff'));
-      ctx.fillStyle = '#0c0e12'; ctx.fillRect(0, H - 80, W, 80);
-      text('Enter to start', W / 2, H - 40, 28, '#ffffff', 'center', 'bold');
+      render3d(); ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(12,14,18,0.84)'; rr(W / 2 - 400, 70, 800, 580, 28); ctx.fill();
+      ctx.fillStyle = '#35e0cf'; ctx.fillRect(W / 2 - 150, 222, 150, 5); ctx.fillStyle = '#ff3b4a'; ctx.fillRect(W / 2, 222, 150, 5);
+      text(TITLE, W / 2, 150, 104, '#ffffff', 'center', 'bold');
+      text('one room, two lives: walk through an arch to change life', W / 2, 262, 24, '#fff3c4');
+      ['W A S D or arrows: walk', 'E or Space: pick up a crate, or put it down ahead', 'Z: undo, as often as you like',
+        'R: restart the room (Z brings it back)', 'P: pause     M: mute'].forEach((c, i) => text(c, W / 2, 330 + i * 42, 24, '#ffffff'));
+      text('Enter to start', W / 2, 590, 30, '#fff06a', 'center', 'bold');
     },
   },
   play: {
@@ -640,19 +606,19 @@ const scenes = {
   pause: {
     update() { if (pressed('KeyP') || pressed('Escape')) scene = 'play'; },
     draw() {
-      drawPlay(); ctx.fillStyle = 'rgba(12,14,18,0.8)'; ctx.fillRect(0, 0, W, PLAY_H);
-      text('Paused', W / 2, PLAY_H / 2 - 20, 56, '#ffffff', 'center', 'bold'); text('P to carry on', W / 2, PLAY_H / 2 + 40, 26, '#c9d2dc');
+      drawPlay(); ctx.fillStyle = 'rgba(12,14,18,0.8)'; ctx.fillRect(0, 0, W, H - 64);
+      text('Paused', W / 2, H / 2 - 50, 56, '#ffffff', 'center', 'bold'); text('P to carry on', W / 2, H / 2 + 10, 26, '#c9d2dc');
     },
   },
   results: {
     update(dt) { state.t += dt; if (pressed('Enter')) { params.delete('level'); reset(); scene = 'play'; } },
     draw() {
-      drawPlay(); ctx.fillStyle = 'rgba(12,14,18,0.86)'; ctx.fillRect(0, 0, W, H);
-      drawWalker(W / 2 - 40, 200, 1, 0, false, false, PAL[0], null, PAL[0].scarf); drawWalker(W / 2 + 40, 200, -1, 0, false, false, PAL[1], null, PAL[1].scarf);
-      text(state.gained || 'You walked both lives', W / 2, 290, 56, '#ffffff', 'center', 'bold');
-      text(`All ${LEVELS.length} rooms solved`, W / 2, 370, 28, '#fff6d8');
-      text(`${state.crossings} crossings between lives, ${state.undos} moves taken back`, W / 2, 420, 24, '#c9d2dc');
-      text('Enter to play again', W / 2, 520, 28, '#ffffff', 'center', 'bold');
+      render3d(); ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(12,14,18,0.86)'; ctx.fillRect(0, 0, W, H);
+      text(state.gained || 'You walked both lives', W / 2, 250, 56, '#ffffff', 'center', 'bold');
+      text(`All ${LEVELS.length} rooms solved`, W / 2, 330, 28, '#fff06a');
+      text(`${state.crossings} crossings between lives, ${state.undos} moves taken back`, W / 2, 380, 24, '#c9d2dc');
+      text('Enter to play again', W / 2, 480, 28, '#ffffff', 'center', 'bold');
     },
   },
 };
@@ -660,7 +626,7 @@ const scenes = {
 // ---- Loop: fixed step, frame time clamped ---------------------------------------------
 function step() {
   if (pressed('KeyM')) { setMuted(!muted); hit.delete('KeyM'); }
-  scenes[scene].update(STEP); hit.clear();
+  scenes2d[scene].update(STEP); hit.clear();
 }
 let last, acc = 0, ALPHA = 1;
 function tick() {
@@ -670,7 +636,7 @@ function tick() {
   ALPHA = acc / STEP;
   drawFrame();
 }
-function drawFrame() { scenes[scene].draw(); }
+function drawFrame() { scenes2d[scene].draw(); }
 function frame() { tick(); requestAnimationFrame(frame); }
 // A headless browser on a time budget runs timers but almost no animation frames: a timer
 // ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
@@ -689,8 +655,10 @@ window.game = {
   },
 };
 
+addEventListener('resize', fit); fit();
 reset();
 scene = params.get('scene') || 'title';
+if (scene === 'figures') loadLevel(0, FIGURES);
 last = clock.now();
 if (params.get('manual') === '1') drawFrame();
 else { requestAnimationFrame(frame); setInterval(timer, 50); }

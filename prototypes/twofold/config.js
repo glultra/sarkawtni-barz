@@ -8,18 +8,17 @@ window.CONFIG = {
   volume: { value: 0.5, min: 0, max: 1, step: 0.05 },
 
   // The walker
-  move_speed: { value: 230, min: 120, max: 400, step: 10 },     // px per second (a tile is 40 px)
-  gravity: { value: 1900, min: 800, max: 3200, step: 50 },      // px per second squared
-  jump_height: { value: 1.3, min: 1.05, max: 1.9, step: 0.05 }, // tiles; under 2 so a 2-tile wall needs a crate
-  coyote_s: { value: 0.1, min: 0, max: 0.25, step: 0.01 },      // seconds a jump still works after leaving a ledge
-  jump_buffer_s: { value: 0.12, min: 0, max: 0.25, step: 0.01 },// seconds an early jump press is remembered
+  move_speed: { value: 4.2, min: 2, max: 8, step: 0.1 },        // tiles per second
+  turn_speed: { value: 14, min: 4, max: 30, step: 1 },          // how fast the walker turns to face its way, per second
 
-  // Crates
-  pickup_reach: { value: 1.5, min: 1, max: 2.5, step: 0.1 },    // tiles, sideways, from the walker's middle
+  // The camera: a fixed tilt from the south, leaning toward the walker
+  cam_height: { value: 10.5, min: 6, max: 16, step: 0.5 },     // tiles above the floor
+  cam_back: { value: 6.5, min: 3, max: 12, step: 0.5 },       // tiles south of what it looks at
+  cam_fov: { value: 46, min: 30, max: 70, step: 1 },            // degrees
+  cam_follow: { value: 0.35, min: 0, max: 1, step: 0.05 },      // 0 looks at the room's middle, 1 at the walker
 
   // Portals
-  portal_tall: { value: 4, min: 3, max: 6, step: 1 },           // tiles above the floor the seam reaches (blocks jumping over it)
-  wipe_s: { value: 0.45, min: 0.1, max: 1.2, step: 0.05 },      // seconds the other life takes to spread from the portal
+  flash_s: { value: 0.4, min: 0.1, max: 1.2, step: 0.05 },      // seconds the crossing flash lasts
 
   // Doors
   door_open_speed: { value: 4, min: 1, max: 12, step: 0.5 },    // door travel per second (1 = fully open)
