@@ -13,11 +13,15 @@ After play: dude i asked the game is short yet i want maybe 20-50 levels with mo
 
 After play: rollback to 2D pleasse i hate this one ! and improve more with more levels and make it more enjoyable and up to 50 levels ultimate hard levels included ! and if u can add guns or some mechanical inputs this would make it perfect ! but in some levels not all where required ! and add the kurdish song as well u forgot it !
 
+After play: i played it this is was so good but we need to add a nice main menu and add co-op please so in co-op mode we will race togather the game maybe up to 5 player and i create session and share the room id so other players can join me through website isn't it fun ?  i will host it from my pc maybe ! and on the game always indicate where are the other players and i recommend making the game abit fun by pushing other players or hold other players like sos ops !and the game will be a bit more difficult and fun to play what do u say buddy ? and mechanicals more fun to play and  collisions better and physic i like it a bit but if u can improve why not ! so i guess 2D with this idea will be perfect for me to attract viewers what do u say !?
+
+Co-op: Both (a server on my PC, and bots in the empty seats)
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of fifty levels
 
-**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, P to pause, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
+**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, P to pause, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: E to shove the climber beside you, Q to hold them still. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
 
 **Question:** Is one long, punishing climb fun to play and to watch for an hour? *(guessed)*
 
@@ -63,6 +67,13 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A tune for each world, made in code, with a slot for your own song in each
 - [x] The climb is kept at every level, to continue after closing the game
 - [x] A gold star to collect on every level
+- [x] A main menu: climb alone, race the bots, make a room, join a room, your name, check a code
+- [x] A race of up to five to a level the host picks, with a countdown and live standings
+- [x] Rooms with a code, served from your own PC by server.js, for players on your Wi-Fi or through a tunnel
+- [x] Four named bots that race, slip, and shove you
+- [x] Shove and grab: E throws the climber beside you sideways, Q holds them still
+- [x] The other climbers always shown: names overhead, arrows at the screen's edge with the distance, dots on the height bar
+- [x] Fans whose column of air lifts you; a held jump hangs a moment at its top; a jump keeps the speed of a moving ledge
 - [x] Falls that drop you to what is below, with gold rest floors that catch long falls
 - [x] Forgiving jump: late jumps, early presses and hold-to-jump-higher
 - [x] Height, timer and fall counter always on screen, with a side height bar
@@ -75,11 +86,16 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - parkour · in the slice
 - up to 50 levels ultimate hard levels included · in the slice
 - guns or some mechanical inputs · in the slice
+- a nice main menu · in the slice
+- co-op: race togather up to 5 player, i create session and share the room id · in the slice
+- always indicate where are the other players · in the slice
+- pushing other players or hold other players · in the slice
 - the kurdish song · thin stand-in
 - who wins against me i give a gift · thin stand-in *(guessed)*
 
 ## Keep
--
+- i played it this is was so good *(you said)*
+- 2D with this idea will be perfect for me *(you said)*
 
 ## Avoid
 - duel maybe not makes sense
@@ -87,7 +103,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - the game or the idea shouldn't be short
 
 ## Out of scope
-- A shared online leaderboard: needs a server: not built yet
+- A shared online leaderboard kept between races: needs a server that is always on: not built yet
+- Players in a room share positions, shoves and the finish, not the machines: each player's gates, crumbling ledges and turrets are their own
 - Real TikTok chat or gift connection: needs a server: not built yet
 - A ghost of your best run: change it after play
 - A speedrun split timer per level: change it after play
