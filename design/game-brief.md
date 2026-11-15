@@ -21,11 +21,13 @@ After play: dont run the game kill the server u ran ! i run it myself ! i need a
 
 After play: make the ui ux of the menu as simple as u can so i can enter my name before joining the session
 
+After play: add english language as well and show language selection on the menu ,  make sure i can play with controller ps5 and xbox controllers and make sure it is playable on mobile with nice ui ux of mechanical inputs please ! since on keyboard pressing q/e is a bit hard i prefer using mouse buttons, and how do i join on mobile on local ? i opened my ip with the port which didnt open it for me :(
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of fifty levels
 
-**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: E to shove the climber beside you, Q to hold them still. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
+**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: left click or E to shove the climber beside you, right click or Q to hold them still; left click also fires the blaster. A controller (PS5, Xbox): stick or d-pad to move, Cross/A jump, Circle/B or R1/RB shove, Triangle/Y or L1/LB grab, Square/X or R2/RT fire, Options/Menu for the menu. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
 
 **Question:** Is one long, punishing climb fun to play and to watch for an hour? *(guessed)*
 
@@ -45,7 +47,7 @@ After play: make the ui ux of the menu as simple as u can so i can enter my name
   - Every figure drawn, no emoji, no plain circles.
 - References: none named.
 - View: 2D · Camera: side view, follows the climber upward.
-- Text: Sorani Kurdish, right to left, with Western digits. *(the digits are guessed)*
+- Text: Sorani Kurdish, right to left, or English, picked on the menu; Western digits. *(the digits are guessed)*
 
 ## First minute
 You pick a difficulty and stand in a garden at the foot of the tower with the height bar at zero. Wide, easy ledges teach the jump: tap for a hop, hold for a full jump. You miss one, fall, and land a few ledges down instead of dying. A gold star hangs a full jump above a late ledge. At about 30 metres you land on the first gold floor: a chime plays, a banner shows level 1 of 50, and the climb is kept from there.
@@ -72,6 +74,10 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] The climb is kept at every level, to continue after closing the game
 - [x] A gold star to collect on every level
 - [x] A simple main menu: your name in a box at the top, then four big buttons (alone, bots, make a room, join a room); making or joining a room asks for your name first
+- [x] Two languages, Kurdish and English, picked on the menu
+- [x] A controller plays it: PS5, Xbox or any standard pad
+- [x] The mouse plays it: left click shoves and fires, right click grabs
+- [x] Phone buttons that show only what applies (fire, shove, grab), with a ring while a shove or grab is not ready; a room link that carries the code
 - [x] A menu on Esc (and a menu button on screen): go on, start again, sound, or leave for the main menu and out of the room
 - [x] A race of up to five to a level the host picks, with a countdown and live standings
 - [x] Rooms with a code, served from your own PC by server.js, for players on your Wi-Fi or through a tunnel
