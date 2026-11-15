@@ -10,19 +10,17 @@
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d14; overflow: hidden; }
   body { font-variant-numeric: tabular-nums; }
-  #stage { position: relative; margin: 0 auto; }
-  #stage canvas { display: block; position: absolute; left: 0; top: 0; touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; margin: 0 auto; touch-action: none; -webkit-user-select: none; user-select: none; }
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="gl"></canvas><canvas id="game"></canvas></div>
-<script src="vendor/three.js"></script>
+<canvas id="game"></canvas>
 <script src="config.js"></script>
 <script>
 'use strict';
-// Long Climb in 3D: thirty levels wound round one tower, in a tall 9:16 window. Every ledge is
-// one-way: you rise through it from below and land on its top, so a miss drops you to whatever
-// is underneath. The camera swings round the tower by itself; there is no mouse to steer.
+// Long Climb: one tall tower of fifty levels in a tall 9:16 window. Every ledge is one-way: you
+// rise through it from below and land on its top, so a miss drops you to whatever is underneath.
+// Some worlds add machines (buttons, gates, timed ledges) and some hand you a blaster.
 
 // ---- Built to be checked ----------------------------------------------------------------
 const params = new URLSearchParams(location.search);
@@ -32,7 +30,6 @@ const W = 720, H = 1280;        // logical size: a phone held upright, as TikTok
 const FONT = '"Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif';
 const TITLE = 'Long Climb';
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
-const CHEAP = params.get('render') === 'cheap'; // a headless shot or check: 3D draws cheap; players never see it
 let seed;
 function rng() { // mulberry32; every gameplay random call reads this, never Math.random
   seed = (seed + 0x6D2B79F5) | 0;
@@ -51,40 +48,44 @@ const PI = Math.PI;
 // ---- Words: Sorani Kurdish, right to left -------------------------------------------------
 const K = {
   title: 'سەرکەوتنی درێژ',
-  tagline: 'سی ئاست، یەک تاوەر، یەک هەڵە و دەکەویتە خوارەوە',
-  controls: ['W A S D یان تیرەکان: جووڵە', 'Space: باز (بۆ بازی بەرزتر دایبگرە)', 'R دابگرە: دەستپێکردنەوە     P: وەستان     M: بێدەنگ', 'C: پشکنینی کۆدی بینەر'],
+  tagline: 'پەنجا ئاست، یەک تاوەر، یەک هەڵە و دەکەویتە خوارەوە',
+  controls: ['A / D یان تیرەکان: جووڵە', 'Space: باز (بۆ بازی بەرزتر دایبگرە)', 'F: تەقە، لەو ئاستانەی تفەنگت هەیە', 'R دابگرە: دەستپێکردنەوە     P: وەستان     M: بێدەنگ', 'C: پشکنینی کۆدی بینەر'],
   start: 'Enter یان دەست لێدان بۆ دەستپێکردن', cont: 'B: بەردەوامبوون لە ئاستی',
   pick: 'ئاستی سەختی (تیرەکان یان 1 2 3)', modes: ['ئاسان', 'ئاسایی', 'سەخت'],
-  height: 'بەرزی', time: 'کات', falls: 'کەوتن', best: 'باشترین', metre: 'م', level: 'ئاستی', next: 'جیهانی نوێ',
-  paused: 'وەستاوە', resume: 'P بۆ بەردەوامبوون', holdR: 'R دابگرە بۆ دەستپێکردنەوە', wind: 'با',
+  height: 'بەرزی', time: 'کات', falls: 'کەوتن', stars: 'ئەستێرە', best: 'باشترین', metre: 'م', level: 'ئاستی', next: 'جیهانی نوێ',
+  paused: 'وەستاوە', resume: 'P بۆ بەردەوامبوون', holdR: 'R دابگرە بۆ دەستپێکردنەوە', wind: 'با', gun: 'F: تەقە', hurry: 'خێرا بە!',
+  needBtn: 'دەروازە داخراوە: دوگمە سوورەکە بدۆزەوە', needTgt: 'دەروازە داخراوە: تەقە لە ئامانجەکە بکە',
   summit: 'گەیشتیتە لووتکە!', yourCode: 'کۆدەکەت', sendCode: 'ئەم کۆدە بنێرە بۆ سەلماندنی کاتەکەت', again: 'Enter بۆ دووبارە سەرکەوتن',
   codeTitle: 'پشکنینی کۆدی بینەر', codeAsk: 'کۆدەکە بنووسە و Enter لێبدە', codeBad: 'کۆدەکە هەڵەیە', codeOk: 'کۆدەکە دروستە',
   viewerTime: 'کاتی بینەر', yourTime: 'کاتی تۆ', viewerWins: 'بینەر بردیەوە!', youWin: 'تۆ بردتەوە', noTime: 'تۆ هێشتا ئەم ئاستی سەختییەت تەواو نەکردووە', back: 'Esc بۆ گەڕانەوە',
-  bestTime: 'باشترین کات', figures: ['سەرکەوتوو', 'سەکۆ', 'سەکۆی جووڵاو', 'بەرزکەرەوە', 'سەکۆی داڕماو', 'سەهۆڵ', 'هەڵبەزێنەر', 'پشتێنی گوازەرەوە', 'وێستگەی زێڕین', 'تۆپی سوور'],
+  bestTime: 'باشترین کات',
+  figures: ['سەرکەوتوو', 'سەکۆ', 'سەکۆی جووڵاو', 'سەکۆی داڕماو', 'سەهۆڵ', 'هەڵبەزێنەر', 'پشتێنی گوازەرەوە', 'سەکۆی کاتی', 'دوگمە', 'دەروازە', 'ئامانج', 'قوللە', 'تۆپی سوور', 'ئەستێرە'],
 };
-// Six worlds of five levels: the sky, the cap colour of plain ledges, what the world adds, and its tune.
+// Ten worlds of five levels. Each has its sky, the mix of special ledges it uses, what it adds,
+// the hint its banner shows, and the scale and speed of its tune.
 const WORLDS = [
-  { name: 'باخچە', sky: 0x9adcff, fog: 0xcfeeff, cap: 0x6fcf5a, pillar: 0xf6e9c8, mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
-  { name: 'هەورەکان', sky: 0xbfe2ff, fog: 0xeef6ff, cap: 0xffffff, pillar: 0xdfeaff, mix: { m: 0.3, l: 0.1 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 104 },
-  { name: 'ئێوارە', sky: 0xffa26e, fog: 0xffd2a8, cap: 0xffb347, pillar: 0xffd9b0, mix: { c: 0.35, m: 0.12 }, wind: true, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 112 },
-  { name: 'سەهۆڵ', sky: 0xa9e4ff, fog: 0xe6f8ff, cap: 0xe8fbff, pillar: 0xcfefff, mix: { i: 0.55, m: 0.15, l: 0.08 }, scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 100 },
-  { name: 'کارگەی شەو', sky: 0x4a3f9a, fog: 0x6a5fc0, cap: 0x9a8cff, pillar: 0x8a7fd0, mix: { b: 0.16, v: 0.28, m: 0.14, l: 0.1 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 120 },
-  { name: 'ئەستێرەکان', sky: 0x101232, fog: 0x1c1e4a, cap: 0xc9d2ff, pillar: 0x4a4f9a, mix: { c: 0.15, i: 0.15, m: 0.15, l: 0.08, b: 0.12, v: 0.14 }, bumpers: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 294, bpm: 126 },
+  { name: 'باخچە', sky: ['#8fd6ff', '#dff5ff'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
+  { name: 'سەکۆی جووڵاو', sky: ['#9ad0ff', '#f2f8ff'], cap: '#ffffff', mix: { m: 0.35 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 102 },
+  { name: 'سەکۆی داڕماو', sky: ['#ffd39a', '#fff0d8'], cap: '#f2c14e', mix: { c: 0.4, m: 0.1 }, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 108 },
+  { name: 'دوگمە و دەروازە', sky: ['#b7e3c0', '#eefaf0'], cap: '#58c9a0', mix: { m: 0.2 }, gate: 'btn', timed: true, hint: 'دوگمە سوورەکە دەروازە دەکاتەوە', scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 104 },
+  { name: 'سەهۆڵ', sky: ['#a9e4ff', '#f0fbff'], cap: '#e8fbff', mix: { i: 0.55, m: 0.12 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 100 },
+  { name: 'با', sky: ['#ff9a6a', '#ffd9a8'], cap: '#ffb347', mix: { c: 0.15, m: 0.15 }, wind: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 220, bpm: 112 },
+  { name: 'تفەنگ', sky: ['#c86fb8', '#ffb0a0'], cap: '#ff8fb8', mix: { m: 0.2, c: 0.15 }, gun: true, gate: 'tgt', bumpers: true, hint: 'F: تەقە لە ئامانجەکە بکە', scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 294, bpm: 118 },
+  { name: 'هەڵبەزێنەر و پشتێن', sky: ['#5a4fb0', '#b58ad6'], cap: '#9a8cff', mix: { b: 0.16, v: 0.3, m: 0.12 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 120 },
+  { name: 'قوللەکان', sky: ['#23246a', '#5a4fb0'], cap: '#7f8cff', mix: { i: 0.15, c: 0.15, m: 0.15, v: 0.1 }, gun: true, gate: 'tgt', bumpers: true, turrets: true, hint: 'تەقە لە قوللەکان بکە بۆ وەستاندنیان', scale: [0, 1, 4, 5, 7, 8, 10], root: 233, bpm: 126 },
+  { name: 'کۆتایی', sky: ['#0d0e2a', '#3a1040'], cap: '#ff5a7a', mix: { c: 0.18, i: 0.15, m: 0.15, b: 0.1, v: 0.14 }, gun: true, gate: 'both', timed: true, bumpers: true, turrets: true, wind: true, hint: 'هەموو شتێک پێکەوە', scale: [0, 1, 3, 5, 7, 8, 10], root: 262, bpm: 132 },
 ];
-const LEVELS = 30, PER = 5;
+const LEVELS = 50, PER = 5;
 
-// ---- Screen: a WebGL canvas for the tower, a 2D canvas over it for the words ----------------
-const stage = document.getElementById('stage');
+// ---- Screen ---------------------------------------------------------------------------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: !CHEAP });
-renderer.shadowMap.enabled = false; // the climber carries its own round shadow, which is what tells you where you will land
 function fit() { // fills the window at any size and pixel ratio
-  const k = Math.min(innerWidth / W, innerHeight / H), cw = Math.round(W * k), ch = Math.round(H * k), r = k * (devicePixelRatio || 1);
-  stage.style.width = cw + 'px'; stage.style.height = ch + 'px'; stage.style.marginTop = Math.max(0, Math.floor((innerHeight - ch) / 2)) + 'px';
-  canvas.width = Math.round(W * r); canvas.height = Math.round(H * r); canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+  const k = Math.min(innerWidth / W, innerHeight / H), r = k * (devicePixelRatio || 1);
+  canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
+  canvas.style.width = Math.round(W * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
+  canvas.style.marginTop = Math.max(0, Math.floor((innerHeight - H * k) / 2)) + 'px';
   ctx.setTransform(r, 0, 0, r, 0, 0);
-  renderer.setPixelRatio(CHEAP ? 0.5 : Math.min(devicePixelRatio || 1, 2)); renderer.setSize(cw, ch, true);
 }
 addEventListener('resize', fit); fit();
 function text(s, x, y, size, c, align = 'center', bold = false) {
@@ -111,8 +112,8 @@ addEventListener('keyup', e => down.delete(e.code));
 addEventListener('blur', () => down.clear());
 let touchSeen = params.get('touch') === '1';
 const BTN = [ // the phone's buttons: where they sit, and the key each one holds down
-  { x: 74, y: H - 176, r: 54, code: 'ArrowLeft' }, { x: 246, y: H - 176, r: 54, code: 'ArrowRight' },
-  { x: 160, y: H - 262, r: 54, code: 'ArrowUp' }, { x: 160, y: H - 90, r: 54, code: 'ArrowDown' }, { x: W - 118, y: H - 160, r: 86, code: 'Space' },
+  { x: 126, y: H - 120, r: 68, code: 'ArrowLeft' }, { x: 282, y: H - 120, r: 68, code: 'ArrowRight' },
+  { x: W - 118, y: H - 128, r: 84, code: 'Space' }, { x: W - 250, y: H - 250, r: 58, code: 'KeyF' },
 ];
 const fingers = new Map();
 function fingerAt(e) { const b = canvas.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * W, y: (e.clientY - b.top) / b.height * H }; }
@@ -129,8 +130,8 @@ canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch') touchSeen = true;
   const f = fingerAt(e);
   if (scene === 'title') { // tap a difficulty to pick it, the continue line to go on, anywhere else to start
-    if (f.y > 560 && f.y < 650) hit.add(['Digit3', 'Digit2', 'Digit1'][clamp(Math.floor((f.x - 60) / 200), 0, 2)]);
-    else if (f.y > 670 && f.y < 730) hit.add('KeyB'); else hit.add('Enter');
+    if (f.y > 610 && f.y < 700) hit.add(['Digit3', 'Digit2', 'Digit1'][clamp(Math.floor((f.x - 60) / 200), 0, 2)]);
+    else if (f.y > 716 && f.y < 776) hit.add('KeyB'); else hit.add('Enter');
   } else if (scene === 'results') hit.add('Enter');
   else if (scene === 'pause') hit.add('KeyP');
   else if (touchSeen) { fingers.set(e.pointerId, f); syncFingers(); }
@@ -171,6 +172,14 @@ const sfx = {
   rest: () => [523, 659, 784].forEach((f, i) => tone(f, 0.4, 'sine', 0.14, 0, i * 0.09)),
   win: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.45, 'triangle', 0.15, 0, i * 0.11)),
   type: () => tone(700, 0.03, 'square', 0.04),
+  shot: () => tone(900, 0.09, 'square', 0.07, 300),
+  hitTarget: () => { tone(880, 0.12, 'triangle', 0.14); tone(1320, 0.2, 'triangle', 0.12, 0, 0.08); },
+  zap: () => tone(500, 0.12, 'sawtooth', 0.08, 120),
+  bonk: () => tone(120, 0.14, 'square', 0.12, 80),
+  click: () => { tone(300, 0.06, 'square', 0.12); tone(600, 0.1, 'triangle', 0.1, 0, 0.05); },
+  open: () => [392, 523, 784].forEach((f, i) => tone(f, 0.25, 'triangle', 0.12, 0, i * 0.06)),
+  tick: () => tone(1000, 0.03, 'square', 0.05),
+  star: () => { tone(1047, 0.1, 'sine', 0.12); tone(1568, 0.18, 'sine', 0.12, 0, 0.07); },
 };
 // Each world has a tune: your own song when config.js names one, otherwise a short melody the game
 // writes itself in that world's scale, over a hand-drum beat.
@@ -201,116 +210,72 @@ function stepMusic(dt) {
   }
 }
 
-// ---- The 3D world -----------------------------------------------------------------------------
-const world = new THREE.Scene();
-world.add(new THREE.HemisphereLight(0xffffff, 0x8a8f98, 2.3));
-const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-6, 12, 5); world.add(sun);
-const fill = new THREE.DirectionalLight(0xffffff, 0.5); fill.position.set(6, 3, -6); world.add(fill);
-const cam = new THREE.PerspectiveCamera(80, W / H, 0.1, 260);
-world.background = new THREE.Color(WORLDS[0].sky); world.fog = new THREE.Fog(WORLDS[0].fog, 30, 150);
-const GEO = { box: new THREE.BoxGeometry(1, 1, 1), ball: new THREE.IcosahedronGeometry(1, 2), ico: new THREE.IcosahedronGeometry(1, 0), cone: new THREE.ConeGeometry(1, 1, 6),
-  cyl: new THREE.CylinderGeometry(1, 1, 1, 24), disc: new THREE.CircleGeometry(1, 28).rotateX(-PI / 2), ring: new THREE.TorusGeometry(1, 0.035, 6, 48).rotateX(PI / 2), octa: new THREE.OctahedronGeometry(1, 0) };
-const matCache = new Map();
-function mat(color, o = {}) {
-  const key = color + '|' + (o.em || 0) + '|' + (o.basic ? 1 : 0) + '|' + (o.alpha || 1) + '|' + (o.smooth ? 1 : 0);
-  let m = matCache.get(key);
-  if (!m) { m = o.basic ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color, flatShading: !o.smooth, emissive: o.em || 0 });
-    if (o.alpha) { m.transparent = true; m.opacity = o.alpha; m.depthWrite = false; } matCache.set(key, m); }
-  return m;
-}
-function part(parent, geo, m, x, y, z, sx, sy, sz) { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); parent.add(o); return o; }
-const OUT = 0x2a1c14;
-function ledgeMesh(kind, hw, hd, cap) { // one ledge, drawn so its kind reads at a glance; its top is at y = 0
-  const g = new THREE.Group(), w = hw * 2, d = hd * 2, white = mat(0xffffff, { basic: true });
-  if (kind === 'n') { part(g, GEO.box, mat(0xb9814e), 0, -0.3, 0, w, 0.44, d); part(g, GEO.box, mat(cap), 0, -0.04, 0, w + 0.08, 0.1, d + 0.08); }
-  else if (kind === 'm') { part(g, GEO.box, mat(0x4f9cf0), 0, -0.25, 0, w, 0.5, d); for (const s of [-1, 1]) part(g, GEO.cone, white, s * 0.42, 0.012, 0, 0.02, 0.36, 0.22).rotation.z = -s * PI / 2; } // arrows along its slide
-  else if (kind === 'l') { part(g, GEO.box, mat(0x2fbfa8), 0, -0.25, 0, w, 0.5, d); part(g, GEO.cone, white, -0.3, 0.2, 0, 0.16, 0.36, 0.16); part(g, GEO.cone, white, 0.3, 0.2, 0, 0.16, 0.36, 0.16).rotation.z = PI; }  // arrows up and down
-  else if (kind === 'c') { part(g, GEO.box, mat(0xe7c98a), 0, -0.22, 0, w, 0.44, d); for (let i = 1; i < w / 0.6; i++) part(g, GEO.box, mat(0x7a5a22), -hw + i * 0.6, 0.005, 0, 0.06, 0.02, d * 0.9).rotation.y = i % 2 ? 0.5 : -0.4; }
-  else if (kind === 'i') { part(g, GEO.box, mat(0xc9f1ff, { em: 0x1a3a48 }), 0, -0.18, 0, w, 0.36, d); part(g, GEO.box, white, -hw * 0.35, 0.006, -hd * 0.4, w * 0.4, 0.012, 0.1);
-    for (let i = 0; i < w / 0.55; i++) part(g, GEO.cone, mat(0x9fdcf5), -hw + 0.28 + i * 0.55, -0.56, 0, 0.13, 0.4, 0.13).rotation.x = PI; }
-  else if (kind === 'b') { part(g, GEO.box, mat(0x7a45c2), 0, -0.4, 0, w * 0.8, 0.4, d * 0.8); part(g, GEO.cyl, mat(0x3d1f78), 0, -0.15, 0, 0.3, 0.16, 0.3); part(g, GEO.box, mat(0xff7ad1, { em: 0x4a0f3a }), 0, -0.05, 0, w, 0.12, d); }
-  else if (kind === 'v') { part(g, GEO.box, mat(0x565e6c), 0, -0.22, 0, w, 0.44, d); g.userData.chev = [];
-    for (let i = 0; i < Math.ceil(w / 0.7) + 1; i++) g.userData.chev.push(part(g, GEO.cone, mat(0xffd44f, { basic: true }), 0, 0.012, 0, 0.02, 0.3, 0.2)); }
-  else if (kind === 'p') { part(g, GEO.box, mat(0xffd44f, { em: 0x5a4000 }), 0, -0.2, 0, w, 0.4, d); part(g, GEO.box, mat(0xfff3b0, { basic: true }), 0, 0.006, 0, w * 0.8, 0.012, 0.12); }
-  return g;
-}
-function floorMesh(rad, summit) { // a gold rest floor right across the tower: see-through, so the climb above it shows
-  const g = new THREE.Group();
-  part(g, GEO.disc, mat(0xffd44f, { basic: true, alpha: 0.4 }), 0, 0, 0, rad, 1, rad);
-  for (const s of [1, 0.66, 0.36]) part(g, GEO.ring, mat(0xffe58a, { basic: true }), 0, 0.01, 0, rad * s, 1, rad * s);
-  if (summit) { part(g, GEO.cyl, mat(OUT), 4.5, 1.6, 0, 0.06, 3.2, 0.06); part(g, GEO.box, mat(0xe8334a, { em: 0x4a0a14 }), 5.05, 2.8, 0, 1.1, 0.7, 0.05); }
-  return g;
-}
-function bumperMesh() { // a red spiked ball with a scowl
-  const g = new THREE.Group(); part(g, GEO.ball, mat(0xff3b4e, { em: 0x4a0a14, smooth: true }), 0, 0, 0, 0.55, 0.55, 0.55);
-  for (let i = 0; i < 12; i++) { const a = i / 12 * PI * 2, e = (i % 3 - 1) * 0.7, c = part(g, GEO.cone, mat(0x8a0f1e), Math.cos(a) * Math.cos(e) * 0.66, Math.sin(e) * 0.66, Math.sin(a) * Math.cos(e) * 0.66, 0.14, 0.42, 0.14);
-    c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.position.clone().normalize()); }
-  for (const s of [-1, 1]) { part(g, GEO.ball, mat(0xffffff, { basic: true }), s * 0.2, 0.1, 0.5, 0.12, 0.14, 0.06); part(g, GEO.box, mat(OUT), s * 0.2, 0.27, 0.53, 0.26, 0.06, 0.04).rotation.z = -s * 0.5; }
-  return g;
-}
-function climberMesh() { // a small round climber with a red scarf
-  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-  part(body, GEO.ball, mat(0xfff3da, { smooth: true }), 0, 0.5, 0, 0.42, 0.46, 0.42);
-  part(body, GEO.cyl, mat(0xe8334a, { em: 0x3a0810 }), 0, 0.36, 0, 0.4, 0.14, 0.4);
-  g.userData.tail = part(body, GEO.box, mat(0xe8334a, { em: 0x3a0810 }), 0, 0.42, -0.55, 0.2, 0.08, 0.6);
-  for (const s of [-1, 1]) { part(body, GEO.ball, mat(OUT, { smooth: true }), s * 0.15, 0.62, 0.36, 0.06, 0.09, 0.05); part(body, GEO.ball, mat(OUT, { smooth: true }), s * 0.18, 0.06, 0.05, 0.16, 0.08, 0.2); }
-  g.userData.body = body; return g;
-}
-
-// ---- The tower: thirty levels of ledges wound round a pillar --------------------------------------
-const PILLAR = 2.2, FLOOR_R = 10.5, EDGE = 10.1;
-let plats = [], bumpers = [], tops = [], towerGroup = null, SUMMIT = 0;
+// ---- The tower: fifty levels, laid by one recipe per world from a fixed seed --------------------
+// Each ledge sits within one jump of the one before: the sideways gap and the rise are drawn from
+// the level's range, which runs from easy at level 1 to the limit of the jump at level 50.
+const PW = 30, PH = 38;
+let plats = [], bumpers = [], rests = [], gates = [], targets = [], turrets = [], stars = [], decor = [], SUMMIT = 0;
 function pickKind(mix, roll) { let a = 0; for (const k in mix) { a += mix[k]; if (roll < a) return k; } return 'n'; }
 function buildTower(mode) {
-  if (towerGroup) world.remove(towerGroup);
-  towerGroup = new THREE.Group(); world.add(towerGroup); plats = []; bumpers = []; tops = [];
+  plats = []; bumpers = []; rests = []; gates = []; targets = []; turrets = []; stars = [];
   const size = mode === 0 ? tune.easy_size : mode === 2 ? tune.hard_size : 1;
-  const add = p => { p.dx = p.dy = p.dz = 0; p.gone = 0; p.shake = 0; p.squash = 0; p.bx = p.x; p.by = p.y; p.bz = p.z; p.mesh.position.set(p.x, p.y, p.z); towerGroup.add(p.mesh); p.i = plats.length; plats.push(p); return p; };
-  const floor = (y, n, summit) => { tops[n] = add({ kind: 'f', x: 0, y, z: 0, rad: n === 0 ? 60 : FLOOR_R, top: n, level: n, mesh: n === 0 ? new THREE.Group() : floorMesh(FLOOR_R, summit) }); };
-  floor(0, 0);
-  let y = 0, th = 0, r = 5.6, prevHw = 2.2;
+  const add = p => { p.x0 = p.x; p.dx = 0; p.gone = 0; p.shake = 0; p.squash = 0; plats.push(p); return p; };
+  let alt = 0, cx = W / 2;
+  rests[0] = add({ x: 0, w: W, alt: 0, kind: 'r', level: 0, rest: 0 });
   for (let L = 0; L < LEVELS; L++) {
-    const Wd = WORLDS[Math.floor(L / PER)], d = L / (LEVELS - 1), rnd = fixedRng(1000 + L * 77), dir = L % 2 ? -1 : 1, n = 9 + Math.floor(d * 3);
-    let after = false, prevKind = 'n';
-    for (let i = 0; i <= n; i++) {
-      const last = i === n; // the last ledge of a level is its gold pad
-      let kind = last ? 'p' : 'n';
-      if (!last && i > 0 && !after) { kind = pickKind(Wd.mix, rnd()); if (kind === 'b' && (i >= n - 1 || prevKind === 'b')) kind = 'n'; }
-      const hw = last ? 2.2 : (after ? 1.8 : lerp(tune.ledge_wide, tune.ledge_narrow, d) * (0.85 + rnd() * 0.3)) * size * (kind === 'b' ? 0.75 : 1);
-      const hd = last ? 1.5 : lerp(1.35, 0.85, d) * size;
-      const rise = after ? 3.3 : last ? 1.05 : 0.95 + rnd() * 0.3, gap = i === 0 ? 0.3 : after ? 1.1 : lerp(tune.gap_small, tune.gap_big, d) * (0.8 + rnd() * 0.3);
-      const nr = clamp(r + (rnd() * 2 - 1) * 1.3, 4.3, 7.6), dr = nr - r, dist = prevHw + hw + gap, ds = Math.sqrt(Math.max(0.6, dist * dist - dr * dr));
-      th += dir * ds / ((r + nr) / 2); r = nr; y += rise;
-      const tx = -Math.sin(th), tz = Math.cos(th), p = { kind, hw, hd, x: Math.cos(th) * r, y, z: Math.sin(th) * r, tx, tz, nx: Math.cos(th), nz: Math.sin(th), level: L + 1,
-        a: kind === 'v' ? (rnd() < 0.5 ? -1 : 1) * lerp(2, 3.4, d) : kind === 'm' ? 1.1 + rnd() * 0.5 : kind === 'l' ? 0.7 : 0, sp: 1.1 + rnd() * 0.9, ph: rnd() * 6 };
-      p.mesh = ledgeMesh(kind, hw, hd, Wd.cap); p.mesh.rotation.y = Math.atan2(-tz, tx);
-      add(p);
-      if (Wd.bumpers && i > 1 && i % 3 === 0 && !last) bumpers.push({ th: th - dir * (hw + gap * 0.5) / r, span: 0.22, r, y: y + 0.5, ph: bumpers.length * 1.9, cool: 0, mesh: null }); // a red bumper sways across the jump onto this ledge
-      after = kind === 'b'; prevKind = kind; prevHw = hw;
+    const w = Math.floor(L / PER), Wd = WORLDS[w], d = L / (LEVELS - 1), rnd = fixedRng(2000 + L * 131), n = 10 + Math.floor(d * 3), inW = L % PER, main = [];
+    const timedHere = Wd.timed && inW >= 2, t0 = timedHere ? Math.floor(n * 0.3) + 1 : -9;
+    let dir = rnd() < 0.5 ? 1 : -1, nearL = cx, nearR = cx, farL = cx, farR = cx, lastDir = dir, after = false, prevKind = 'n';
+    for (let i = 0; i < n; i++) {
+      let kind = 'n';
+      if (i > 0 && !after) { kind = pickKind(Wd.mix, rnd()); if (kind === 'b' && (i >= n - 1 || prevKind === 'b')) kind = 'n'; }
+      if (i >= t0 && i < t0 + 3) kind = 'g'; else if (i === t0 - 1 || i === t0 + 3) kind = 'n'; // the timed ledges and the plain ones round them
+      const pw = Math.max(56, Math.round((after ? 150 : lerp(tune.ledge_wide, tune.ledge_narrow, d) * (0.85 + rnd() * 0.3)) * size * (kind === 'b' ? 0.7 : 1)));
+      const gap = i === 0 ? 0 : after ? 50 : Math.min(104, lerp(tune.gap_small, tune.gap_big, d) * (0.8 + rnd() * 0.3)), rise = after ? 235 : 88 + rnd() * 18;
+      if (rnd() < 0.3) dir = -dir;
+      const place = dr => { const L0 = dr === lastDir ? farL : nearL, R0 = dr === lastDir ? farR : nearR; return dr > 0 ? R0 + gap : L0 - gap - pw; };
+      let x = i === 0 ? cx - pw / 2 + (rnd() - 0.5) * 240 : place(dir);
+      if (i > 0 && (x < 0 || x + pw > W)) { dir = -dir; x = place(dir); }
+      x = clamp(x, 0, W - pw); alt += rise;
+      const p = add({ x, w: pw, alt, kind, level: L + 1, a: 0, b: 0, world: w });
+      nearL = farL = x; nearR = farR = x + pw;
+      if (kind === 'm') { // a ferry: it slides on from where you board it, the way you are heading
+        const range = clamp((2 + rnd() * 2) * 40, 0, dir > 0 ? W - pw - x : x), fx = x + dir * range;
+        p.x0 = Math.min(x, fx); p.a = Math.max(20, range); p.b = 70 + rnd() * 70 + d * 40; p.flip = dir < 0; farL = fx; farR = fx + pw;
+      } else if (kind === 'v') p.a = (rnd() < 0.5 ? -1 : 1) * lerp(110, 170, d);
+      if (i === t0 - 1) p.timer = true;
+      if (Wd.bumpers && i > 1 && i % 3 === 0 && kind !== 'g') { const bx = dir > 0 ? x + pw + 38 : x - 38; if (bx > 34 && bx < W - 34) bumpers.push({ x: bx, alt: alt + 62, phase: bumpers.length * 1.7, cool: 0, off: 0 }); } // a red bumper waits just past the ledge, for the jump that goes too far
+      if (Wd.turrets && i > 0 && i % 4 === 2) { const left = x + pw / 2 > W / 2; turrets.push({ x: left ? 22 : W - 22, dir: left ? 1 : -1, alt: alt + 20, phase: turrets.length * 0.9, sleep: 0, next: 0 }); } // a turret on the far wall fires along this ledge
+      main.push(p); lastDir = dir; after = kind === 'b'; prevKind = kind;
     }
-    // a full gold floor ends every level; in hard mode only every fifth, and the other levels end on their pad alone
+    stars.push({ x: main[Math.floor(n * 0.8)].x + main[Math.floor(n * 0.8)].w / 2, alt: main[Math.floor(n * 0.8)].alt + 128, taken: false, level: L + 1 }); // a star a full jump above a late ledge
+    const gk = Wd.gate && (Wd.gate !== 'btn' || inW >= 1 || w > 3) ? Wd.gate : null;
+    if (gk) { // a gate across the tower under the level's end: a button opens it, or a shot at its target, or both
+      const g = { alt: alt + 52, level: L + 1, needBtn: gk !== 'tgt', needTgt: gk !== 'btn', btn: false, tgt: false, open: false }; gates.push(g);
+      if (g.needBtn) { // the button sits on a side ledge, off the way up
+        let k = Math.floor(n * 0.55); for (let j = Math.floor(n * 0.4); j < n - 2; j++) if (j > t0 + 3 && main[j].x + main[j].w / 2 > 200 && main[j].x + main[j].w / 2 < 520) { k = j; break; }
+        if (k <= t0 + 3) k = Math.min(n - 2, t0 + 5);
+        const m = main[k], nx = main[k + 1], side = nx.x + nx.w / 2 > m.x + m.w / 2 ? -1 : 1, bw = 96, bx = clamp(side > 0 ? m.x + m.w + 46 : m.x - 46 - bw, 0, W - bw);
+        add({ x: bx, w: bw, alt: m.alt + 92, kind: 'n', level: L + 1, a: 0, b: 0, world: w, button: g });
+      }
+      if (g.needTgt) { const j = main[Math.floor(n * 0.62)], left = j.x + j.w / 2 > W / 2; targets.push({ x: left ? 30 : W - 30, alt: j.alt + 20, amp: d > 0.8 ? 46 : 0, phase: L, gate: g, hit: false }); } // the target hangs on the far wall, level with a ledge
+    }
+    const lastP = main[n - 1]; cx = lastP.x + lastP.w / 2;
+    alt += 112;
+    // a full gold floor ends every level; in hard mode only every fifth, and the others end on a gold pad
     const full = mode !== 2 || (L + 1) % PER === 0 || L === LEVELS - 1;
-    if (full) { y += 1.05; floor(y, L + 1, L === LEVELS - 1); } else { tops[L + 1] = plats[plats.length - 1]; tops[L + 1].top = L + 1; }
+    rests[L + 1] = full ? add({ x: 0, w: W, alt, kind: 'r', level: L + 1, rest: L + 1 }) : add({ x: clamp(cx - 110, 0, W - 220), w: 220, alt, kind: 'p', level: L + 1, rest: L + 1 });
   }
-  SUMMIT = y;
-  for (const b of bumpers) { b.mesh = bumperMesh(); towerGroup.add(b.mesh); }
-  // the pillar itself, banded by world, and the garden at its foot
-  for (let w = 0; w < WORLDS.length; w++) { const y0 = tops[w * PER].y, y1 = tops[(w + 1) * PER].y; part(towerGroup, GEO.cyl, mat(WORLDS[w].pillar), 0, (y0 + y1) / 2, 0, PILLAR, y1 - y0, PILLAR); part(towerGroup, GEO.cyl, mat(WORLDS[w].cap), 0, y0 + 0.2, 0, PILLAR + 0.15, 0.4, PILLAR + 0.15); }
-  part(towerGroup, GEO.cone, mat(0xf07f95), 0, SUMMIT + 2.2, 0, PILLAR + 0.5, 4.4, PILLAR + 0.5);
-  part(towerGroup, GEO.cyl, mat(0x86d06e), 0, -0.5, 0, 60, 1, 60);
-  const r2 = fixedRng(9);
-  for (let i = 0; i < 26; i++) { const a = r2() * PI * 2, rr2 = 12 + r2() * 40, s = 1 + r2() * 1.4, x = Math.cos(a) * rr2, z = Math.sin(a) * rr2; part(towerGroup, GEO.cyl, mat(0x9b6b45), x, 0.8 * s, z, 0.16 * s, 1.6 * s, 0.16 * s); part(towerGroup, GEO.ico, mat([0x5cc46a, 0xf8a9c4, 0x7fd67f][i % 3]), x, 2.3 * s, z, 1.1 * s, 1.0 * s, 1.1 * s); }
-  for (let i = 0; i < 70; i++) { // clouds low down, stars high up
-    const a = r2() * PI * 2, rr2 = 22 + r2() * 45, yy = 8 + r2() * (SUMMIT + 20), x = Math.cos(a) * rr2, z = Math.sin(a) * rr2, s = 1.5 + r2() * 2.5;
-    if (yy > SUMMIT * 0.62) part(towerGroup, GEO.octa, mat(0xffffff, { basic: true }), x, yy, z, 0.25 * s, 0.4 * s, 0.25 * s);
-    else { part(towerGroup, GEO.ball, mat(0xffffff, { em: 0x9a9a9a }), x, yy, z, s * 1.6, s * 0.55, s); part(towerGroup, GEO.ball, mat(0xffffff, { em: 0x9a9a9a }), x + s, yy + 0.4, z + 0.5, s, s * 0.5, s * 0.8); }
-  }
+  SUMMIT = alt; plats[plats.length - 1].summit = true;
+  WORLDS.forEach((Wd, w) => { Wd.base = rests[w * PER].alt; Wd.end = rests[(w + 1) * PER].alt; });
+  const r = fixedRng(7); decor = [];
+  for (let i = 0; i < 360; i++) decor.push({ x: r() * W, alt: r() * SUMMIT, s: 0.6 + r() * 1.2, k: r() });
 }
-const inside = (p, x, z, m) => p.kind === 'f' ? x * x + z * z <= p.rad * p.rad : Math.abs((x - p.x) * p.tx + (z - p.z) * p.tz) <= p.hw + m && Math.abs((x - p.x) * p.nx + (z - p.z) * p.nz) <= p.hd + m;
-const levelAt = y => { let n = 0; for (let i = 1; i < tops.length; i++) if (y >= tops[i].y - 0.05) n = i; return n; };
+const levelAt = alt => { let n = 0; for (let i = 1; i < rests.length; i++) if (alt >= rests[i].alt - 1) n = i; return n; };
+const metres = alt => Math.max(0, Math.round(alt / 40));
 
 // ---- What is kept between sessions, and the finish code ---------------------------------------
-const SAVE = 'long-climb-3d-v1';
+const SAVE = 'long-climb-v2';
 let save = { best: [{}, {}, {}], run: null };
 try { const s = JSON.parse(localStorage.getItem(SAVE) || 'null'); if (s && Array.isArray(s.best)) save = s; } catch (e) {}
 function store() { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch (e) {} }
@@ -332,45 +297,50 @@ const clockText = (cs, fine) => {
 };
 
 // ---- The climber ------------------------------------------------------------------------------
-let P, scene, state = {}, camA = 0, camY = 0, mode = clamp(Number(params.get('mode') || 2) - 1, 0, 2), builtMode = -1;
-const hero = climberMesh(); world.add(hero);
-const shadow = part(world, GEO.disc, mat(0x000000, { basic: true, alpha: 0.38 }), 0, 0, 0, 0.5, 1, 0.5);
-const beacon = part(world, GEO.octa, mat(0xffe066, { basic: true }), 0, -99, 0, 0.22, 0.34, 0.22); // a gold marker over the ledge to jump to next
-let lastOn = 0;
-const dust = []; for (let i = 0; i < 24; i++) { const d = part(world, GEO.ico, mat(0xffffff, { basic: true }), 0, -99, 0, 0.1, 0.1, 0.1); d.visible = false; dust.push({ m: d, life: 0, vx: 0, vy: 0, vz: 0 }); }
-function puff(x, y, z, n, speed = 2.5) { let k = 0; for (const d of dust) { if (d.life > 0 || k >= n) continue; const a = (k++ / n) * PI * 2; d.life = 0.45; d.m.visible = true; d.m.position.set(x, y + 0.05, z); d.vx = Math.cos(a) * speed; d.vz = Math.sin(a) * speed; d.vy = 1.5; } }
+let P, cam, parts, shots, orbs, scene, state = {}, mode = clamp(Number(params.get('mode') || 2) - 1, 0, 2), builtMode = -1;
 function reset(from) {
   seed = Number(params.get('seed')) || CONFIG.seed;
   if (builtMode !== mode) { buildTower(mode); builtMode = mode; }
   // state.gained: what this run gained or learned, the high the ending shows.
-  state = { t: 0, score: 0, gained: '', time: 0, started: false, falls: 0, height: 0, level: 1, world: 1, mode: mode + 1, banner: 0, bannerN: 0, holdR: 0, code: '', entry: '', verdict: null, done: false, shake: 0, wind: 0 };
-  for (const p of plats) { p.x = p.bx; p.y = p.by; p.z = p.bz; p.gone = 0; p.shake = 0; p.squash = 0; p.seen = false; }
-  for (const b of bumpers) b.cool = 0;
-  const lp = Number(params.get('level')) || 1;
-  let n = clamp(lp - 1, 0, LEVELS - 1);
-  if (from) { n = from.top; state.time = from.cs / 100; state.falls = from.falls; state.started = true; }
-  const start = tops[n]; for (let i = 0; i <= n; i++) tops[i].seen = true;
-  P = { x: start.kind === 'f' ? 5.6 : start.x, y: start.y, z: start.kind === 'f' ? 0 : start.z, vx: 0, vy: 0, vz: 0, on: start, coy: 0, buf: 0, face: 0, squash: 0, stun: 0, last: start.y, cut: false, whistled: false };
-  if (lp > LEVELS && !from) { P.on = null; P.y = SUMMIT + 3; P.last = P.y; state.started = true; state.time = 5025.4; state.falls = 63; } // a check may drop onto the summit
-  camA = Math.atan2(P.z, P.x); camY = P.y; lastOn = start.i;
+  state = { t: 0, score: 0, gained: '', time: 0, started: false, falls: 0, stars: 0, height: 0, level: 1, world: 1, mode: mode + 1, banner: 0, bannerN: 0, holdR: 0, code: '', entry: '', verdict: null, done: false, shake: 0, wind: 0, ghost: 0, hint: '', hintT: 0, cool: 0, gun: false };
+  for (const p of plats) { p.x = p.kind === 'm' && p.flip ? p.x0 + p.a : p.x0; p.dx = 0; p.gone = 0; p.shake = 0; p.squash = 0; p.seen = false; }
+  for (const b of bumpers) { b.cool = 0; b.off = 0; }
+  for (const g of gates) { g.btn = g.tgt = g.open = false; }
+  for (const t of targets) t.hit = false;
+  for (const t of turrets) { t.sleep = 0; t.next = 0; }
+  for (const s of stars) s.taken = false;
+  const lp = Number(params.get('level')) || 1; let n = clamp(lp - 1, 0, LEVELS - 1);
+  if (from) { n = from.top; state.time = from.cs / 100; state.falls = from.falls; state.stars = from.stars || 0; state.started = true; }
+  const start = rests[n]; for (let i = 0; i <= n; i++) rests[i].seen = true;
+  for (const g of gates) if (g.level <= n) g.open = true;
+  P = { x: clamp(start.kind === 'p' ? start.x + start.w / 2 - PW / 2 : W / 2 - PW / 2, 0, W - PW), alt: start.alt, vx: 0, vy: 0, on: start, coy: 0, buf: 0, face: 1, squash: 0, stun: 0, last: start.alt, cut: false, whistled: false };
+  if (lp > LEVELS && !from) { P.on = null; P.alt = SUMMIT + 70; P.last = P.alt; state.started = true; state.time = 6325.4; state.falls = 88; state.stars = 37; } // a check may drop onto the summit
+  cam = P.alt + tune.cam_lead; parts = []; shots = []; orbs = [];
   state.level = Math.min(LEVELS, n + 1); state.world = Math.floor((state.level - 1) / PER) + 1;
 }
+function puff(x, alt, n, color, speed = 120) {
+  for (let i = 0; i < n; i++) { const a = PI * (0.1 + 0.8 * (i + 0.5) / n); parts.push({ x, alt, vx: Math.cos(a) * speed * (i % 2 ? 1 : -1), vy: Math.sin(a) * speed * 0.6, life: 0.45, max: 0.45, color, s: 5 + (i % 3) * 2 }); }
+}
+function hint(s) { state.hint = s; state.hintT = 2.2; }
 function land(p) {
-  const drop = P.last - p.y;
-  P.y = p.y; P.last = p.y; P.whistled = false;
-  if (drop > tune.fall_min) { state.falls++; state.shake = 0.3; sfx.thud(); puff(P.x, P.y, P.z, 10, 4); events.push(['fall', Math.round(drop)]); }
-  if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(P.x, P.y, P.z, 6); return; } // a bouncer throws you straight back up
-  P.on = p; P.vy = 0; P.squash = 0.22; lastOn = p.i;
-  if (drop <= tune.fall_min) { sfx.land(); puff(P.x, P.y, P.z, 4, 1.5); }
+  const drop = P.last - p.alt;
+  P.alt = p.alt; P.last = p.alt; P.whistled = false;
+  if (drop > tune.fall_min * 40) { state.falls++; state.shake = 0.3; sfx.thud(); puff(P.x + PW / 2, P.alt, 10, '#ffffff', 200); events.push(['fall', metres(drop)]); }
+  if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(P.x + PW / 2, P.alt, 6, '#ff8fd8'); return; } // a bouncer throws you straight back up
+  P.on = p; P.vy = 0; P.squash = 0.22;
+  if (drop <= tune.fall_min * 40) { sfx.land(); puff(P.x + PW / 2, P.alt, 4, 'rgba(255,255,255,0.8)', 70); }
   if (p.kind === 'c' && !p.shake) { p.shake = tune.crumble_delay; sfx.crack(); }
-  if (p.top && !p.seen) { // the end of a level: a chime, a banner, and the climb is kept from here
+  if (p.timer) { state.ghost = tune.ghost_time; sfx.click(); events.push(['timer', p.level]); }                 // a plate that makes the timed ledges solid for a while
+  if (p.button && !p.button.btn) { p.button.btn = true; sfx.click(); events.push(['button', p.level]); openGate(p.button); } // a button that opens this level's gate
+  if (p.rest && !p.seen) { // the end of a level: a chime, a banner, and the climb is kept from here
     p.seen = true;
-    if (p.top === LEVELS) { finish(); return; }
-    state.banner = tune.banner_time; state.bannerN = p.top; sfx.rest(); events.push(['level', p.top, Math.round(p.y)]);
-    const b = save.best[mode]; if (!(b.level >= p.top)) b.level = p.top;
-    save.run = { mode, top: p.top, cs: Math.round(state.time * 100), falls: state.falls }; store();
+    if (p.summit) { finish(); return; }
+    state.banner = tune.banner_time; state.bannerN = p.rest; sfx.rest(); events.push(['level', p.rest, metres(p.alt)]);
+    const b = save.best[mode]; if (!(b.level >= p.rest)) b.level = p.rest;
+    save.run = { mode, top: p.rest, cs: Math.round(state.time * 100), falls: state.falls, stars: state.stars }; store();
   }
 }
+function openGate(g) { const was = g.open; g.open = (!g.needBtn || g.btn) && (!g.needTgt || g.tgt); if (g.open && !was) { sfx.open(); events.push(['gate', g.level]); } }
 function finish() {
   const cs = Math.round(state.time * 100), b = save.best[mode];
   state.done = true; state.code = makeCode(cs, state.falls, mode); state.cs = cs; state.gained = K.summit; state.t = 0;
@@ -378,191 +348,323 @@ function finish() {
   b.level = LEVELS; save.run = null; store();
   sfx.win(); events.push(['summit', cs, state.falls, state.code]); scene = 'results';
 }
+function knock(fromX, y) { // thrown away from what hit you, and down
+  P.vx = (P.x + PW / 2 >= fromX ? 1 : -1) * tune.bump_push; P.vy = -220; P.on = null; P.coy = 0; P.cut = false; P.stun = tune.bump_stun;
+  state.shake = 0.2; sfx.bump(); puff(fromX, y, 8, '#ff3b4e', 220); events.push(['bump']);
+}
 function stepWorld(dt) {
   const t = state.t;
   for (const p of plats) {
-    p.dx = p.dy = p.dz = 0;
-    if (p.kind === 'm') { const o = Math.sin(t * p.sp + p.ph) * p.a, nx = p.bx + p.tx * o, nz = p.bz + p.tz * o; p.dx = nx - p.x; p.dz = nz - p.z; p.x = nx; p.z = nz; } // slides along the tower
-    else if (p.kind === 'l') { const ny = p.by + Math.sin(t * p.sp + p.ph) * p.a; p.dy = ny - p.y; p.y = ny; }                                                    // rises and sinks
+    p.dx = 0;
+    if (p.kind === 'm') { const ph = ((t * p.b / p.a) + (p.flip ? 1 : 0)) % 2, nx = p.x0 + (ph < 1 ? ph : 2 - ph) * p.a; p.dx = nx - p.x; p.x = nx; } // slides between its two ends
     else if (p.kind === 'c') {
-      if (p.shake > 0) { p.shake -= dt; if (p.shake <= 0) { p.shake = 0; p.gone = tune.crumble_back; puff(p.x, p.y, p.z, 8, 3); } }
+      if (p.shake > 0) { p.shake -= dt; if (p.shake <= 0) { p.shake = 0; p.gone = tune.crumble_back; puff(p.x + p.w / 2, p.alt - 10, 8, '#e7c98a', 150); } }
       else if (p.gone > 0) p.gone = Math.max(0, p.gone - dt);
     }
     if (p.squash > 0) p.squash = Math.max(0, p.squash - dt);
   }
-  for (const b of bumpers) { if (b.cool > 0) b.cool -= dt; const a = b.th + Math.sin(t * 1.5 + b.ph) * b.span; b.x = Math.cos(a) * b.r; b.z = Math.sin(a) * b.r; b.cy = b.y + 0.4 + Math.sin(t * 2.3 + b.ph) * 0.35; }
-  for (const d of dust) if (d.life > 0) { d.life -= dt; d.m.position.x += d.vx * dt; d.m.position.z += d.vz * dt; d.m.position.y += d.vy * dt; d.vy -= 6 * dt; d.m.scale.setScalar(Math.max(0.01, d.life * 0.3)); if (d.life <= 0) d.m.visible = false; }
+  for (const b of bumpers) { if (b.cool > 0) b.cool -= dt; if (b.off > 0) b.off -= dt; }
+  if (state.ghost > 0) { const was = Math.ceil(state.ghost); state.ghost = Math.max(0, state.ghost - dt); if (Math.ceil(state.ghost) !== was) sfx.tick(); }
+  for (const tr of turrets) { // a turret near you fires an orb along its ledge every few seconds
+    if (tr.sleep > 0) { tr.sleep -= dt; continue; }
+    if (Math.abs(tr.alt - P.alt) > 620) continue;
+    tr.next -= dt; if (tr.next <= 0) { tr.next = tune.turret_period; orbs.push({ x: tr.x + tr.dir * 26, alt: tr.alt, vx: tr.dir * tune.orb_speed }); }
+  }
+  for (const o of orbs) o.x += o.vx * dt;
+  orbs = orbs.filter(o => o.x > -20 && o.x < W + 20 && !o.dead);
+  for (const s of shots) { // the blaster's shots: they open targets, and put bumpers, turrets and orbs out for a while
+    s.x += s.vx * dt;
+    for (const tg of targets) if (!tg.hit && Math.hypot(s.x - tg.x, s.alt - (tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp)) < 30) { tg.hit = true; s.dead = true; tg.gate.tgt = true; sfx.hitTarget(); puff(tg.x, tg.alt, 10, '#ffd44f', 200); events.push(['target', tg.gate.level]); openGate(tg.gate); }
+    for (const b of bumpers) if (!(b.off > 0) && Math.hypot(s.x - b.x, s.alt - (b.alt + Math.sin(t * 2 + b.phase) * 30)) < 30) { b.off = tune.off_time; s.dead = true; sfx.zap(); puff(b.x, b.alt, 8, '#ff3b4e', 180); }
+    for (const tr of turrets) if (!(tr.sleep > 0) && Math.abs(s.x - tr.x) < 26 && Math.abs(s.alt - tr.alt) < 26) { tr.sleep = tune.off_time; tr.next = tune.turret_period; s.dead = true; sfx.zap(); puff(tr.x, tr.alt, 8, '#9aa0a8', 180); }
+    for (const o of orbs) if (Math.hypot(s.x - o.x, s.alt - o.alt) < 22) { o.dead = true; s.dead = true; sfx.zap(); puff(o.x, o.alt, 6, '#c77dff', 150); }
+  }
+  shots = shots.filter(s => s.x > -20 && s.x < W + 20 && !s.dead);
+  for (const q of parts) { q.life -= dt; q.x += q.vx * dt; q.alt += q.vy * dt; q.vy -= 500 * dt; }
+  parts = parts.filter(q => q.life > 0);
   if (state.banner > 0) state.banner -= dt;
   if (state.shake > 0) state.shake -= dt;
+  if (state.hintT > 0) state.hintT -= dt;
+  if (state.cool > 0) state.cool -= dt;
 }
-function stepCam(dt, want, y) { // the camera stands outside the climber and swings round the tower to stay there
-  let da = want - camA; while (da > PI) da -= 2 * PI; while (da < -PI) da += 2 * PI;
-  camA += da * Math.min(1, tune.cam_turn * dt); camY += (y - camY) * Math.min(1, 6 * dt);
-}
+const solid = p => !(p.gone > 0) && (p.kind !== 'g' || state.ghost > 0);
 function stepPlayer(dt) {
-  const kx = (down.has('KeyD') || down.has('ArrowRight') ? 1 : 0) - (down.has('KeyA') || down.has('ArrowLeft') ? 1 : 0);
-  const kz = (down.has('KeyW') || down.has('ArrowUp') ? 1 : 0) - (down.has('KeyS') || down.has('ArrowDown') ? 1 : 0);
-  const jumpHeld = down.has('Space');
-  if (pressed('Space')) P.buf = tune.jump_buffer;
-  if (!state.started && (kx || kz || P.buf > 0)) state.started = true;
+  const left = down.has('KeyA') || down.has('ArrowLeft'), right = down.has('KeyD') || down.has('ArrowRight');
+  const jumpHeld = down.has('Space') || down.has('KeyW') || down.has('ArrowUp');
+  if (pressed('Space') || pressed('KeyW') || pressed('ArrowUp')) P.buf = tune.jump_buffer;
+  if (!state.started && (left || right || P.buf > 0)) state.started = true;
   if (state.started) state.time += dt;
   if (P.stun > 0) P.stun -= dt;
-  // steer by the camera: up is towards the tower, right is to the right of the screen
-  const cr = Math.max(3.5, Math.hypot(P.x, P.z)) + tune.cam_dist;
-  let fx = P.x - Math.cos(camA) * cr, fz = P.z - Math.sin(camA) * cr; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
-  let wx = fx * kz - fz * kx, wz = fz * kz + fx * kx; const wl = Math.hypot(wx, wz);
-  if (wl > 1) { wx /= wl; wz /= wl; }
-  if (P.stun > 0) { wx = 0; wz = 0; } else if (wl > 0.1) P.face = Math.atan2(wx, wz);
-  const acc = (P.on ? (P.on.kind === 'i' ? tune.ice_accel : tune.ground_accel) : tune.air_accel) * dt;
-  const dvx = wx * tune.move_speed - P.vx, dvz = wz * tune.move_speed - P.vz, dl = Math.hypot(dvx, dvz);
-  if (!(P.stun > 0)) { if (dl <= acc) { P.vx += dvx; P.vz += dvz; } else { P.vx += dvx / dl * acc; P.vz += dvz / dl * acc; } }
-  if (P.on) { const p = P.on; P.x += p.dx; P.z += p.dz; if (p.kind === 'l') P.y = p.y; if (p.kind === 'v') { P.x += p.tx * p.a * dt; P.z += p.tz * p.a * dt; } } // carried by what you stand on
+  const dir = P.stun > 0 ? 0 : (right ? 1 : 0) - (left ? 1 : 0);
+  if (dir) P.face = dir;
+  const acc = P.on ? (P.on.kind === 'i' ? tune.ice_accel : tune.ground_accel) : tune.air_accel;
+  const want = dir * tune.move_speed, dv = want - P.vx, md = acc * dt;
+  if (!(P.stun > 0)) P.vx += Math.abs(dv) <= md ? dv : Math.sign(dv) * md;
+  if (P.on) { P.x += P.on.dx; if (P.on.kind === 'v') P.x += P.on.a * dt; } // carried by what you stand on
   if (P.buf > 0) P.buf -= dt;
   if (P.coy > 0) P.coy -= dt;
-  if (P.buf > 0 && (P.on || P.coy > 0)) { P.vy = tune.jump_speed; P.last = P.y; P.on = null; P.coy = 0; P.buf = 0; P.cut = true; P.squash = -0.25; sfx.jump(); } // late and early presses both count
+  if (P.buf > 0 && (P.on || P.coy > 0)) { P.vy = tune.jump_speed; P.on = null; P.coy = 0; P.buf = 0; P.cut = true; P.squash = -0.25; sfx.jump(); } // late and early presses both count
   if (P.cut && !jumpHeld && P.vy > 0) { P.vy *= tune.jump_cut; P.cut = false; } // let go early for a hop
-  const Wd = WORLDS[state.world - 1], lv = state.level % PER;
-  state.wind = 0;
-  if (Wd.wind && (lv >= 3 || lv === 0)) { // the wind turns every few seconds and carries you round the tower while you are in the air
-    state.wind = (state.t / tune.wind_period) % 2 < 1 ? 1 : -1;
-    if (!P.on) { const pr0 = Math.hypot(P.x, P.z) || 1, ox = -P.z / pr0, oz = P.x / pr0; P.x += ox * state.wind * tune.wind_speed * dt; P.z += oz * state.wind * tune.wind_speed * dt; }
+  const Wd = WORLDS[state.world - 1];
+  state.gun = !!Wd.gun;
+  if (state.gun && state.cool <= 0 && (down.has('KeyF') || down.has('KeyJ') || down.has('KeyX'))) { // the blaster fires the way you face
+    state.cool = tune.shot_cool; shots.push({ x: P.x + PW / 2 + P.face * 22, alt: P.alt + 20, vx: P.face * tune.shot_speed }); sfx.shot();
   }
-  P.x += P.vx * dt; P.z += P.vz * dt;
-  const pr = Math.hypot(P.x, P.z);
-  if (pr < PILLAR + 0.42) { const k = (PILLAR + 0.42) / (pr || 1); P.x *= k; P.z *= k; } // the pillar is solid
-  else if (pr > EDGE) { const k = EDGE / pr; P.x *= k; P.z *= k; }                      // and the tower has an unseen wall, so every fall is caught by a gold floor
-  const prev = P.y;
+  state.wind = 0;
+  if (Wd.wind && (state.world < 10 || state.level % PER === 0 || state.level % PER >= 3)) { // the wind turns every few seconds and carries you while you are in the air
+    state.wind = (state.t / tune.wind_period) % 2 < 1 ? 1 : -1;
+    if (!P.on) P.x += state.wind * tune.wind_speed * dt;
+  }
+  P.x += P.vx * dt;
+  if (P.x < 0) { P.x = 0; P.vx = Math.max(0, P.vx); } else if (P.x > W - PW) { P.x = W - PW; P.vx = Math.min(0, P.vx); }
+  const prev = P.alt;
   if (P.on) {
     const p = P.on;
-    if (p.gone > 0 || !inside(p, P.x, P.z, 0.22)) { P.on = null; P.coy = tune.coyote; P.cut = false; }
+    if (!solid(p) || P.x + PW < p.x + 4 || P.x > p.x + p.w - 4) { P.on = null; P.coy = tune.coyote; P.cut = false; }
   } else {
     P.vy -= (P.vy > 0 ? tune.gravity : tune.gravity * tune.fall_mult) * dt;
     if (P.vy < -tune.max_fall) P.vy = -tune.max_fall;
-    P.y += P.vy * dt;
-    if (P.vy <= 0) { // falling: the highest ledge your feet pass through catches you
+    P.alt += P.vy * dt;
+    if (P.vy > 0) { // rising: a shut gate stops your head
+      for (const g of gates) if (!g.open && prev + PH <= g.alt && P.alt + PH > g.alt) { P.alt = g.alt - PH; P.vy = -140; P.cut = false; sfx.bonk(); hint(g.needBtn && !g.btn ? K.needBtn : K.needTgt); break; }
+    } else { // falling: the highest ledge your feet pass through catches you
       let hitP = null;
-      for (const p of plats) if (!(p.gone > 0) && prev >= p.y - 0.02 - Math.abs(p.dy) && P.y <= p.y && inside(p, P.x, P.z, 0.22) && (!hitP || p.y > hitP.y)) hitP = p;
+      for (const p of plats) if (solid(p) && prev >= p.alt - 0.01 && P.alt <= p.alt && P.x + PW > p.x + 4 && P.x < p.x + p.w - 4 && (!hitP || p.alt > hitP.alt)) hitP = p;
       if (hitP) land(hitP);
-      else if (!P.whistled && P.last - P.y > tune.fall_min) { P.whistled = true; sfx.whistle(); }
+      else if (!P.whistled && P.last - P.alt > tune.fall_min * 40) { P.whistled = true; sfx.whistle(); }
     }
   }
+  const pcx = P.x + PW / 2, pcy = P.alt + PH / 2;
   for (const b of bumpers) { // red bumpers knock you away and down
-    if (b.cool > 0 || Math.abs(b.y - P.y) > 4) continue;
-    const dx = P.x - b.x, dy = P.y + 0.45 - b.cy, dz = P.z - b.z;
-    if (dx * dx + dy * dy + dz * dz < 0.95 * 0.95) {
-      const hl = Math.hypot(dx, dz) || 1; b.cool = 0.5; P.vx = dx / hl * tune.bump_push; P.vz = dz / hl * tune.bump_push; P.vy = -3; P.on = null; P.coy = 0; P.cut = false; P.stun = tune.bump_stun;
-      state.shake = 0.2; sfx.bump(); puff(b.x, b.cy, b.z, 8, 4); events.push(['bump']);
-    }
+    if (b.cool > 0 || b.off > 0 || Math.abs(b.alt - P.alt) > 200) continue;
+    const by = b.alt + Math.sin(state.t * 2 + b.phase) * 30;
+    if (Math.hypot(pcx - b.x, pcy - by) < 36) { b.cool = 0.5; knock(b.x, by); }
   }
+  for (const o of orbs) if (!o.dead && Math.abs(pcx - o.x) < 26 && Math.abs(pcy - o.alt) < 28) { o.dead = true; knock(o.x, o.alt); } // so do a turret's orbs
+  for (const s of stars) if (!s.taken && Math.abs(s.alt - pcy) < 44 && Math.abs(s.x - pcx) < 36) { s.taken = true; state.stars++; sfx.star(); puff(s.x, s.alt, 8, '#ffd44f', 160); events.push(['star', s.level]); }
   if (P.squash > 0) P.squash = Math.max(0, P.squash - dt * 1.6); else if (P.squash < 0) P.squash = Math.min(0, P.squash + dt * 1.6);
-  stepCam(dt, Math.atan2(P.z, P.x), P.y);
-  state.height = Math.max(0, Math.round(P.y)); state.score = state.height;
-  state.level = Math.min(LEVELS, levelAt(P.y) + 1); state.world = Math.floor((state.level - 1) / PER) + 1;
-  state.x = +P.x.toFixed(2); state.z = +P.z.toFixed(2); state.onLedge = !!P.on;
+  cam += (P.alt + tune.cam_lead - cam) * Math.min(1, tune.cam_speed * dt);
+  state.height = metres(P.alt); state.score = state.height;
+  state.level = Math.min(LEVELS, levelAt(P.alt) + 1); state.world = Math.floor((state.level - 1) / PER) + 1;
+  state.x = Math.round(P.x); state.onLedge = !!P.on;
 }
 
 // ---- Drawing ----------------------------------------------------------------------------------
-const skyC = new THREE.Color(), fogC = new THREE.Color(), tmpC = new THREE.Color();
-function draw3D() {
-  const t = state.t, px = P.x, py = P.y, pz = P.z;
-  if (cam.fov !== tune.fov) { cam.fov = tune.fov; cam.updateProjectionMatrix(); }
-  const cr = Math.max(3.5, Math.hypot(px, pz)) + tune.cam_dist, sh = state.shake > 0 ? state.shake * 0.5 : 0;
-  cam.position.set(Math.cos(camA) * cr + Math.sin(t * 90) * sh, camY + tune.cam_height + Math.cos(t * 70) * sh, Math.sin(camA) * cr);
-  cam.lookAt(px * 0.9, camY + 1.3, pz * 0.9);
-  // the sky of the world you are in, fading into the next as you near it
-  const lv = clamp(levelAt(camY) / PER, 0, WORLDS.length - 1), w0 = Math.floor(lv), w1 = Math.min(WORLDS.length - 1, w0 + 1), k = Math.max(0, (lv - w0) * 5 - 4);
-  world.background.copy(skyC.setHex(WORLDS[w0].sky).lerp(tmpC.setHex(WORLDS[w1].sky), k)); world.fog.color.copy(fogC.setHex(WORLDS[w0].fog).lerp(tmpC.setHex(WORLDS[w1].fog), k));
-  for (const p of plats) {
-    const near = Math.abs(p.y - camY) < 46; p.mesh.visible = near && !(p.gone > 0); if (!near) continue;
-    p.mesh.position.set(p.x + (p.shake > 0 ? Math.sin(t * 70) * 0.05 : 0), p.y - (p.squash > 0 ? p.squash * 0.6 : 0), p.z);
-    if (p.kind === 'v') p.mesh.userData.chev.forEach((c, i) => { const x = -p.hw + i * 0.7 + (((t * p.a) % 0.7) + 0.7) % 0.7 - 0.35; c.position.x = x; c.visible = x > -p.hw + 0.15 && x < p.hw - 0.15; c.rotation.z = p.a > 0 ? -PI / 2 : PI / 2; }); // the belt's arrows run the way it carries you
-  }
-  for (const b of bumpers) { b.mesh.visible = Math.abs(b.y - camY) < 46; b.mesh.position.set(b.x || 0, b.cy || b.y, b.z || 0); b.mesh.rotation.y = t * 2; }
-  hero.position.set(px, py, pz); hero.rotation.y = P.face;
-  const sq = P.squash; hero.userData.body.scale.set(1 + sq * 0.6, 1 - sq * 0.6, 1 + sq * 0.6);
-  hero.userData.tail.rotation.x = clamp(P.vy * 0.05, -0.6, 0.8) + Math.sin(t * 12) * 0.08;
-  const nextP = plats[lastOn + 1]; beacon.visible = !!nextP && scene === 'play'; if (nextP) { beacon.position.set(nextP.kind === 'f' ? px * 0.8 : nextP.x, nextP.y + 1.5 + Math.sin(t * 4) * 0.15, nextP.kind === 'f' ? pz * 0.8 : nextP.z); beacon.rotation.y = t * 3; }
-  let under = null; for (const p of plats) if (!(p.gone > 0) && p.y <= py + 0.05 && inside(p, px, pz, 0.1) && (!under || p.y > under.y)) under = p; // the round shadow lands where you will
-  shadow.visible = !!under; if (under) { const s = clamp(0.55 - (py - under.y) * 0.03, 0.2, 0.55); shadow.position.set(px, under.y + 0.03, pz); shadow.scale.set(s, 1, s); }
-  renderer.render(world, cam);
+const sy = alt => H * 0.6 - (alt - cam); // where an altitude lands on the screen
+const worldAt = alt => clamp(Math.floor(levelAt(alt) / PER), 0, WORLDS.length - 1);
+function mix(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), ch = s => Math.round(lerp((pa >> s) & 255, (pb >> s) & 255, t));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
 }
-const hex = n => '#' + n.toString(16).padStart(6, '0');
-function stat(label, value, cx) { text(label, cx, 30, 23, '#cfd6e0'); text(value, cx, 68, 38, '#ffffff', 'center', true); }
-function hud() {
-  ctx.fillStyle = 'rgba(12,14,22,0.86)'; ctx.fillRect(0, 0, W, 100); ctx.fillStyle = '#ffd44f'; ctx.fillRect(0, 100, W, 4);
-  stat(K.height, state.height + ' ' + K.metre, W - 130); stat(K.time, clockText(Math.floor(state.time * 100)), W / 2); stat(K.falls, String(state.falls), 130);
-  rr(W - 344, 116, 330, 42, 12, 'rgba(12,14,22,0.74)'); text(`${K.level} ${state.level} / ${LEVELS}: ${WORLDS[state.world - 1].name}`, W - 179, 138, 23, '#ffffff', 'center', true);
-  rr(54, 116, 150, 42, 12, 'rgba(12,14,22,0.74)'); text(K.modes[mode], 129, 138, 23, ['#7be08a', '#ffe58a', '#ff6a78'][mode], 'center', true);
-  // the height bar: the whole tower by world, with every level marked, where you are and your best
-  const bx = 16, by = 176, bh = H - by - 70, yOf = y => by + bh - clamp(y / SUMMIT, 0, 1) * bh;
-  rr(bx - 4, by - 4, 30, bh + 8, 10, 'rgba(12,14,22,0.8)');
-  WORLDS.forEach((Wd, w) => { const a = yOf(tops[(w + 1) * PER].y), b = yOf(tops[w * PER].y); ctx.fillStyle = hex(Wd.sky); ctx.fillRect(bx, a, 22, b - a); });
-  ctx.fillStyle = 'rgba(255,212,79,0.9)'; for (let i = 1; i <= LEVELS; i++) ctx.fillRect(bx, yOf(tops[i].y) - 1, i % PER ? 9 : 22, 2);
-  const bl = save.best[mode].level; if (bl) { const y = yOf(tops[bl].y); ctx.fillStyle = '#ffd44f'; ctx.strokeStyle = hex(OUT); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx + 26, y); ctx.lineTo(bx + 44, y - 10); ctx.lineTo(bx + 44, y + 10); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-  const py = yOf(P.y); ctx.beginPath(); ctx.arc(bx + 11, py, 9, 0, 7); ctx.fillStyle = '#e8334a'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
-  if (state.wind) { // which way the wind blows now
-    rr(W / 2 - 70, 170, 140, 46, 12, 'rgba(12,14,22,0.74)'); text(K.wind, W / 2 + 24, 193, 24, '#ffffff', 'center', true);
-    ctx.fillStyle = '#ffd44f'; const ax = W / 2 - 28, d = -state.wind; ctx.beginPath(); ctx.moveTo(ax + d * 14, 193); ctx.lineTo(ax - d * 8, 181); ctx.lineTo(ax - d * 8, 205); ctx.fill();
+function drawSky() {
+  const z = worldAt(cam), Z = WORLDS[z], N = WORLDS[Math.min(z + 1, WORLDS.length - 1)], t = clamp((cam - Z.base) / (Z.end - Z.base), 0, 1), k = Math.max(0, t * 5 - 4);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, mix(Z.sky[0], N.sky[0], k)); g.addColorStop(1, mix(Z.sky[1], N.sky[1], k));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const d of decor) { // clouds low down, stars high up, drifting slower than the tower
+    const y = H * 0.6 - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
+    const high = d.alt / SUMMIT;
+    if (high > 0.62) { ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.5 * d.k})`; const s = 2 + d.s * 2.2; ctx.beginPath(); ctx.moveTo(d.x, y - s); ctx.lineTo(d.x + s * 0.35, y - s * 0.35); ctx.lineTo(d.x + s, y); ctx.lineTo(d.x + s * 0.35, y + s * 0.35); ctx.lineTo(d.x, y + s); ctx.lineTo(d.x - s * 0.35, y + s * 0.35); ctx.lineTo(d.x - s, y); ctx.lineTo(d.x - s * 0.35, y - s * 0.35); ctx.fill(); }
+    else { ctx.fillStyle = `rgba(255,255,255,${0.42 - high * 0.2})`; const s = 34 * d.s; ctx.beginPath(); ctx.ellipse(d.x, y, s * 1.5, s * 0.5, 0, 0, 7); ctx.ellipse(d.x - s * 0.6, y - s * 0.3, s * 0.7, s * 0.5, 0, 0, 7); ctx.ellipse(d.x + s * 0.5, y - s * 0.36, s * 0.8, s * 0.56, 0, 0, 7); ctx.fill(); }
   }
+  if (cam < 900) { // the garden's hills at the foot of the tower
+    const y = sy(0); ctx.fillStyle = '#5fbf5a'; ctx.beginPath(); ctx.ellipse(120, y, 260, 150, 0, PI, 0); ctx.ellipse(560, y, 300, 110, 0, PI, 0); ctx.fill();
+    ctx.fillStyle = '#4aa650'; ctx.fillRect(0, y, W, H - y + 40);
+  }
+}
+const OUT = '#2a1c14';
+function drawLedge(p, x, y, t) {
+  const w = p.w, h = 26;
+  if (p.kind === 'r') { // a gold rest floor, right across the tower
+    rr(-6, y, W + 12, 24, 8, '#ffd44f', '#a06a00', 4); ctx.fillStyle = '#fff3b0'; ctx.fillRect(0, y + 3, W, 5);
+    ctx.fillStyle = '#e0a520'; for (let i = 0; i < 18; i++) ctx.fillRect(i * 40 + 14, y + 13, 12, 6);
+    if (p.summit) { ctx.fillStyle = OUT; ctx.fillRect(W / 2 - 3, y - 120, 6, 120); ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.moveTo(W / 2 + 3, y - 118); ctx.lineTo(W / 2 + 70, y - 96 + Math.sin(t * 4) * 5); ctx.lineTo(W / 2 + 3, y - 72); ctx.fill(); }
+    return;
+  }
+  if (p.kind === 'c' && p.gone > 0) { ctx.setLineDash([8, 8]); rr(x, y, w, h, 8, null, 'rgba(120,90,40,0.45)', 3); ctx.setLineDash([]); return; }
+  if (p.kind === 'g') { // a timed ledge: a dashed outline until its plate is pressed, then solid, blinking as time runs out
+    const on = state.ghost > 0, blink = on && state.ghost < 2 && Math.floor(t * 8) % 2;
+    if (!on || blink) { ctx.setLineDash([10, 8]); rr(x, y, w, h, 8, 'rgba(60,220,255,0.10)', 'rgba(60,220,255,0.75)', 3); ctx.setLineDash([]); }
+    else { rr(x, y, w, h, 8, '#3fdcff', '#0d6a8a'); ctx.fillStyle = '#d6f8ff'; ctx.fillRect(x + 6, y + 4, w - 12, 5); }
+    return;
+  }
+  const jx = p.shake > 0 ? Math.sin(t * 70) * 3 : 0, sq = p.squash > 0 ? p.squash * 30 : 0;
+  x += jx; y += sq;
+  if (p.kind === 'p') { rr(x, y, w, h, 9, '#ffd44f', '#a06a00'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x + 8, y + 4, w - 16, 5); }
+  else if (p.kind === 'n') { rr(x, y, w, h, 9, '#b9814e', OUT); rr(x + 2, y + 2, w - 4, 9, 6, WORLDS[p.world || 0].cap); }
+  else if (p.kind === 'm') {
+    rr(x, y, w, h, 9, '#4f9cf0', '#16407e'); ctx.fillStyle = '#d6ebff'; ctx.fillRect(x + 6, y + 4, w - 12, 5);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { const cx = x + w / 2 + s * 16; ctx.beginPath(); ctx.moveTo(cx - s * 6, y + 12); ctx.lineTo(cx + s * 2, y + 17); ctx.lineTo(cx - s * 6, y + 22); ctx.stroke(); }
+  } else if (p.kind === 'c') {
+    rr(x, y, w, h, 7, '#e7c98a', '#7a5a22'); ctx.strokeStyle = '#7a5a22'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 1; i < w / 30; i++) { const cx = x + i * 30; ctx.beginPath(); ctx.moveTo(cx - 5, y + 3); ctx.lineTo(cx + 2, y + 12); ctx.lineTo(cx - 4, y + 23); ctx.stroke(); }
+  } else if (p.kind === 'i') {
+    rr(x, y, w, h - 4, 8, '#c9f1ff', '#3f8fb5'); ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 8, y + 4, w * 0.45, 4);
+    ctx.fillStyle = '#9fdcf5'; for (let i = 0; i < w / 26; i++) { const cx = x + 13 + i * 26; ctx.beginPath(); ctx.moveTo(cx - 6, y + h - 5); ctx.lineTo(cx + 6, y + h - 5); ctx.lineTo(cx, y + h + 9); ctx.fill(); }
+  } else if (p.kind === 'b') {
+    rr(x + 4, y + 12, w - 8, h - 10, 6, '#7a45c2', '#3d1f78'); ctx.strokeStyle = '#3d1f78'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); for (let i = 0; i <= 6; i++) ctx.lineTo(x + 10 + (w - 20) * i / 6, y + (i % 2 ? 9 : 14)); ctx.stroke();
+    rr(x, y - 2, w, 11, 6, '#ff7ad1', '#8a1f6a');
+  } else if (p.kind === 'v') {
+    rr(x, y, w, h, 12, '#565e6c', '#1c2028'); const d = Math.sign(p.a) || 1, off = ((t * Math.abs(p.a) * 0.5) % 24) * d;
+    ctx.save(); ctx.beginPath(); ctx.rect(x + 6, y + 2, w - 12, h - 4); ctx.clip(); ctx.strokeStyle = '#ffd44f'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (let cx = x - 24 + off; cx < x + w + 24; cx += 24) { ctx.beginPath(); ctx.moveTo(cx - d * 5, y + 6); ctx.lineTo(cx + d * 3, y + 13); ctx.lineTo(cx - d * 5, y + 20); ctx.stroke(); }
+    ctx.restore();
+  }
+  if (p.button) { // the gate's button: red until pressed, then green and flat
+    const on = p.button.btn; rr(x + w / 2 - 26, y - (on ? 6 : 16), 52, on ? 8 : 18, 8, on ? '#4fd66a' : '#ff3b4e', on ? '#1f7a34' : '#8a0f1e'); rr(x + w / 2 - 34, y - 3, 68, 8, 4, '#565e6c', '#1c2028', 3);
+  }
+  if (p.timer) { // the plate that starts the timed ledges: a clock face set in the ledge
+    const cx = x + w / 2; ctx.beginPath(); ctx.arc(cx, y - 2, 17, PI, 0); ctx.fillStyle = '#3fdcff'; ctx.fill(); ctx.strokeStyle = '#0d6a8a'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.strokeStyle = '#0d6a8a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, y - 3); ctx.lineTo(cx, y - 14); ctx.moveTo(cx, y - 3); ctx.lineTo(cx + 8, y - 8); ctx.stroke();
+  }
+}
+function drawGate(g, y, t) { // red beams across the tower while shut, a faint green trace once open
+  for (const s of [0, 1]) rr(s ? W - 22 : -6, y - 16, 28, 32, 6, '#565e6c', '#1c2028');
+  if (g.open) { ctx.setLineDash([6, 14]); ctx.strokeStyle = 'rgba(79,214,106,0.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(22, y); ctx.lineTo(W - 22, y); ctx.stroke(); ctx.setLineDash([]); return; }
+  ctx.strokeStyle = 'rgba(255,59,78,0.35)'; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(22, y); ctx.lineTo(W - 22, y); ctx.stroke();
+  ctx.strokeStyle = '#ff3b4e'; ctx.lineWidth = 5; ctx.beginPath(); for (let x = 22; x <= W - 22; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.2 + t * 14) * 3); ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(22, y - 1, W - 44, 2);
+}
+function drawTarget(x, y, hit) { // a bullseye on the wall
+  rr(x < W / 2 ? -4 : x + 10, y - 8, 30, 16, 4, '#565e6c', '#1c2028', 3);
+  for (const [r, c] of [[26, hit ? '#1f7a34' : '#8a0f1e'], [20, '#ffffff'], [13, hit ? '#4fd66a' : '#ff3b4e'], [6, '#ffffff']]) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); }
+}
+function drawTurret(x, y, dir, asleep, t) { // a wall gun with one red eye
+  rr(x - 22, y - 22, 44, 44, 8, asleep ? '#7a808c' : '#565e6c', '#1c2028'); rr(dir > 0 ? x + 14 : x - 40, y - 7, 26, 14, 4, '#3a404c', '#1c2028', 3);
+  ctx.beginPath(); ctx.arc(x, y - 2, 8, 0, 7); ctx.fillStyle = asleep ? '#3a404c' : (Math.floor(t * 4) % 2 ? '#ff3b4e' : '#ff8a96'); ctx.fill();
+  if (asleep) { ctx.strokeStyle = '#1c2028'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 8, y - 2); ctx.lineTo(x + 8, y - 2); ctx.stroke(); }
+}
+function drawOrb(x, y, t) { ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fillStyle = '#c77dff'; ctx.fill(); ctx.strokeStyle = '#4a1a8a'; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x - 4 + Math.sin(t * 9) * 2, y - 4, 4, 0, 7); ctx.fill(); }
+function drawStar(x, y, t, s = 1) {
+  ctx.save(); ctx.translate(x, y + Math.sin(t * 3 + x) * 4); ctx.scale(s, s); ctx.rotate(Math.sin(t * 2) * 0.2); ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -PI / 2 + i * PI / 5, r = i % 2 ? 9 : 20; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+  ctx.closePath(); ctx.fillStyle = '#ffd44f'; ctx.fill(); ctx.strokeStyle = '#a06a00'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+}
+function drawBumper(x, y, t, s = 1, off = false) { // a red spiked ball with a scowl; grey while a shot keeps it out
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha = off ? 0.35 : 1; ctx.rotate(t * 1.5);
+  ctx.fillStyle = off ? '#565e6c' : '#8a0f1e'; for (let i = 0; i < 8; i++) { const a = i * PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a - 0.22) * 20, Math.sin(a - 0.22) * 20); ctx.lineTo(Math.cos(a) * 34, Math.sin(a) * 34); ctx.lineTo(Math.cos(a + 0.22) * 20, Math.sin(a + 0.22) * 20); ctx.fill(); }
+  ctx.rotate(-t * 1.5); ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fillStyle = off ? '#9aa0a8' : '#ff3b4e'; ctx.fill(); ctx.strokeStyle = off ? '#565e6c' : '#8a0f1e'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(-8, -2, 5, 6, 0, 0, 7); ctx.ellipse(8, -2, 5, 6, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(-7, -1, 2.5, 0, 7); ctx.arc(7, -1, 2.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, -11); ctx.lineTo(-4, -7); ctx.moveTo(14, -11); ctx.lineTo(4, -7); ctx.stroke();
+  ctx.restore();
+}
+function drawClimber(cx, footY, face, squash, vx, vy, t, s = 1, gun = false) { // a small round climber with a red scarf, and a blaster where the world gives one
+  ctx.save(); ctx.translate(cx, footY); ctx.scale(s * (1 + squash * 0.7), s * (1 - squash * 0.7));
+  const run = Math.abs(vx) > 30 && vy === 0 ? Math.sin(t * 22) * 5 : 0;
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(-8 + run, -3, 8, 5, 0, 0, 7); ctx.ellipse(8 - run, -3, 8, 5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -22, 18, 19, 0, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
+  const flap = clamp(-vx / 260, -1, 1) || -face * 0.5, lift = clamp(-vy / 900, -0.6, 0.9);
+  ctx.fillStyle = '#e8334a'; ctx.strokeStyle = '#8a0f1e'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(flap * 10, -15); ctx.quadraticCurveTo(flap * 26, -18 - lift * 18, flap * 40, -10 - lift * 26 + Math.sin(t * 12) * 3); ctx.lineTo(flap * 34, -4 - lift * 20); ctx.quadraticCurveTo(flap * 22, -8, flap * 10, -9); ctx.fill(); ctx.stroke();
+  rr(-18, -17, 36, 9, 4, '#e8334a', '#8a0f1e', 3);
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(face * 5 - 5, -28, 3, 4.5, 0, 0, 7); ctx.ellipse(face * 5 + 6, -28, 3, 4.5, 0, 0, 7); ctx.fill();
+  if (gun) { rr(face > 0 ? 12 : -34, -24, 22, 9, 3, '#3a404c', '#1c2028', 3); rr(face > 0 ? 12 : -20, -18, 8, 11, 2, '#3a404c', '#1c2028', 3); ctx.fillStyle = '#ffd44f'; ctx.fillRect(face > 0 ? 30 : -34, -22, 4, 5); }
+  ctx.restore();
+}
+function drawWorld() {
+  const t = state.t, vis = y => y > -70 && y < H + 70;
+  ctx.save();
+  if (state.shake > 0) ctx.translate(Math.sin(t * 90) * state.shake * 14, Math.cos(t * 70) * state.shake * 14);
+  drawSky();
+  if (state.wind && scene !== 'title') { // streaks show which way the wind blows
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 14; i++) { const y = (i * 97 + 40) % H, x = ((i * 173 + t * 420 * state.wind) % (W + 200) + W + 200) % (W + 200) - 100; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - state.wind * (40 + (i % 3) * 20), y); ctx.stroke(); }
+  }
+  for (const g of gates) { const y = sy(g.alt); if (vis(y)) drawGate(g, y, t); }
+  for (const p of plats) { const y = sy(p.alt); if (vis(y)) drawLedge(p, p.x, y, t); }
+  for (const tg of targets) { const y = sy(tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp); if (vis(y)) drawTarget(tg.x, y, tg.hit); }
+  for (const tr of turrets) { const y = sy(tr.alt); if (vis(y)) drawTurret(tr.x, y, tr.dir, tr.sleep > 0, t); }
+  for (const s of stars) { const y = sy(s.alt); if (!s.taken && vis(y)) drawStar(s.x, y, t); }
+  for (const b of bumpers) { const y = sy(b.alt + Math.sin(t * 2 + b.phase) * 30); if (vis(y)) drawBumper(b.x, y, t, 1, b.off > 0); }
+  for (const o of orbs) drawOrb(o.x, sy(o.alt), t);
+  for (const s of shots) { rr(s.x - 12, sy(s.alt) - 4, 24, 8, 4, '#ffe58a', '#b98a00', 2); }
+  for (const q of parts) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.color; ctx.beginPath(); ctx.ellipse(q.x, sy(q.alt), q.s, q.s * 0.8, 0, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  drawClimber(P.x + PW / 2, sy(P.alt), P.face, P.squash, P.vx, P.on ? 0 : P.vy, t, 1, state.gun && scene !== 'title');
+  ctx.restore();
+}
+function stat(label, value, cx) { text(label, cx, 30, 22, '#cfd6e0'); text(value, cx, 68, 36, '#ffffff', 'center', true); }
+function hud() {
+  const t = state.t;
+  ctx.fillStyle = 'rgba(12,14,22,0.86)'; ctx.fillRect(0, 0, W, 100); ctx.fillStyle = '#ffd44f'; ctx.fillRect(0, 100, W, 4);
+  stat(K.height, state.height + ' ' + K.metre, W - 96); stat(K.time, clockText(Math.floor(state.time * 100)), W - 280); stat(K.falls, String(state.falls), 264); text(K.stars, 96, 30, 22, '#cfd6e0'); plain(state.stars + ' / ' + LEVELS, 96, 68, 36, '#ffffff');
+  rr(W - 384, 116, 370, 42, 12, 'rgba(12,14,22,0.74)'); text(`${K.level} ${state.level} / ${LEVELS}: ${WORLDS[state.world - 1].name}`, W - 199, 138, 22, '#ffffff', 'center', true);
+  rr(54, 116, 130, 42, 12, 'rgba(12,14,22,0.74)'); text(K.modes[mode], 119, 138, 22, ['#7be08a', '#ffe58a', '#ff6a78'][mode], 'center', true);
+  if (state.gun) { rr(194, 116, 130, 42, 12, 'rgba(12,14,22,0.74)'); text(K.gun, 259, 138, 22, '#ffe58a', 'center', true); }
+  // the height bar: the whole tower by world, with every level marked, where you are and your best
+  const bx = 5, by = 176, bh = H - by - 70, yOf = alt => by + bh - clamp(alt / SUMMIT, 0, 1) * bh;
+  rr(bx - 3, by - 4, 18, bh + 8, 8, 'rgba(12,14,22,0.8)');
+  WORLDS.forEach(Z => { ctx.fillStyle = Z.sky[0]; ctx.fillRect(bx, yOf(Z.end), 12, yOf(Z.base) - yOf(Z.end)); });
+  ctx.fillStyle = 'rgba(255,212,79,0.9)'; for (let i = 1; i <= LEVELS; i++) ctx.fillRect(bx, yOf(rests[i].alt) - 1, i % PER ? 5 : 12, 2);
+  const bl = save.best[mode].level; if (bl) { const y = yOf(rests[bl].alt); ctx.fillStyle = '#ffd44f'; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx + 15, y); ctx.lineTo(bx + 31, y - 9); ctx.lineTo(bx + 31, y + 9); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  const py = yOf(P.alt); ctx.beginPath(); ctx.arc(bx + 6, py, 8, 0, 7); ctx.fillStyle = '#e8334a'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
+  let row = 170;
+  if (state.wind) { // which way the wind blows now
+    rr(W / 2 - 70, row, 140, 46, 12, 'rgba(12,14,22,0.74)'); text(K.wind, W / 2 + 24, row + 23, 24, '#ffffff', 'center', true);
+    ctx.fillStyle = '#ffd44f'; const ax = W / 2 - 28, d = state.wind; ctx.beginPath(); ctx.moveTo(ax + d * 14, row + 23); ctx.lineTo(ax - d * 8, row + 11); ctx.lineTo(ax - d * 8, row + 35); ctx.fill(); row += 56;
+  }
+  if (state.ghost > 0) { // how long the timed ledges will hold
+    rr(W / 2 - 150, row, 300, 46, 12, 'rgba(12,14,22,0.8)', '#3fdcff', 3); ctx.fillStyle = '#3fdcff'; ctx.fillRect(W / 2 - 138, row + 34, 276 * state.ghost / tune.ghost_time, 6); text(`${K.hurry} ${Math.ceil(state.ghost)}`, W / 2, row + 18, 23, '#ffffff', 'center', true); row += 56;
+  }
+  if (state.hintT > 0) { rr(W / 2 - 290, row, 580, 48, 12, 'rgba(120,16,28,0.9)', '#ff3b4e', 3); text(state.hint, W / 2, row + 24, 23, '#ffffff', 'center', true); }
   if (state.banner > 0) {
-    const a = clamp(Math.min(state.banner, tune.banner_time - state.banner) * 4, 0, 1), n = state.bannerN;
-    ctx.globalAlpha = a; rr(W / 2 - 250, 250, 500, n % PER ? 130 : 176, 26, 'rgba(12,14,22,0.88)', '#ffd44f', 5);
-    text(`${K.level} ${n} / ${LEVELS}`, W / 2, 300, 46, '#ffd44f', 'center', true); text(`${Math.round(tops[n].y)} ${K.metre}`, W / 2, 350, 32, '#ffffff', 'center', true);
-    if (n % PER === 0 && WORLDS[n / PER]) text(`${K.next}: ${WORLDS[n / PER].name}`, W / 2, 396, 25, '#cfd6e0');
+    const a = clamp(Math.min(state.banner, tune.banner_time - state.banner) * 4, 0, 1), n = state.bannerN, nw = n % PER === 0 && WORLDS[n / PER];
+    ctx.globalAlpha = a; rr(W / 2 - 280, 290, 560, nw ? (nw.hint ? 226 : 180) : 130, 26, 'rgba(12,14,22,0.88)', '#ffd44f', 5);
+    text(`${K.level} ${n} / ${LEVELS}`, W / 2, 340, 46, '#ffd44f', 'center', true); text(`${metres(rests[n].alt)} ${K.metre}`, W / 2, 390, 32, '#ffffff', 'center', true);
+    if (nw) { text(`${K.next}: ${nw.name}`, W / 2, 438, 26, '#cfd6e0'); if (nw.hint) text(nw.hint, W / 2, 484, 25, '#ffe58a', 'center', true); }
     ctx.globalAlpha = 1;
   }
-  if (state.holdR > 0) { rr(W / 2 - 220, 470, 440, 60, 16, 'rgba(12,14,22,0.88)'); ctx.fillStyle = '#e8334a'; ctx.fillRect(W / 2 - 200, 516, 400 * clamp(state.holdR / 0.8, 0, 1), 6); text(K.holdR, W / 2, 496, 24, '#ffffff'); }
-  if (touchSeen) for (const b of BTN) { // the phone's buttons: four arrows and a jump
+  if (state.holdR > 0) { rr(W / 2 - 220, 540, 440, 60, 16, 'rgba(12,14,22,0.88)'); ctx.fillStyle = '#e8334a'; ctx.fillRect(W / 2 - 200, 586, 400 * clamp(state.holdR / 0.8, 0, 1), 6); text(K.holdR, W / 2, 566, 24, '#ffffff'); }
+  if (touchSeen) for (const b of BTN) { // the phone's buttons: two arrows, a jump, and the blaster where there is one
+    if (b.code === 'KeyF' && !state.gun) continue;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fillStyle = b.on ? 'rgba(255,255,255,0.5)' : 'rgba(12,14,22,0.42)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 5; ctx.stroke();
-    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate({ ArrowLeft: -PI / 2, ArrowRight: PI / 2, ArrowDown: PI, ArrowUp: 0, Space: 0 }[b.code]);
     ctx.fillStyle = '#ffffff'; ctx.beginPath();
-    if (b.code === 'Space') { ctx.moveTo(0, -34); ctx.lineTo(32, 6); ctx.lineTo(12, 6); ctx.lineTo(12, 34); ctx.lineTo(-12, 34); ctx.lineTo(-12, 6); ctx.lineTo(-32, 6); }
-    else { ctx.moveTo(0, -24); ctx.lineTo(24, 16); ctx.lineTo(-24, 16); }
-    ctx.fill(); ctx.restore();
+    if (b.code === 'Space') { ctx.moveTo(b.x, b.y - 34); ctx.lineTo(b.x + 32, b.y + 6); ctx.lineTo(b.x + 12, b.y + 6); ctx.lineTo(b.x + 12, b.y + 34); ctx.lineTo(b.x - 12, b.y + 34); ctx.lineTo(b.x - 12, b.y + 6); ctx.lineTo(b.x - 32, b.y + 6); ctx.fill(); }
+    else if (b.code === 'KeyF') { ctx.fill(); for (const [r, c] of [[30, '#ffffff'], [20, '#ff3b4e'], [9, '#ffffff']]) { ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); } }
+    else { const d = b.code === 'ArrowLeft' ? -1 : 1; ctx.moveTo(b.x + d * 28, b.y); ctx.lineTo(b.x - d * 16, b.y - 28); ctx.lineTo(b.x - d * 16, b.y + 28); ctx.fill(); }
   }
 }
 
 // ---- Scenes ---------------------------------------------------------------------------------
-const figGroup = new THREE.Group(); figGroup.visible = false; world.add(figGroup);
-const FIG = ['n', 'm', 'l', 'c', 'i', 'b', 'v', 'p'], figAt = i => [(i % 2 ? 2.3 : -2.3), 8.6 - Math.floor(i / 2) * 3.2];
-(function buildFigures() {
-  const put = (o, i, y = 0) => { const [x, yy] = figAt(i); o.position.set(x, yy + y, 0); figGroup.add(o); return o; };
-  const c = put(climberMesh(), 0, -0.3); c.scale.setScalar(1.6); c.rotation.y = 0.5;
-  FIG.forEach((k, i) => { const o = put(ledgeMesh(k, 1.2, 0.8, 0x6fcf5a), i + 1, 0.2); o.rotation.x = 0.5; if (k === 'v') o.userData.chev.forEach((ch, j) => { ch.position.x = -0.85 + j * 0.7; ch.rotation.z = -PI / 2; ch.visible = j < 3; }); });
-  put(bumperMesh(), 9, 0.3).scale.setScalar(1.3);
-})();
-const v3 = new THREE.Vector3();
 const scenes = {
   figures: {
     update(dt) { state.t += dt; },
     draw() {
-      ctx.clearRect(0, 0, W, H); towerGroup.visible = false; hero.visible = false; shadow.visible = false; beacon.visible = false; figGroup.visible = true;
-      world.background.setHex(0x8fbfe0); world.fog.color.setHex(0x8fbfe0); cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(0, 2.2, 15.5); cam.lookAt(0, 2.2, 0); renderer.render(world, cam);
-      K.figures.forEach((s, i) => { const [x, y] = figAt(i); v3.set(x, y - 1.25, 0).project(cam); const sx = (v3.x * 0.5 + 0.5) * W, sy = (-v3.y * 0.5 + 0.5) * H; rr(sx - 130, sy - 22, 260, 44, 12, 'rgba(12,14,22,0.85)'); text(s, sx, sy + 1, 25, '#ffffff', 'center', true); });
+      const t = state.t; cam = 0; drawSky(); ctx.fillStyle = 'rgba(12,14,22,0.4)'; ctx.fillRect(0, 0, W, H);
+      const cell = (i, f) => { const cx = 124 + (i % 3) * 236, cy = 120 + Math.floor(i / 3) * 250; rr(cx - 108, cy - 86, 216, 206, 18, 'rgba(255,255,255,0.2)'); f(cx, cy); rr(cx - 100, cy + 70, 200, 42, 10, 'rgba(12,14,22,0.85)'); text(K.figures[i], cx, cy + 92, 22, '#ffffff', 'center', true); };
+      const led = (k, extra = {}) => (x, y) => drawLedge(Object.assign({ kind: k, w: 150, world: 0, a: 120, shake: 0, squash: 0, gone: 0 }, extra), x - 75, y, t);
+      cell(0, (x, y) => drawClimber(x, y + 40, 1, 0, 0, 0, t, 2, true));
+      cell(1, led('n')); cell(2, led('m')); cell(3, led('c')); cell(4, led('i')); cell(5, led('b')); cell(6, led('v'));
+      cell(7, (x, y) => { const g = state.ghost; state.ghost = 9; led('g')(x, y); state.ghost = g; });
+      cell(8, led('n', { button: { btn: false } }));
+      cell(9, (x, y) => { ctx.save(); ctx.beginPath(); ctx.rect(x - 100, y - 40, 200, 80); ctx.clip(); ctx.translate(x - 100, 0); ctx.scale(200 / W, 1); drawGate({ open: false }, y, t); ctx.restore(); });
+      cell(10, (x, y) => drawTarget(x, y, false)); cell(11, (x, y) => drawTurret(x, y, 1, false, t));
+      cell(12, (x, y) => drawBumper(x, y, t, 1.3)); cell(13, (x, y) => drawStar(x, y, t, 1.8));
     },
   },
   title: {
     update(dt) {
-      state.t += dt; stepWorld(dt); stepCam(dt, camA + 0.05, P.y + 3);
+      state.t += dt; stepWorld(dt);
       const m0 = mode; if (pressed('ArrowLeft')) mode = Math.min(2, mode + 1); if (pressed('ArrowRight')) mode = Math.max(0, mode - 1);
       for (let i = 0; i < 3; i++) if (pressed('Digit' + (i + 1))) mode = i;
       if (mode !== m0) { const t = state.t; sfx.type(); reset(); state.t = t; }
       if (pressed('KeyC')) { state.entry = ''; state.verdict = null; typed.length = 0; scene = 'code'; return; }
-      if (pressed('KeyB') && save.run && save.run.mode === mode) { reset(save.run); hit.clear(); scene = 'play'; playWorld(state.world - 1); return; }
-      if (pressed('Enter') || pressed('Space')) { if (save.run && save.run.mode === mode) { save.run = null; store(); } reset(); hit.clear(); scene = 'play'; playWorld(state.world - 1); }
+      if (pressed('KeyB') && save.run && save.run.mode === mode) { reset(save.run); hit.clear(); scene = 'play'; return; }
+      if (pressed('Enter') || pressed('Space')) { if (save.run && save.run.mode === mode) { save.run = null; store(); } reset(); hit.clear(); scene = 'play'; }
     },
     draw() {
-      ctx.clearRect(0, 0, W, H); draw3D();
-      rr(40, 130, W - 80, 880, 30, 'rgba(12,14,22,0.84)');
-      text(K.title, W / 2, 226, 76, '#ffffff', 'center', true); ctx.fillStyle = '#ffd44f'; ctx.fillRect(W / 2 - 170, 284, 340, 6);
-      text(K.tagline, W / 2, 334, 27, '#ffe58a');
-      K.controls.forEach((c, i) => text(c, W / 2, 384 + i * 38, 22, '#ffffff'));
-      text(K.pick, W / 2, 542, 23, '#ffe58a');
-      for (let i = 0; i < 3; i++) { const x = 60 + (2 - i) * 200, on = i === mode; rr(x + 8, 566, 184, 78, 18, on ? ['#1f8a3a', '#b98a00', '#b3202e'][i] : 'rgba(255,255,255,0.1)', on ? '#ffffff' : 'rgba(255,255,255,0.35)', on ? 5 : 3); text(K.modes[i], x + 100, 606, 32, '#ffffff', 'center', true); }
+      drawWorld(); rr(40, 120, W - 80, 880, 30, 'rgba(12,14,22,0.86)');
+      text(K.title, W / 2, 214, 76, '#ffffff', 'center', true); ctx.fillStyle = '#ffd44f'; ctx.fillRect(W / 2 - 170, 272, 340, 6);
+      text(K.tagline, W / 2, 322, 26, '#ffe58a');
+      K.controls.forEach((c, i) => text(c, W / 2, 378 + i * 40, 22, '#ffffff'));
+      text(K.pick, W / 2, 588, 23, '#ffe58a');
+      for (let i = 0; i < 3; i++) { const x = 60 + (2 - i) * 200, on = i === mode; rr(x + 8, 614, 184, 78, 18, on ? ['#1f8a3a', '#b98a00', '#b3202e'][i] : 'rgba(255,255,255,0.1)', on ? '#ffffff' : 'rgba(255,255,255,0.35)', on ? 5 : 3); text(K.modes[i], x + 100, 654, 32, '#ffffff', 'center', true); }
       const b = save.best[mode];
-      if (save.run && save.run.mode === mode) text(`${K.cont} ${save.run.top + 1}`, W / 2, 700, 27, '#7be08a', 'center', true);
-      if (b.level) text(`${K.best}: ${K.level} ${b.level}` + (b.cs ? `     ${K.bestTime}: ${clockText(b.cs)}` : ''), W / 2, 770, 25, '#cfd6e0');
-      text(K.start, W / 2, 900, 30, '#ffd44f', 'center', true);
+      if (save.run && save.run.mode === mode) text(`${K.cont} ${save.run.top + 1}`, W / 2, 746, 27, '#7be08a', 'center', true);
+      if (b.level) text(`${K.best}: ${K.level} ${b.level}` + (b.cs ? `     ${K.bestTime}: ${clockText(b.cs)}` : ''), W / 2, 810, 25, '#cfd6e0');
+      text(K.start, W / 2, 910, 30, '#ffd44f', 'center', true);
     },
   },
   play: {
@@ -573,35 +675,35 @@ const scenes = {
       if (state.holdR >= 0.8) { events.push(['restart']); save.run = null; store(); reset(); return; }
       stepWorld(dt); stepPlayer(dt); if (scene === 'play') { playWorld(state.world - 1); stepMusic(dt); }
     },
-    draw() { ctx.clearRect(0, 0, W, H); draw3D(); hud(); },
+    draw() { drawWorld(); hud(); },
   },
   pause: {
     update() { if (pressed('KeyP') || pressed('Escape') || pressed('Enter')) { if (song.el) song.el.play().catch(() => {}); scene = 'play'; } },
     draw() { scenes.play.draw(); ctx.fillStyle = 'rgba(8,10,16,0.6)'; ctx.fillRect(0, 0, W, H); text(K.paused, W / 2, H / 2 - 40, 72, '#ffffff', 'center', true); text(K.resume, W / 2, H / 2 + 40, 30, '#ffd44f'); },
   },
   results: {
-    update(dt) { state.t += dt; stepWorld(dt); stepCam(dt, camA + 0.06, P.y); if (state.t > 1 && pressed('Enter')) { reset(); scene = 'play'; } },
+    update(dt) { state.t += dt; stepWorld(dt); if (state.t > 1 && pressed('Enter')) { reset(); scene = 'play'; } },
     draw() {
-      ctx.clearRect(0, 0, W, H); draw3D();
-      rr(40, 200, W - 80, 760, 30, 'rgba(12,14,22,0.9)', '#ffd44f', 5);
+      drawWorld(); rr(40, 200, W - 80, 800, 30, 'rgba(12,14,22,0.9)', '#ffd44f', 5);
       text(K.summit, W / 2, 296, 60, '#ffd44f', 'center', true); text(K.modes[mode], W / 2, 360, 28, ['#7be08a', '#ffe58a', '#ff6a78'][mode], 'center', true);
-      text(K.time, W / 2 + 150, 430, 28, '#cfd6e0'); text(clockText(state.cs || 0, true), W / 2 + 150, 484, 50, '#ffffff', 'center', true);
-      text(K.falls, W / 2 - 150, 430, 28, '#cfd6e0'); text(String(state.falls), W / 2 - 150, 484, 50, '#ffffff', 'center', true);
+      text(K.time, W / 2 + 190, 430, 26, '#cfd6e0'); text(clockText(state.cs || 0, true), W / 2 + 190, 484, 44, '#ffffff', 'center', true);
+      text(K.falls, W / 2 - 40, 430, 26, '#cfd6e0'); text(String(state.falls), W / 2 - 40, 484, 44, '#ffffff', 'center', true);
+      text(K.stars, W / 2 - 210, 430, 26, '#cfd6e0'); plain(state.stars + ' / ' + LEVELS, W / 2 - 210, 484, 44, '#ffffff');
       text(K.yourCode, W / 2, 586, 28, '#cfd6e0'); rr(W / 2 - 270, 618, 540, 90, 18, '#ffffff', '#ffd44f', 5); plain(state.code, W / 2, 665, 46, '#0c0e16');
       text(K.sendCode, W / 2, 756, 25, '#ffe58a');
       if (save.best[mode].cs) text(`${K.bestTime}: ${clockText(save.best[mode].cs, true)}`, W / 2, 814, 26, '#ffffff');
-      text(K.again, W / 2, 896, 29, '#ffd44f', 'center', true);
+      text(K.again, W / 2, 916, 29, '#ffd44f', 'center', true);
     },
   },
   code: { // the streamer types a viewer's code to see their time against their own
     update(dt) {
-      state.t += dt; stepCam(dt, camA + 0.05, P.y + 3);
+      state.t += dt;
       if (pressed('Escape')) { scene = 'title'; return; }
       while (typed.length) { const k = typed.shift(); if (k === 'Backspace') state.entry = state.entry.slice(0, -1); else if (/^[a-zA-Z0-9-]$/.test(k) && state.entry.length < 18) { state.entry += k.toUpperCase(); sfx.type(); } state.verdict = null; }
       if (pressed('Enter') && state.entry) { const c = readCode(state.entry); state.verdict = c ? { ok: true, cs: c.cs, falls: c.falls, mode: c.mode } : { ok: false }; events.push(['code', !!c]); }
     },
     draw() {
-      ctx.clearRect(0, 0, W, H); draw3D(); rr(40, 200, W - 80, 760, 30, 'rgba(12,14,22,0.92)');
+      drawWorld(); rr(40, 200, W - 80, 760, 30, 'rgba(12,14,22,0.92)');
       text(K.codeTitle, W / 2, 290, 48, '#ffffff', 'center', true); text(K.codeAsk, W / 2, 356, 26, '#cfd6e0');
       rr(W / 2 - 270, 400, 540, 96, 18, '#ffffff', '#ffd44f', 5); plain(state.entry + (Math.floor(state.t * 2) % 2 ? '_' : ' '), W / 2, 450, 46, '#0c0e16');
       const v = state.verdict;
@@ -632,7 +734,7 @@ function tick() {
   ALPHA = acc / STEP; // draw between steps, so the view never judders
   drawFrame();
 }
-function drawFrame() { if (scene !== 'figures') { towerGroup.visible = true; hero.visible = true; figGroup.visible = false; } scenes[scene].draw(); }
+function drawFrame() { scenes[scene].draw(); }
 function frame() { tick(); requestAnimationFrame(frame); }
 // A headless browser on a time budget runs timers but almost no animation frames: a timer
 // ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
