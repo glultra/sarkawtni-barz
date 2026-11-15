@@ -75,7 +75,12 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
 });
 addEventListener('keyup', e => down.delete(e.code));
-addEventListener('pointerdown', () => startAudio());
+addEventListener('pointerdown', () => { startAudio(); if (scene === 'play' && stage.requestPointerLock) stage.requestPointerLock(); });
+addEventListener('mousemove', e => { // look around with the mouse, once the game is clicked
+  if (document.pointerLockElement !== stage || scene !== 'play') return;
+  state.yaw -= e.movementX * tune.look_sens;
+  state.pitch = Math.max(0.05, Math.min(1.3, state.pitch + e.movementY * tune.look_sens));
+});
 addEventListener('blur', () => down.clear());
 
 // ---- Audio: started on first input, mute on M --------------------------------------------
@@ -167,14 +172,14 @@ function reset() {
 function loadLevel(i, def) {
   const L = parseLevel(def || LEVELS[i]);
   state.li = i; state.L = L; state.score = i;
-  state.p = { x: L.start.x + 0.5, z: L.start.z + 0.5, life: L.start.life, fx: 0, fz: 1, ang: 0, carry: -1, walk: 0, moving: false };
+  state.p = { x: L.start.x + 0.5, z: L.start.z + 0.5, life: L.start.life, fx: 0, fz: -1, ang: Math.PI, carry: -1, walk: 0, moving: false };
   state.crates = L.crates.map(c => ({ x: c.x, z: c.z, life: c.life, origin: c.origin, carried: false, sunk: false }));
   state.switches = L.switches.map(s => ({ x: s.x, z: s.z, life: s.life, c: s.c, on: false }));
   state.doors = L.doors.map(d => ({ x: d.x, z: d.z, life: d.life, c: d.c, o: 0 }));
   state.bridges = [];
   state.undo = []; state.first = snap(); state.flash = 0; state.doneT = 0; state.idle = 0;
   state.lit = false; state.bonkT = 0;
-  state.cam = null;
+  state.cam = null; state.yaw = 0; state.pitch = tune.cam_pitch; // the camera starts behind the walker, looking north
   updateSwitches(true); buildView(); updateCam(true);
 }
 function snap() {
@@ -190,11 +195,13 @@ function restore(s) {
   Object.assign(state.p, s.p);
   state.crates.forEach((c, i) => Object.assign(c, s.c[i]));
   state.bridges = s.b.slice(); state.flash = 0; state.idle = 0;
+  view.camLife = state.p.life; view.camPrev = null;
   updateSwitches(true);
 }
 
 // What stops the walker in one life: its walls, its water, its closed doors, its crates.
 const R = 0.28; // the walker's half width, in tiles
+const WALL_H = 1.5; // taller than the walker: the rooms are places you stand in
 function bridged(life, x, z) { return state.bridges.includes(life + ':' + x + ',' + z); }
 function solidCell(life, x, z, doorAt = 0.9) {
   const L = state.L;
@@ -304,17 +311,19 @@ function updatePlay(dt) {
   if (pressed('KeyR')) { pushUndo(); restore(state.first); sfx('undo'); return; }
   if (pressed('KeyE') || pressed('Space')) tryCarry();
 
-  // Walk: up the screen is north
-  let ix = (down.has('ArrowRight') || down.has('KeyD') ? 1 : 0) - (down.has('ArrowLeft') || down.has('KeyA') ? 1 : 0);
-  let iz = (down.has('ArrowDown') || down.has('KeyS') ? 1 : 0) - (down.has('ArrowUp') || down.has('KeyW') ? 1 : 0);
-  p.moving = ix !== 0 || iz !== 0;
+  // Look and walk: forward is where the camera faces
+  state.yaw += ((down.has('ArrowLeft') ? 1 : 0) - (down.has('ArrowRight') ? 1 : 0)) * tune.turn_rate * dt;
+  const iF = (down.has('ArrowUp') || down.has('KeyW') ? 1 : 0) - (down.has('ArrowDown') || down.has('KeyS') ? 1 : 0);
+  const iR = (down.has('KeyD') ? 1 : 0) - (down.has('KeyA') ? 1 : 0);
+  const ix = -Math.sin(state.yaw) * iF + Math.cos(state.yaw) * iR, iz = -Math.cos(state.yaw) * iF - Math.sin(state.yaw) * iR;
+  p.moving = iF !== 0 || iR !== 0;
   if (p.moving) {
-    if (ix && iz) { if (p.fx && !p.fz) { p.fx = ix; } else { p.fx = 0; p.fz = iz; } } // on a diagonal, keep the axis faced
-    else { p.fx = ix; p.fz = iz; }
     const n = Math.hypot(ix, iz), dx = ix / n * tune.move_speed * dt, dz = iz / n * tune.move_speed * dt;
     const want = Math.atan2(ix, iz); let da = want - p.ang;
     while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
     p.ang += da * Math.min(1, tune.turn_speed * dt); p.walk += dt * 13;
+    const fs = Math.sin(p.ang), fc = Math.cos(p.ang); // the tile ahead is the one the walker mostly faces
+    if (Math.abs(fs) > Math.abs(fc)) { p.fx = Math.sign(fs); p.fz = 0; } else { p.fx = 0; p.fz = Math.sign(fc); }
     if (dx && !blocked(p.life, p.x + dx, p.z)) p.x += dx;
     if (dz && !blocked(p.life, p.x, p.z + dz)) {
       const oz = p.z; let nz = p.z + dz;
@@ -327,7 +336,7 @@ function updatePlay(dt) {
         if (blocked(other, p.x, nz)) { if (!state.bonkT) { sfx('bonk'); state.bonkT = 0.4; } } // the other life is solid here
         else {
           pushUndo(); p.z = nz; p.life = other; if (p.carry >= 0) state.crates[p.carry].life = other;
-          state.flash = tune.flash_s; state.crossings++; sfx('cross'); events.push({ type: 'cross', life: other, t: state.t });
+          state.crossings++; sfx('cross'); events.push({ type: 'cross', life: other, t: state.t });
         }
       }
     }
@@ -372,7 +381,7 @@ const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: tr
 function add(parent, geo, mat, x, y, z, sx = 1, sy = sx, sz = sx) {
   const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m;
 }
-const camera = new THREE.PerspectiveCamera(44, W / H, 0.1, 140);
+const camera = new THREE.PerspectiveCamera(44, W / H, 0.05, 140);
 const scenes = LOOK.map(P => {
   const s = new THREE.Scene(); s.fog = new THREE.Fog(P.bg, 20, 46);
   s.add(new THREE.HemisphereLight(P.hemi[0], P.hemi[1], P.hemi[2]));
@@ -382,7 +391,7 @@ const scenes = LOOK.map(P => {
 });
 const maskScene = new THREE.Scene();
 const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0), NOCLIP = [];
-const view = { worlds: [null, null], masks: [], crates: [], doors: [], switches: [], walker: null, exit: null };
+const view = { worlds: [null, null], masks: [], crates: [], doors: [], switches: [], walker: null, exit: null, marker: null, camLife: 0, camPrev: null };
 const hash = (x, z, k) => { let h = (x * 374761393 + z * 668265263 + k * 2246822519) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 function decor(g, life, x, z, y, r, tall) { // small things that make each life its own place
@@ -411,7 +420,7 @@ function buildWorld(life) {
     if (ch === '~') { add(g, GEO.box, M(P.water, { emissive: P.waterGlow }), cx, -0.42, cz, 1, 0.2, 1); continue; }
     add(g, GEO.box, M(P.floor[(x + z) % 2]), cx, -0.2, cz, 1, 0.4, 1);
     if (ch === '#') {
-      const front = z === L.d - 1, h = front ? 0.25 : 0.8; // the wall nearest the camera is a low kerb
+      const front = false, h = WALL_H;
       add(g, GEO.box, M(P.wall), cx, h / 2, cz, 1, h, 1); add(g, GEO.box, M(P.cap), cx, h + 0.05, cz, 1.04, 0.1, 1.04);
       const edge = x === 0 || z === 0 || x === L.w - 1;
       if (!front && r < 0.6) decor(g, life, cx, cz, h + 0.1, hash(x, z, 9 + life), edge);
@@ -422,6 +431,10 @@ function buildWorld(life) {
     const x = L.w / 2 + Math.cos(a) * (L.w / 2 + d), z = L.d / 2 + Math.sin(a) * (L.d / 2 + d) - 3;
     if (x > -1.5 && x < L.w + 1.5 && z > -1.5 && z < L.d + 1.5) continue;
     decor(g, life, x, z, -0.55, hash(i, life, 5) * 0.75, true);
+  }
+  for (let i = 0; i < 14; i++) { // clouds, or their red cousins
+    const a = hash(i, life, 71) * Math.PI * 2, d = 12 + hash(i, life, 73) * 22;
+    add(g, GEO.sph, M(life ? 0x5c1322 : 0xffffff), L.w / 2 + Math.cos(a) * d, 8 + hash(i, life, 77) * 6, L.d / 2 + Math.sin(a) * d, 5 + hash(i, life, 79) * 4, 1.4, 3);
   }
   for (const o of L.portals) { // the arch stands in both lives
     const m = M(0xfff3c4, { emissive: 0x6b5a2a });
@@ -460,7 +473,9 @@ function buildView() {
   view.masks = state.L.portals.map((o, i) => add(maskScene, GEO.mask, new THREE.MeshBasicMaterial({
     colorWrite: false, depthWrite: false, side: THREE.DoubleSide, stencilWrite: true, stencilRef: i + 1,
     stencilFunc: THREE.EqualStencilFunc, stencilFuncMask: 0x80, stencilZPass: THREE.ReplaceStencilOp }), o.x + 0.5, 0, o.zc));
-  view.walker = buildWalker();
+  view.walker = buildWalker(); view.camLife = state.p.life; view.camPrev = null;
+  view.marker = new THREE.Mesh(GEO.box, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false }));
+  view.marker.scale.set(0.86, 0.04, 0.86);
   view.crates = state.crates.map(c => ({ g: buildCrate(c.origin), ghost: new THREE.Mesh(GEO.box, ghostMat) }));
   view.crates.forEach(v => v.ghost.scale.setScalar(0.72));
   view.doors = state.doors.map(d => {
@@ -508,9 +523,45 @@ function syncView() { // put every figure where the state says it is
   const ex = view.exit, lit = state.lit;
   ex.star.material.color.setHex(lit ? 0xfff06a : 0x8a8fa0); ex.star.rotation.y = t * (lit ? 2.4 : 0.5);
   ex.star.position.y = 0.85 + (lit ? Math.sin(t * 4) * 0.1 : 0); ex.halo.visible = lit; ex.halo.scale.setScalar(0.75 + Math.sin(t * 5) * 0.06);
-  const c = state.cam;
+  view.worlds[p.life].add(view.marker); view.marker.visible = p.carry >= 0 && scene === 'play'; // where a carried crate would go
+  view.marker.position.set(Math.floor(p.x) + p.fx + 0.5, 0.04, Math.floor(p.z) + p.fz + 0.5);
+  placeCamera();
+}
+function camSolid(life, x, z) {
+  const L = state.L, cx = Math.floor(x), cz = Math.floor(z);
+  if (cx < 0 || cz < 0 || cx >= L.w || cz >= L.d) return false; // beyond the room is open air
+  return L.grid[life][cz][cx] === '#' || state.doors.some(d => d.life === life && d.x === cx && d.z === cz && d.o < 0.5);
+}
+function placeCamera() {
+  const p = state.p, c = camera.position;
   camera.fov = tune.cam_fov; camera.updateProjectionMatrix();
-  camera.position.set(c.x, tune.cam_height, c.z + tune.cam_back); camera.lookAt(c.x, 0.3, c.z - 0.4);
+  if (scene === 'title' || scene === 'figures') { // the whole room from above
+    const o = state.cam; c.set(o.x, tune.cam_height, o.z + tune.cam_back); camera.lookAt(o.x, 0.3, o.z - 0.4);
+    view.camLife = p.life; view.camPrev = null; return;
+  }
+  // Behind the walker, pulled in when a wall is in the way
+  const ty = 1.0, cp = Math.cos(state.pitch), dx = Math.sin(state.yaw) * cp, dy = Math.sin(state.pitch), dz = Math.cos(state.yaw) * cp;
+  let d = 0.4;
+  for (let s = 0.4; s <= tune.cam_dist; s += 0.08) {
+    if (view.camLife === p.life && ty + dy * s < WALL_H + 0.3 && camSolid(p.life, p.x + dx * (s + 0.25), p.z + dz * (s + 0.25))) break;
+    d = s;
+  }
+  c.set(p.x + dx * d, ty + dy * d, p.z + dz * d); camera.lookAt(p.x, ty + 0.1, p.z);
+  // The camera has a life of its own: it changes when the camera itself passes through an arch
+  const prev = view.camPrev;
+  if (prev) for (const o of state.L.portals) if ((prev.z - o.zc) * (c.z - o.zc) < 0) {
+    const k = (o.zc - prev.z) / (c.z - prev.z), hx = prev.x + (c.x - prev.x) * k, hy = prev.y + (c.y - prev.y) * k;
+    if (hx > o.x && hx < o.x + 1 && hy < 2.4) view.camLife = 1 - view.camLife;
+  }
+  view.camPrev = { x: c.x, y: c.y, z: c.z };
+  if (view.camLife !== p.life) { // walker and camera in different lives: right only while it is seen through an arch
+    const through = state.L.portals.some(o => {
+      if ((c.z - o.zc) * (p.z - o.zc) >= 0) return false;
+      const k = (o.zc - c.z) / (p.z - c.z), hx = c.x + (p.x - c.x) * k, hy = c.y + (0.6 - c.y) * k;
+      return hx > o.x && hx < o.x + 1 && hy < 2.4;
+    });
+    if (!through) { view.camLife = p.life; state.flash = tune.flash_s; }
+  }
 }
 function setStencil(sc, ref) {
   sc.traverse(o => {
@@ -521,8 +572,8 @@ function setStencil(sc, ref) {
   });
 }
 function render3d() {
-  const cur = state.p.life, oth = 1 - cur;
   syncView();
+  const cur = view.camLife, oth = 1 - cur;
   renderer.clippingPlanes = NOCLIP; setStencil(scenes[cur], 0);
   renderer.setClearColor(LOOK[cur].bg, 1); renderer.clear(true, true, true);
   renderer.render(scenes[cur], camera);                                   // this life
@@ -553,11 +604,11 @@ function drawHud() {
   const P = LOOK[state.p.life], y = H - 32;
   ctx.fillStyle = '#0c0e12'; ctx.fillRect(0, H - 64, W, 64);
   ctx.fillStyle = P.hud; ctx.fillRect(0, H - 64, W, 4);
-  text(`Room ${state.li + 1} of ${LEVELS.length}: ${state.L.def.name}`, 28, y + 2, 22, '#ffffff', 'left');
-  ctx.save(); ctx.translate(560, y + 2); ctx.rotate(Math.PI / 4); ctx.fillStyle = P.ground; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  text(`Room ${state.li + 1} of ${LEVELS.length}: ${state.L.def.name}`, 28, y + 2, 20, '#ffffff', 'left');
+  ctx.save(); ctx.translate(470, y + 2); ctx.rotate(Math.PI / 4); ctx.fillStyle = P.ground; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
   ctx.fillRect(-10, -10, 20, 20); ctx.strokeRect(-10, -10, 20, 20); ctx.restore();
-  text(P.name, 584, y + 2, 22, '#ffffff', 'left', 'bold');
-  text('E carry   Z undo   R restart   P pause   M ' + (muted ? 'sound on' : 'mute'), W - 28, y + 2, 18, '#c9d2dc', 'right');
+  text(P.name, 492, y + 2, 20, '#ffffff', 'left', 'bold');
+  text('Mouse or Left/Right look   E carry   Z undo   R restart   P pause', W - 28, y + 2, 18, '#c9d2dc', 'right');
 }
 function drawPlay() {
   render3d();
@@ -587,12 +638,12 @@ const scenes2d = {
     update(dt) { state.t += dt; if (pressed('Enter') || pressed('Space')) { reset(); scene = 'play'; } },
     draw() {
       render3d(); ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = 'rgba(12,14,18,0.84)'; rr(W / 2 - 400, 70, 800, 580, 28); ctx.fill();
+      ctx.fillStyle = 'rgba(12,14,18,0.84)'; rr(W / 2 - 440, 70, 880, 580, 28); ctx.fill();
       ctx.fillStyle = '#35e0cf'; ctx.fillRect(W / 2 - 150, 222, 150, 5); ctx.fillStyle = '#ff3b4a'; ctx.fillRect(W / 2, 222, 150, 5);
       text(TITLE, W / 2, 150, 104, '#ffffff', 'center', 'bold');
       text('one room, two lives: walk through an arch to change life', W / 2, 262, 24, '#fff3c4');
-      ['W A S D or arrows: walk', 'E or Space: pick up a crate, or put it down ahead', 'Z: undo, as often as you like',
-        'R: restart the room (Z brings it back)', 'P: pause     M: mute'].forEach((c, i) => text(c, W / 2, 330 + i * 42, 24, '#ffffff'));
+      ['W A S D: walk     Mouse (click the game) or Left / Right: look around', 'E or Space: pick up a crate, or put it down on the marked tile', 'Z: undo, as often as you like',
+        'R: restart the room (Z brings it back)', 'P: pause     M: mute     Esc: free the mouse'].forEach((c, i) => text(c, W / 2, 330 + i * 42, 24, '#ffffff'));
       text('Enter to start', W / 2, 590, 30, '#fff06a', 'center', 'bold');
     },
   },

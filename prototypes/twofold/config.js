@@ -11,10 +11,16 @@ window.CONFIG = {
   move_speed: { value: 4.2, min: 2, max: 8, step: 0.1 },        // tiles per second
   turn_speed: { value: 14, min: 4, max: 30, step: 1 },          // how fast the walker turns to face its way, per second
 
-  // The camera: a fixed tilt from the south, leaning toward the walker
+  // The camera in play: behind the walker, turned with the mouse or the Left and Right arrows
+  cam_dist: { value: 3.8, min: 1.5, max: 8, step: 0.1 },        // tiles behind the walker
+  cam_pitch: { value: 0.45, min: 0.05, max: 1.3, step: 0.05 },  // radians above level when a room starts
+  turn_rate: { value: 2.4, min: 0.8, max: 5, step: 0.1 },       // radians per second on the arrow keys
+  look_sens: { value: 0.0026, min: 0.0005, max: 0.008, step: 0.0001 }, // radians per pixel of mouse travel
+
+  // The camera on the title: a fixed tilt from the south
   cam_height: { value: 10.5, min: 6, max: 16, step: 0.5 },     // tiles above the floor
   cam_back: { value: 6.5, min: 3, max: 12, step: 0.5 },       // tiles south of what it looks at
-  cam_fov: { value: 46, min: 30, max: 70, step: 1 },            // degrees
+  cam_fov: { value: 60, min: 30, max: 70, step: 1 },            // degrees
   cam_follow: { value: 0.35, min: 0, max: 1, step: 0.05 },      // 0 looks at the room's middle, 1 at the walker
 
   // Portals

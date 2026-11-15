@@ -7,11 +7,13 @@ create me a non-eculidean games where two lifes are merged a colorful life with 
 
 After play: well i was expecting 3D diamension tbh with a cute nice world can u go with it fast ?
 
+After play: i played it ! it is perfect but u know it is not fully 3D yet it looks like 2.5D can we go real 3D world !?
+
 **Pitch:** One room exists twice, a colourful life and a red life laid over each other, and you walk through portal arches between them to get around what blocks you in the other.
 
 **Genre:** 3D puzzle
 
-**Controls:** W A S D or arrows to walk, E or Space to pick up a crate or put it down ahead, Z to undo, R to restart. Walking through an arch changes life. *(guessed)*
+**Controls:** W A S D or the Up and Down arrows to walk, the mouse (click the game) or the Left and Right arrows to look around, E or Space to pick up a crate or put it down ahead, Z to undo, R to restart, P to pause, M to mute, Esc to free the mouse. Walking through an arch changes life. *(guessed)*
 
 **Question:** Is crossing between two overlaid worlds to solve a room satisfying for ten minutes? *(guessed)*
 
@@ -28,7 +30,7 @@ After play: well i was expecting 3D diamension tbh with a cute nice world can u 
   - Signature: every portal arch shows the other life through it, drawn live from the same camera.
   - Every figure modelled, no emoji.
 - References: none named.
-- View: 3D · Camera: fixed tilt from the south, looking down on the whole room and leaning toward the walker. *(guessed)*
+- View: 3D · Camera: behind the walker at its shoulder height and above, turned with the mouse or the Left and Right arrows; it passes through an arch with you. The title keeps the tilted view of the whole room.
 
 ## First minute
 You stand in a sunny walled garden with the exit star in sight behind a wall you cannot pass. Ahead is a glowing arch, and through it the same floor shows in red. You walk through, the world turns red, the wall is gone on the far side of the room, you cross over, walk through a second arch, and you are back in colour beside the exit. The star lights. Room 2 opens with a switch, a door, and a crate that exists only in the red life.
@@ -61,7 +63,7 @@ You stand in a sunny walled garden with the exit star in sight behind a wall you
 - simple puzzles · in the slice
 
 ## Keep
--
+- i played it ! it is perfect *(you said)*
 
 ## Avoid
 -
