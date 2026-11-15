@@ -27,13 +27,15 @@ const LETTERS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function newRoomId() { for (;;) { let s = ''; for (const b of crypto.randomBytes(4)) s += LETTERS[b % 32]; if (!rooms.has(s)) return s; } }
 const cleanName = n => String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 14) || 'player';
 const GOALS = [3, 5, 10, 25, 50];
+const LAN = []; for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) LAN.push(a.address + ':' + PORT); // what players on the same Wi-Fi type
 function roster(room, type, to) {
-  const m = { t: type, id: room.id, host: room.host, mode: room.mode, goal: room.goal, players: room.players.map(p => ({ id: p.id, name: p.name })) };
+  const m = { t: type, id: room.id, host: room.host, mode: room.mode, goal: room.goal, lan: LAN[0] || '', players: room.players.map(p => ({ id: p.id, name: p.name })) };
   if (to) send(to, Object.assign({ you: to.id }, m)); else room.players.forEach(p => send(p, m));
 }
 function leave(c) {
   const room = c.room; if (!room) return; c.room = null;
   room.players = room.players.filter(p => p !== c);
+  console.log('room ' + room.id + ': ' + c.name + ' left');
   if (!room.players.length) { rooms.delete(room.id); return; }
   if (room.host === c.id) room.host = room.players[0].id; // the next player takes the room over
   roster(room, 'roster');
@@ -42,13 +44,13 @@ function onMessage(c, m) {
   if (!m || typeof m.t !== 'string') return;
   if (m.t === 'create' && !c.room) {
     const room = { id: newRoomId(), host: c.id, players: [c], mode: [0, 1, 2].includes(m.mode) ? m.mode : 1, goal: GOALS.includes(m.goal) ? m.goal : 5, racing: false, place: 0 };
-    c.name = cleanName(m.name); c.room = room; rooms.set(room.id, room); roster(room, 'room', c); return;
+    c.name = cleanName(m.name); c.room = room; rooms.set(room.id, room); roster(room, 'room', c); console.log('room ' + room.id + ' made by ' + c.name); return;
   }
   if (m.t === 'join' && !c.room) {
     const room = rooms.get(String(m.id || '').toUpperCase());
     if (!room) { send(c, { t: 'err', msg: 'none' }); return; }
     if (room.players.length >= MAX) { send(c, { t: 'err', msg: 'full' }); return; }
-    c.name = cleanName(m.name); c.done = false; c.room = room; room.players.push(c); roster(room, 'room', c); roster(room, 'roster');
+    c.name = cleanName(m.name); c.done = false; c.room = room; room.players.push(c); roster(room, 'room', c); roster(room, 'roster'); console.log('room ' + room.id + ': ' + c.name + ' joined (' + room.players.length + ' of ' + MAX + ')');
     if (room.racing) send(c, { t: 'go', mode: room.mode, goal: room.goal }); // a late player starts climbing at once
     return;
   }

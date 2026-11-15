@@ -376,7 +376,7 @@ const net = { ws: null, can: location.protocol.startsWith('http'), room: null, i
 function onNet(m) {
   if (m.t === 'room' || m.t === 'roster') {
     if (m.t === 'room') { net.id = m.you; scene = 'lobby'; }
-    net.room = { id: m.id, players: m.players, host: m.host, mode: m.mode, goal: m.goal }; net.host = m.host === net.id;
+    net.room = { id: m.id, players: m.players, host: m.host, mode: m.mode, goal: m.goal, lan: m.lan }; net.host = m.host === net.id;
     const keep = new Map();
     m.players.forEach((p, i) => { if (p.id === net.id) { game.slot = i; game.color = COLORS[i]; } else { const o = others.get(p.id) || { id: p.id, x: W / 2, alt: 0, tx: W / 2, talt: 0, face: 1, fin: null }; o.name = p.name; o.color = COLORS[i]; keep.set(p.id, o); } });
     others = keep;
@@ -876,7 +876,7 @@ const scenes = {
     draw() {
       const r = net.room; drawWorld(); if (!r) return; rr(40, 110, W - 80, 900, 30, 'rgba(12,14,22,0.9)', '#ffd44f', 4);
       text(K.room, W / 2, 170, 30, '#cfd6e0'); rr(W / 2 - 200, 200, 400, 120, 22, '#ffffff', '#ffd44f', 6); plain(r.id, W / 2, 264, 84, '#0c0e16');
-      text(K.share, W / 2, 356, 22, '#ffe58a'); plain(location.host || 'localhost:8080', W / 2, 394, 26, '#ffffff');
+      text(K.share, W / 2, 356, 22, '#ffe58a'); plain(/^(localhost|127\.)/.test(location.host) || !location.host ? (r.lan || 'localhost:8080') : location.host, W / 2, 394, 28, '#ffffff'); // on the host's own PC, show the address the others must type
       text(`${K.players}: ${r.players.length}`, W / 2, 448, 26, '#cfd6e0');
       r.players.forEach((p, i) => { const y = 480 + i * 62; rr(110, y, W - 220, 52, 14, 'rgba(255,255,255,0.08)', COLORS[i], 3); ctx.beginPath(); ctx.arc(W - 150, y + 26, 12, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill();
         text(p.name + (p.id === net.id ? ` (${K.you})` : ''), W / 2, y + 27, 25, '#ffffff', 'center', true); if (p.id === r.host) drawStar(150, y + 26, 0, 0.7); });
@@ -988,6 +988,7 @@ window.game = {
 reset();
 scene = params.get('scene') || 'title';
 if (params.get('race') === 'bots') { startRace('bots', 5); state.count = Number(params.get('count') || 3.4); } // a check may start a race with the bots
+if (params.get('auto') === 'create') net.open({ t: 'create', name: game.name, mode, goal: 5 }); else if (params.get('auto') === 'join') net.open({ t: 'join', id: params.get('room') || '', name: game.name }); // a check may make or join a room without a key press
 if (params.get('demo') === '1') { net.id = 1; net.host = true; net.room = { id: 'K7QM', players: [{ id: 1, name: game.name }, { id: 2, name: BOTS[0] }, { id: 3, name: BOTS[1] }], host: 1, mode, goal: 5 }; } // and may show a room with made-up players
 last = clock.now();
 if (params.get('manual') === '1') drawFrame();
