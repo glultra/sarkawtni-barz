@@ -1,0 +1,134 @@
+# The one-shot's small check (check-run/1).
+# Written by one-shot-check.sh --record: the results are /prototype's reading of
+# evidence/self-check.tsv; never edited by hand.
+kind: check-run/1
+engine: web
+browser: "HeadlessChrome/157.0.0.0"
+time: "2026-11-15 18:06:39"
+checks:
+  - id: boots
+    result: pass
+    evidence:
+      - "evidence/self-check.tsv"
+  - id: shot
+    result: pass
+    evidence:
+      - "evidence/play.png"
+  - id: outlines
+    result: pass
+    evidence:
+      - "evidence/figures.png"
+  - id: brief-words
+    result: pass
+    why: "missed; 2.5D: answer 1 chose a first person camera in 3D for this game; 2.5D was the earlier game's view, kept in its own folder; 2D: named as what the earlier game was converted from; nothing here is 2D but the HUD"
+    evidence:
+      - "evidence/brief-words.tsv"
+  - id: emoji
+    result: pass
+    evidence:
+      - "evidence/self-check.tsv"
+  - id: nearest-game
+    result: pass
+    evidence:
+      - "evidence/nearest-game.txt"
+brief_checklist:
+  - id: L1
+    result: pass
+    evidence: "evidence/l1-start.png"
+    item: "Look: *(provisional)*"
+  - id: L2
+    result: pass
+    evidence: "evidence/t-l1-shed.png"
+    item: "References: Viewfinder and Superliminal (the first-person view, clean readable spaces, and surprise from space that does not behave)."
+  - id: L3
+    result: pass
+    evidence: "evidence/play.png"
+    item: "View: 3D · Camera: first person at eye height, mouse look, smoothed."
+  - id: F1
+    result: pass
+    evidence: "evidence/t-l1-red.png"
+    item: "Two lives of one place, colourful and red, with different walls and doors"
+  - id: F2
+    result: pass
+    evidence: "evidence/play.png"
+    item: "Arches you see through and walk through with no cut"
+  - id: F3
+    result: pass
+    evidence: "evidence/t-l1-shed.png"
+    item: "A room bigger inside than outside"
+  - id: F4
+    result: pass
+    evidence: "evidence/t-l2-seam.png"
+    item: "A path round a corner that leads somewhere new the second time"
+  - id: F5
+    result: pass
+    evidence: "evidence/t-l4-start.png"
+    item: "A door that leads to a different place from each side"
+  - id: F6
+    result: pass
+    evidence: "index.html:797"
+    item: "Cubes you carry through arches onto switches that open doors"
+  - id: F7
+    result: pass
+    evidence: "evidence/ending.png"
+    item: "Five spaces, one idea each: shown safe, then used, then twisted"
+  - id: F8
+    result: not_run
+    mark: not assessed
+    why: "the gate lights and a chime is called when a space is solved; the sound itself was not heard by the check"
+    evidence: "index.html:848"
+    item: "A clear sound and the gate lighting the moment a space is solved"
+  - id: S1
+    result: pass
+    evidence: "evidence/play.png"
+    item: "teleport like a portal between the lifes · in the slice"
+  - id: S2
+    result: pass
+    evidence: "evidence/t-l4-start.png"
+    item: "a bit more non-ecludiean ideas · in the slice"
+  - id: S3
+    result: pass
+    evidence: "index.html:577"
+    item: "simple puzzles · in the slice *(guessed)*"
+  - id: M1
+    result: pass
+    evidence: "evidence/l1-start.png"
+    item: "You stand on a garden path facing a glowing arch, with red ground showing through it."
+  - id: M2
+    result: pass
+    evidence: "evidence/play.png"
+    item: "You walk through and you are in the red life with no cut; looking back, the green garden is inside the arch."
+  - id: M3
+    result: pass
+    evidence: "evidence/t-l1-red.png"
+    item: "A wall blocks the path in red but not in green, so you cross back at a second arch and pass it."
+  - id: M4
+    result: pass
+    evidence: "evidence/t-l1-shed.png"
+    item: "Then a tiny shed with one door: you step in and it is a long hall, far bigger than the shed."
+  - id: M5
+    result: pass
+    evidence: "index.html:847"
+    item: "The exit gate at its end lights when you reach it."
+  - id: C1
+    result: pass
+    evidence: "index.html:577"
+    item: "*(provisional)* The first real puzzle is the third space, around minute three."
+  - id: C2
+    result: pass
+    evidence: "evidence/t-l3-yard.png"
+    item: "A switch in the colourful life needs a cube that exists only in the red life, and the hedge path round a pillar leads somewhere new the second time round, so the short way is not the way."
+  - id: C3
+    result: pass
+    evidence: "index.html:808"
+    item: "Nothing kills you and nothing is lost: R restarts the space, and a cube that falls out of reach returns to its start."
+  - id: C4
+    result: pass
+    evidence: "index.html:619"
+    item: "Spaces four and five combine the bigger-inside room, the changing path, and a door that leads to a different place from each side."
+measures:
+  - id: step-time
+    value: 0.700
+    unit: ms
+    by: browser
+    detail: "mean 0.014 ms, slowest 0.700 ms, 224 steps"

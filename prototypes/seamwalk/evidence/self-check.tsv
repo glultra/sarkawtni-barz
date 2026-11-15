@@ -1,0 +1,49 @@
+time	2026-11-15 18:06:39
+keep	lines	0	pinned	0
+briefword	2.5D	missed	answer 1 chose a first person camera in 3D for this game; 2.5D was the earlier game's view, kept in its own folder
+briefword	2D	unlisted
+briefword	3D	unlisted
+briefword	first person	unlisted
+briefword	viewfinder and superliminial	unlisted
+briefword	first-person	unlisted
+checklist	L1	unlisted	-	Look: *(provisional)*	
+checklist	L2	unlisted	-	References: Viewfinder and Superliminal (the first-person view, clean readable spaces, and surprise from space that does not behave).	
+checklist	L3	unlisted	-	View: 3D · Camera: first person at eye height, mouse look, smoothed.	
+checklist	F1	unlisted	-	Two lives of one place, colourful and red, with different walls and doors	
+checklist	F2	unlisted	-	Arches you see through and walk through with no cut	
+checklist	F3	unlisted	-	A room bigger inside than outside	
+checklist	F4	unlisted	-	A path round a corner that leads somewhere new the second time	
+checklist	F5	unlisted	-	A door that leads to a different place from each side	
+checklist	F6	unlisted	-	Cubes you carry through arches onto switches that open doors	
+checklist	F7	unlisted	-	Five spaces, one idea each: shown safe, then used, then twisted	
+checklist	F8	unlisted	-	A clear sound and the gate lighting the moment a space is solved	
+checklist	S1	unlisted	-	teleport like a portal between the lifes · in the slice	
+checklist	S2	unlisted	-	a bit more non-ecludiean ideas · in the slice	
+checklist	S3	unlisted	-	simple puzzles · in the slice *(guessed)*	
+checklist	M1	unlisted	-	You stand on a garden path facing a glowing arch, with red ground showing through it.	
+checklist	M2	unlisted	-	You walk through and you are in the red life with no cut; looking back, the green garden is inside the arch.	
+checklist	M3	unlisted	-	A wall blocks the path in red but not in green, so you cross back at a second arch and pass it.	
+checklist	M4	unlisted	-	Then a tiny shed with one door: you step in and it is a long hall, far bigger than the shed.	
+checklist	M5	unlisted	-	The exit gate at its end lights when you reach it.	
+checklist	C1	unlisted	-	*(provisional)* The first real puzzle is the third space, around minute three.	
+checklist	C2	unlisted	-	A switch in the colourful life needs a cube that exists only in the red life, and the hedge path round a pillar leads somewhere new the second time round, so the short way is not the way.	
+checklist	C3	unlisted	-	Nothing kills you and nothing is lost: R restarts the space, and a cube that falls out of reach returns to its start.	
+checklist	C4	unlisted	-	Spaces four and five combine the bigger-inside room, the changing path, and a door that leads to a different place from each side.	
+webgl	ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)
+browser	HeadlessChrome/157.0.0.0
+console	play	6359	[ProtocolLaunch] handler constructed; wiring port events.
+console	play	1796	[.WebGL-0x382c0007aa00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+scene	play	0	title
+scene	play	1	play
+digits	log	bold 20px "Trebuchet MS", "Segoe UI", sans-serif	tabular	0
+measure	step-time	play	0.014	0.700	224
+lane	play	stop	3.7	360
+console	play	0	[.WebGL-0x382c0007aa00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+console	play	0	[.WebGL-0x382c0007aa00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+uncaught	play	0
+text	play	canvas	28,682,346,701	27.0	19.40	inside	Space 1 of 5: A hole in the garden
+text	play	canvas	581,682,653,697	27.0	19.40	inside	Red life
+text	play	canvas	1022,682,1253,700	27.0	13.26	inside	E cube   R restart   P pause
+screen	play	drawn
+shot	play	prototypes/seamwalk/evidence/play.png
+responds	changed	4

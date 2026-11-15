@@ -1,0 +1,1060 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: Is walking through impossible spaces between two lives fun for ten minutes in first person? -->
+<!-- Date: 2026-11-15 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seamwalk</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { font-variant-numeric: tabular-nums; }
+  #stage { position: relative; margin: 0 auto; }
+  #stage canvas { display: block; position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="gl"></canvas><canvas id="game"></canvas></div>
+<script src="vendor/three.js"></script>
+<script src="config.js"></script>
+<script>
+'use strict';
+// Seamwalk: a first-person walk through a garden that exists twice. Every arch, door and
+// seam is a portal face: a flat opening linked to another one somewhere else. The world is
+// drawn through each face from where you stand, and walking through one moves you with no cut.
+
+// ---- Built to be checked ----------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
+const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
+const W = 1280, H = 720;        // logical size of the HUD
+const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
+const TITLE = 'Seamwalk';
+const CONTROLS = [
+  'W A S D: walk     Mouse: look around (click the game first)',
+  'E: pick up a cube, or put it down',
+  'R: restart the space     P: pause     M: mute     Esc: free the mouse',
+];
+const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
+const CHEAP = params.get('render') === 'cheap'; // a headless shot or check: 3D draws cheap; players never see it
+let seed;
+function rng() { // mulberry32; every gameplay random call reads this, never Math.random
+  seed = (seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), seed | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function scatterRng(s) { // the scenery's own generator: the same seed plants the same trees in every copy of a place
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), s | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const events = []; // window.game.events: anything the game wants a run to see
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const PI = Math.PI;
+
+// ---- Screen: a WebGL canvas for the world, a 2D canvas over it for the HUD ----------------
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: !CHEAP });
+renderer.shadowMap.enabled = false;
+const RES = new THREE.Vector2(1, 1); // the drawing buffer's size; every portal face reads it
+const pool = [];                     // render targets, by depth then by face seen
+function freeTargets() { pool.forEach(row => row.forEach(rt => rt.dispose())); pool.length = 0; }
+function fit() { // fills the window at any size and pixel ratio
+  const k = Math.min(innerWidth / W, innerHeight / H);
+  const cw = Math.round(W * k), ch = Math.round(H * k), r = k * (devicePixelRatio || 1);
+  stage.style.width = cw + 'px'; stage.style.height = ch + 'px';
+  stage.style.marginTop = Math.max(0, Math.floor((innerHeight - ch) / 2)) + 'px';
+  canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
+  canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+  ctx.setTransform(r, 0, 0, r, 0, 0);
+  renderer.setPixelRatio(CHEAP ? 0.5 : Math.min(devicePixelRatio || 1, 2)); renderer.setSize(cw, ch, true);
+  renderer.getDrawingBufferSize(RES); freeTargets();
+}
+function text(s, x, y, size, c, align = 'center', weight = '') {
+  ctx.fillStyle = c; ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align;
+  ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function panel(x, y, w, h, r, c) {
+  ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+}
+
+// ---- Input: keys by position (event.code), OS key repeat ignored ------------------------
+const down = new Set(), hit = new Set();
+const pressed = code => hit.has(code); // true for one step after the key goes down
+addEventListener('keydown', e => {
+  startAudio();
+  if (!e.repeat) { down.add(e.code); hit.add(e.code); }
+  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e => down.delete(e.code));
+addEventListener('blur', () => down.clear());
+// The mouse: captured on a click, read raw where the browser allows, never accelerated twice.
+let locked = false;
+function lockMouse() {
+  if (CHEAP || !stage.requestPointerLock) return;
+  try {
+    const p = stage.requestPointerLock({ unadjustedMovement: true });
+    if (p && p.catch) p.catch(() => { try { const q = stage.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch (e) {} });
+  } catch (e) {}
+}
+function freeMouse() { if (document.exitPointerLock && document.pointerLockElement) document.exitPointerLock(); }
+addEventListener('pointerdown', () => {
+  startAudio();
+  if (scene === 'title') hit.add('Enter');
+  else if (scene === 'pause') hit.add('KeyP');
+  if (scene === 'title' || scene === 'pause' || scene === 'play') lockMouse();
+});
+document.addEventListener('pointerlockchange', () => {
+  const now = document.pointerLockElement === stage;
+  if (locked && !now && scene === 'play') scene = 'pause'; // Esc freed the mouse
+  locked = now;
+});
+document.addEventListener('mousemove', e => {
+  if (!locked || scene !== 'play' || !P) return;
+  const mx = e.movementX || 0, my = e.movementY || 0;
+  if (Math.abs(mx) > 400 || Math.abs(my) > 400) return; // a browser's stray jump, not the hand
+  P.yawT -= mx * tune.look_sens;
+  P.pitchT = clamp(P.pitchT - my * tune.look_sens, -1.45, 1.45);
+});
+
+// ---- Audio: started on first input, mute on M --------------------------------------------
+let audio = null, muted = false;
+function startAudio() {
+  if (!audio) {
+    const ac = window.GAME_AUDIO || new (window.AudioContext || window.webkitAudioContext)(); // a check may inject one
+    const out = ac.createGain(); out.gain.value = muted ? 0 : tune.volume;
+    out.connect(ac.destination); audio = { ac, out };
+  }
+  if (audio.ac.state === 'suspended') audio.ac.resume();
+}
+function setMuted(m) { muted = m; if (audio) audio.out.gain.value = m ? 0 : tune.volume; }
+addEventListener('tune', () => setMuted(muted)); // the tweak panel (an add-on), when added, moved a value: the volume follows
+function tone(freq, dur, type = 'sine', vol = 0.2, to = 0, delay = 0) {
+  if (!audio || muted) return;
+  const t = audio.ac.currentTime + delay, o = audio.ac.createOscillator(), g = audio.ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audio.out); o.start(t); o.stop(t + dur + 0.02);
+}
+const sfx = {
+  step: n => tone(n % 2 ? 150 : 170, 0.06, 'triangle', 0.05),
+  toRed: () => { tone(520, 0.45, 'sine', 0.16, 180); tone(780, 0.4, 'triangle', 0.07, 260); },
+  toColour: () => { tone(260, 0.45, 'sine', 0.16, 660); tone(390, 0.4, 'triangle', 0.07, 990); },
+  pick: () => tone(440, 0.12, 'triangle', 0.16, 660),
+  put: () => tone(330, 0.12, 'triangle', 0.16, 220),
+  no: () => tone(140, 0.14, 'square', 0.06),
+  splash: () => { tone(700, 0.25, 'sine', 0.12, 200); tone(300, 0.3, 'triangle', 0.08, 120, 0.05); },
+  sw: () => tone(600, 0.08, 'square', 0.07, 900),
+  door: () => tone(110, 0.5, 'sawtooth', 0.06, 70),
+  land: () => tone(90, 0.12, 'triangle', 0.18, 50),
+  solved: () => [660, 880, 1320].forEach((f, i) => tone(f, 0.5, 'sine', 0.14, 0, i * 0.09)),
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.35, 'triangle', 0.14, 0, i * 0.1)),
+};
+
+// ---- The look: one palette per kind of place ---------------------------------------------
+const THEMES = {
+  green: { life: 'colour', open: true, sky: 0xbfe8ff, ground: 0x86d06e, hill: 0x74c463, tileA: 0xb4ec9c, tileB: 0xa2e088,
+    wall: 0xf6e9c8, top: 0xf8b6c9, hedge: 0x4aa85a, hedgeTop: 0x63bf6b, stone: 0xd9d2c4, wood: 0xc8915a, shed: 0xf4dcae,
+    roof: 0xf07f95, water: 0x6fd2f7, trunk: 0x9b6b45, leafs: [0x5cc46a, 0xf8a9c4, 0x7fd67f, 0xfad0dc], flowers: [0xffd23f, 0xffffff, 0xff8fb8] },
+  red: { life: 'red', open: true, sky: 0x6a1226, ground: 0x8c1a2a, hill: 0x6e1222, tileA: 0xb5263a, tileB: 0x9e1e30,
+    wall: 0x4c1c26, top: 0x8a2638, hedge: 0x6a1a2e, hedgeTop: 0x8a2238, stone: 0x4c242a, wood: 0x4a1c20, shed: 0x45181e,
+    roof: 0x260a10, water: 0xff7a3a, trunk: 0x2a1014, leafs: [0xff5a7a, 0xff9ab0, 0xd42a50, 0xffc0cc], flowers: [0xff9ab0, 0xffd0d8, 0xff5a7a] },
+  hall: { life: 'colour', open: false, sky: 0xf6e9c8, tileA: 0xf2d9a6, tileB: 0xe6c98e, wall: 0xf6e9c8, top: 0xf8b6c9,
+    ceil: 0xfbf5e6, stone: 0xd9d2c4, wood: 0xc8915a, leafs: [0x5cc46a], flowers: [0xffd23f] },
+  cave: { life: 'red', open: false, sky: 0x2a0c14, tileA: 0xa02438, tileB: 0x861c30, wall: 0x6e2436, top: 0xa23048,
+    ceil: 0x3c1422, plank: 0x5a2a2a, stone: 0x4c242a, wood: 0x4a1c20, leafs: [0xff5a7a, 0xff9ab0, 0xd42a50], flowers: [0xff9ab0] },
+};
+const KEYS = { y: { color: 0xffd23f, name: 'yellow' }, p: { color: 0xff6ec0, name: 'pink' } };
+const CUBE = 0xff9a3c, CUBE_LIGHT = 0xffc27a, FRAME = 0xf9eaa2, RIM = 0xfffbd8, DOORWOOD = 0xb9824c;
+const GEO = {
+  box: new THREE.BoxGeometry(1, 1, 1),
+  ico: new THREE.IcosahedronGeometry(1, 0),
+  ball: new THREE.IcosahedronGeometry(1, 1),
+  cone: new THREE.ConeGeometry(1, 1, 5),
+  pyr: new THREE.ConeGeometry(1, 1, 4),
+  cyl: new THREE.CylinderGeometry(1, 1, 1, 8),
+  tri: new THREE.CylinderGeometry(1, 1, 1, 3),
+  octa: new THREE.OctahedronGeometry(1, 0),
+  plane: new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2),
+};
+const matCache = new Map();
+function mat(color, o = {}) { // shared flat-shaded materials, one per colour
+  const key = color + '|' + (o.em || 0) + '|' + (o.basic ? 1 : 0) + '|' + (o.alpha || 1);
+  let m = matCache.get(key);
+  if (!m) {
+    m = o.basic ? new THREE.MeshBasicMaterial({ color })
+      : new THREE.MeshLambertMaterial({ color, flatShading: true, emissive: o.em || 0 });
+    if (o.alpha) { m.transparent = true; m.opacity = o.alpha; m.depthWrite = false; }
+    matCache.set(key, m);
+  }
+  return m;
+}
+for (const th of Object.values(THEMES)) { // a 2 m checker for each theme's floor
+  const c = document.createElement('canvas'); c.width = c.height = 2;
+  const g = c.getContext('2d'), hex = v => '#' + v.toString(16).padStart(6, '0');
+  g.fillStyle = hex(th.tileA); g.fillRect(0, 0, 2, 2); g.fillStyle = hex(th.tileB); g.fillRect(0, 0, 1, 1); g.fillRect(1, 1, 1, 1);
+  th.tex = new THREE.CanvasTexture(c); th.tex.colorSpace = THREE.SRGBColorSpace;
+  th.tex.magFilter = THREE.NearestFilter; th.tex.wrapS = th.tex.wrapT = THREE.RepeatWrapping; th.tex.anisotropy = 4;
+  th.skyC = new THREE.Color(th.sky); th.fog = new THREE.Fog(th.sky, 45, 150);
+}
+
+const world = new THREE.Scene();
+world.add(new THREE.HemisphereLight(0xffffff, 0x9a8f98, 2.3));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(-5, 10, 6); world.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.55); fill.position.set(7, 4, -5); world.add(fill); // so no wall is flat
+const cam = new THREE.PerspectiveCamera(74, W / H, 0.03, 170); world.add(cam);
+const vcams = [0, 1, 2, 3].map(() => new THREE.PerspectiveCamera());
+addEventListener('resize', fit); fit();
+
+// ---- Portal faces --------------------------------------------------------------------------
+// A face is a flat opening seen and entered from its front. It shows what its linked face
+// looks out on, and walking through it carries you out of the linked face's front.
+const DUMMY = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); DUMMY.needsUpdate = true;
+const FACE_VS = `
+#include <common>
+#include <clipping_planes_pars_vertex>
+void main() {
+  #include <begin_vertex>
+  #include <project_vertex>
+  #include <clipping_planes_vertex>
+}`;
+const FACE_FS = `
+uniform sampler2D map; uniform vec2 res; uniform vec3 flatColor; uniform float flatMix;
+#include <common>
+#include <clipping_planes_pars_fragment>
+void main() {
+  #include <clipping_planes_fragment>
+  vec4 c = texture2D(map, gl_FragCoord.xy / res);
+  gl_FragColor = vec4(mix(c.rgb, flatColor, flatMix), 1.0);
+  #include <colorspace_fragment>
+}`;
+function rotL(yaw, lx, lz) { return [lx * Math.cos(yaw) + lz * Math.sin(yaw), -lx * Math.sin(yaw) + lz * Math.cos(yaw)]; }
+function archOutline(hw, hs) { // a doorway with a round top
+  const s = new THREE.Shape(); s.moveTo(-hw, 0); s.lineTo(hw, 0); s.lineTo(hw, hs);
+  s.absarc(0, hs, hw, 0, PI, false); s.lineTo(-hw, 0); return s;
+}
+function rectOutline(hw, h) {
+  const s = new THREE.Shape(); s.moveTo(-hw, 0); s.lineTo(hw, 0); s.lineTo(hw, h); s.lineTo(-hw, h); s.lineTo(-hw, 0); return s;
+}
+function frameOutline(kind, hi, ho, h) { // the frame round an opening, as one outline
+  const s = new THREE.Shape(); s.moveTo(-ho, 0); s.lineTo(-hi, 0);
+  if (kind === 'arch') {
+    const hs = h - hi; s.lineTo(-hi, hs); s.absarc(0, hs, hi, PI, 0, true); s.lineTo(hi, 0); s.lineTo(ho, 0);
+    s.lineTo(ho, hs); s.absarc(0, hs, ho, 0, PI, false);
+  } else {
+    s.lineTo(-hi, h); s.lineTo(hi, h); s.lineTo(hi, 0); s.lineTo(ho, 0); s.lineTo(ho, h + (ho - hi)); s.lineTo(-ho, h + (ho - hi));
+  }
+  s.lineTo(-ho, 0); return s;
+}
+
+// ---- Building a level -------------------------------------------------------------------
+let L = null; // the level being played: its zones, colliders, floors, faces and things
+function builder(L) {
+  const B = {};
+  B.zone = themeName => {
+    const th = THEMES[themeName], idx = L.zones.length, ox = idx * 500;
+    const g = new THREE.Group(); g.position.x = ox; L.group.add(g);
+    const Z = { idx, ox, th, g };
+    L.zones.push(Z);
+    const own = o => { L.disp.push(o); return o; };
+    Z.box = (x0, y0, z0, x1, y1, z1, color, o) => {
+      const m = new THREE.Mesh(GEO.box, mat(color, o));
+      m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); m.scale.set(x1 - x0, y1 - y0, z1 - z0); g.add(m); return m;
+    };
+    Z.blob = (geo, x, y, z, sx, sy, sz, color, o, ry = 0) => {
+      const m = new THREE.Mesh(geo, mat(color, o)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = ry; g.add(m); return m;
+    };
+    Z.solid = (x0, z0, x1, z1, y0, y1, extra) => {
+      const c = Object.assign({ x0: x0 + ox, z0, x1: x1 + ox, z1, y0, y1 }, extra); L.colliders.push(c); return c;
+    };
+    Z.region = (x0, z0, x1, z1, ya, yb, axis) => {
+      L.regions.push({ x0: x0 + ox, z0, x1: x1 + ox, z1, ya, yb: yb === undefined ? ya : yb, axis: axis || 'x' });
+    };
+    Z.tiles = (x0, z0, x1, z1, y = 0, from = th) => {
+      const t = own(from.tex.clone()); t.needsUpdate = true;
+      t.repeat.set((x1 - x0) / 2, (z1 - z0) / 2); t.offset.set(x0 / 2, -z1 / 2);
+      const m = new THREE.Mesh(GEO.plane, own(new THREE.MeshLambertMaterial({ map: t })));
+      m.position.set((x0 + x1) / 2, y + 0.012, (z0 + z1) / 2); m.scale.set(x1 - x0, 1, z1 - z0); g.add(m);
+    };
+    Z.ground = () => {
+      const m = new THREE.Mesh(GEO.plane, mat(th.ground)); m.position.y = -0.02; m.scale.set(420, 1, 420); g.add(m);
+    };
+    Z.wall = (x0, z0, x1, z1, h = 3.4, y = 0) => {
+      Z.box(x0, y, z0, x1, y + h - 0.28, z1, th.wall); Z.box(x0 - 0.07, y + h - 0.28, z0 - 0.07, x1 + 0.07, y + h, z1 + 0.07, th.top);
+      Z.solid(x0, z0, x1, z1, y, y + h);
+    };
+    Z.hedge = (x0, z0, x1, z1, h = 2.8) => {
+      Z.box(x0, 0, z0, x1, h - 0.25, z1, th.hedge); Z.box(x0 + 0.04, h - 0.25, z0 + 0.04, x1 - 0.04, h, z1 - 0.04, th.hedgeTop);
+      Z.solid(x0, z0, x1, z1, 0, h);
+      const lx = x1 - x0, lz = z1 - z0, len = Math.max(lx, lz), n = Math.floor(len / 1.5);
+      for (let i = 0; i < n; i++) { // a row of clipped tufts along the top
+        const t = (i + 0.5) / n, bx = lx > lz ? x0 + lx * t : (x0 + x1) / 2, bz = lx > lz ? (z0 + z1) / 2 : z0 + lz * t;
+        Z.blob(GEO.ico, bx, h + 0.05, bz, 0.42, 0.32, 0.42, th.hedgeTop, undefined, i * 1.3);
+      }
+    };
+    Z.deck = (x0, z0, x1, z1, y) => { // a floor in the air: walk on it or under it
+      Z.box(x0, y - 0.3, z0, x1, y, z1, th.wood); Z.tiles(x0, z0, x1, z1, y, th.life === 'red' ? THEMES.cave : THEMES.hall); Z.region(x0, z0, x1, z1, y);
+    };
+    Z.rail = (x0, z0, x1, z1, y) => { Z.box(x0, y, z0, x1, y + 0.55, z1, th.top); Z.solid(x0, z0, x1, z1, y, y + 1.2); };
+    Z.post = (x, z, y1) => { Z.box(x - 0.17, 0, z - 0.17, x + 0.17, y1, z + 0.17, th.wood); Z.solid(x - 0.17, z - 0.17, x + 0.17, z + 0.17, 0, y1); };
+    Z.ramp = (x0, z0, x1, z1, ya, yb, axis) => { // stairs to look at, a smooth slope to walk on
+      Z.region(x0, z0, x1, z1, ya, yb, axis);
+      const n = 10;
+      for (let i = 0; i < n; i++) {
+        const a = i / n, b = (i + 1) / n, low = lerp(ya, yb, a), high = lerp(ya, yb, b);
+        const sx0 = axis === 'x' ? lerp(x0, x1, a) : x0, sx1 = axis === 'x' ? lerp(x0, x1, b) : x1;
+        const sz0 = axis === 'z' ? lerp(z0, z1, a) : z0, sz1 = axis === 'z' ? lerp(z0, z1, b) : z1;
+        const top = Math.max(low, high), bottom = Math.min(low, high);
+        Z.box(sx0, 0, sz0, sx1, top, sz1, i % 2 ? th.stone : th.top);
+        if (bottom > 0.5) Z.solid(sx0, sz0, sx1, sz1, 0, bottom - 0.25); // lower than the walker climbing it, so only the ground bumps it
+      }
+    };
+    Z.water = (x0, z0, x1, z1) => {
+      Z.box(x0, 0.0, z0, x1, 0.05, z1, th.water, { basic: true });
+      Z.box(x0 - 0.12, 0, z0 - 0.12, x1 + 0.12, 0.03, z1 + 0.12, th.stone);
+      Z.solid(x0, z0, x1, z1, -1, 0.6); L.waters.push({ Z, x0: x0 + ox, z0, x1: x1 + ox, z1 });
+    };
+    // Scenery: a tree, bush and flower in the colourful life are a crystal, mushroom and shard in the red
+    Z.tree = (x, z, s = 1, i = 0) => {
+      const c = th.leafs[i % th.leafs.length];
+      if (th.life === 'red') {
+        if (i % 2) { // a tall mushroom
+          Z.blob(GEO.cyl, x, 0.9 * s, z, 0.22 * s, 1.8 * s, 0.22 * s, 0xf2d2c8);
+          Z.blob(GEO.ball, x, 1.8 * s, z, 1.1 * s, 0.55 * s, 1.1 * s, c, { em: 0x3a0812 });
+        } else { // a cluster of crystals
+          Z.blob(GEO.cone, x, 1.5 * s, z, 0.5 * s, 3 * s, 0.5 * s, c, { em: 0x70182c }, i);
+          Z.blob(GEO.cone, x + 0.5 * s, 0.9 * s, z + 0.2 * s, 0.35 * s, 1.8 * s, 0.35 * s, c, { em: 0x70182c }, i + 1).rotation.z = -0.35;
+          Z.blob(GEO.cone, x - 0.45 * s, 0.7 * s, z - 0.2 * s, 0.3 * s, 1.4 * s, 0.3 * s, c, { em: 0x70182c }, i + 2).rotation.z = 0.4;
+        }
+      } else {
+        Z.blob(GEO.cyl, x, 0.8 * s, z, 0.16 * s, 1.6 * s, 0.16 * s, th.trunk);
+        Z.blob(GEO.ico, x, 2.3 * s, z, 1.1 * s, 1.0 * s, 1.1 * s, c, undefined, i);
+        Z.blob(GEO.ico, x + 0.5 * s, 3.0 * s, z - 0.2 * s, 0.7 * s, 0.65 * s, 0.7 * s, c, undefined, i + 2);
+      }
+    };
+    Z.bush = (x, z, s = 1, i = 0, y = 0) => {
+      if (th.life === 'red') {
+        Z.blob(GEO.cyl, x, y + 0.2 * s, z, 0.1 * s, 0.4 * s, 0.1 * s, 0xf2d2c8);
+        Z.blob(GEO.ball, x, y + 0.42 * s, z, 0.45 * s, 0.25 * s, 0.45 * s, th.leafs[i % th.leafs.length], { em: 0x3a0812 });
+      } else Z.blob(GEO.ico, x, y + 0.35 * s, z, 0.7 * s, 0.5 * s, 0.7 * s, th.leafs[i % 3 === 1 ? 2 : 0], undefined, i);
+    };
+    Z.flower = (x, z, i = 0, y = 0) => {
+      const c = th.flowers[i % th.flowers.length];
+      if (th.life === 'red') Z.blob(GEO.octa, x, y + 0.22, z, 0.12, 0.26, 0.12, c, { em: 0x802038 }, i);
+      else { Z.blob(GEO.cyl, x, y + 0.14, z, 0.025, 0.28, 0.025, 0x4aa85a); Z.blob(GEO.ico, x, y + 0.32, z, 0.13, 0.11, 0.13, c, undefined, i); }
+    };
+    Z.crystal = (x, z, s = 1, i = 0, y = 0) => {
+      const c = th.leafs[i % th.leafs.length];
+      Z.blob(GEO.cone, x, y + 0.6 * s, z, 0.25 * s, 1.2 * s, 0.25 * s, c, { em: 0x90203a }, i);
+      Z.blob(GEO.cone, x + 0.22 * s, y + 0.35 * s, z + 0.1 * s, 0.16 * s, 0.7 * s, 0.16 * s, c, { em: 0x90203a }, i + 1).rotation.z = -0.4;
+    };
+    Z.bench = (x, z) => {
+      Z.box(x - 0.8, 0.4, z - 0.25, x + 0.8, 0.5, z + 0.25, th.wood); Z.box(x - 0.8, 0.5, z + 0.18, x + 0.8, 0.95, z + 0.25, th.wood);
+      Z.box(x - 0.7, 0, z - 0.2, x - 0.58, 0.4, z + 0.2, th.trunk); Z.box(x + 0.58, 0, z - 0.2, x + 0.7, 0.4, z + 0.2, th.trunk);
+      Z.solid(x - 0.8, z - 0.25, x + 0.8, z + 0.25, 0, 0.95);
+    };
+    Z.scenery = (bx0, bz0, bx1, bz1, sd) => { // what lies beyond the walls: the same in every copy of a place
+      const r = scatterRng(sd);
+      for (let i = 0; i < 44; i++) {
+        const x = (r() * 2 - 1) * 62, z = (r() * 2 - 1) * 62, s = 1 + r() * 1.5;
+        if (x > bx0 && x < bx1 && z > bz0 && z < bz1) continue;
+        Z.tree(x, z, s, i);
+        if (i % 3 === 0) Z.bush(x + 1.6 * s, z + 0.8, 1.2, i);
+      }
+      for (let i = 0; i < 8; i++) { // low hills on the horizon
+        const a = i / 8 * PI * 2 + r(), d = 95 + r() * 25, rr = 22 + r() * 16;
+        Z.blob(GEO.ball, Math.cos(a) * d, -2, Math.sin(a) * d, rr, rr * 0.4, rr, th.hill);
+      }
+      for (let i = 0; i < 9; i++) { // clouds in one life, drifting rocks in the other
+        const x = (r() * 2 - 1) * 90, z = (r() * 2 - 1) * 90, y = 26 + r() * 14, s = 3 + r() * 4;
+        if (th.life === 'red') Z.blob(GEO.octa, x, y, z, s * 0.6, s * 0.9, s * 0.6, 0x7a1830, { em: 0x3a0a16 }, i);
+        else { Z.blob(GEO.ball, x, y, z, s * 1.6, s * 0.55, s, 0xffffff, { em: 0x8a8a8a }); Z.blob(GEO.ball, x + s, y + 0.5, z + 0.6, s, s * 0.5, s * 0.8, 0xffffff, { em: 0x8a8a8a }); }
+      }
+    };
+    Z.shed = (x, z, open) => { // a tiny shed, its one door on the south side
+      const w = th.shed, d = 0.2;
+      Z.box(x - 1.4, 0, z - 1.2, x - 1.4 + d, 2.4, z + 1.2, w); Z.box(x + 1.4 - d, 0, z - 1.2, x + 1.4, 2.4, z + 1.2, w);
+      Z.box(x - 1.4, 0, z - 1.2, x + 1.4, 2.4, z - 1.2 + d, w);
+      Z.box(x - 1.4, 0, z + 1.2 - d, x - 0.65, 2.4, z + 1.2, w); Z.box(x + 0.65, 0, z + 1.2 - d, x + 1.4, 2.4, z + 1.2, w);
+      Z.box(x - 0.65, 2.2, z + 1.2 - d, x + 0.65, 2.4, z + 1.2, w);
+      Z.box(x - 0.77, 0, z + 1.2, x - 0.65, 2.32, z + 1.26, th.trunk); Z.box(x + 0.65, 0, z + 1.2, x + 0.77, 2.32, z + 1.26, th.trunk);
+      Z.box(x - 0.77, 2.2, z + 1.2, x + 0.77, 2.32, z + 1.26, th.trunk);
+      Z.blob(GEO.pyr, x, 3.0, z, 2.25, 1.25, 1.95, th.roof, undefined, PI / 4);
+      Z.box(x - 1.5, 2.36, z - 1.3, x + 1.5, 2.44, z + 1.3, th.roof);
+      Z.solid(x - 1.4, z - 1.2, x - 1.2, z + 1.2, 0, 3); Z.solid(x + 1.2, z - 1.2, x + 1.4, z + 1.2, 0, 3);
+      Z.solid(x - 1.4, z - 1.2, x + 1.4, z - 1.0, 0, 3);
+      Z.solid(x - 1.4, z + 1.0, x - 0.65, z + 1.2, 0, 3); Z.solid(x + 0.65, z + 1.0, x + 1.4, z + 1.2, 0, 3);
+      if (!open) { // boarded shut in this life
+        Z.box(x - 0.65, 0, z + 1.08, x + 0.65, 2.2, z + 1.16, th.wood);
+        Z.box(x - 0.7, 0.55, z + 1.16, x + 0.7, 0.75, z + 1.22, th.trunk); Z.box(x - 0.7, 1.45, z + 1.16, x + 0.7, 1.65, z + 1.22, th.trunk);
+        Z.solid(x - 0.65, z + 1.0, x + 0.65, z + 1.2, 0, 3);
+      }
+    };
+    Z.frame = (kind, x, y, z, yaw, w, h) => { // the frame round an opening, and its two posts to bump into
+      const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = yaw; g.add(grp);
+      const t = kind === 'arch' ? 0.4 : 0.26, dep = kind === 'arch' ? 0.5 : 0.36;
+      const fg = own(new THREE.ExtrudeGeometry(frameOutline(kind, w / 2, w / 2 + t, h), { depth: dep, bevelEnabled: false, curveSegments: 12 }));
+      fg.translate(0, 0, -dep / 2);
+      grp.add(new THREE.Mesh(fg, mat(kind === 'arch' ? FRAME : DOORWOOD)));
+      const rg = own(new THREE.ExtrudeGeometry(frameOutline(kind, w / 2 - 0.02, w / 2 + 0.05, h), { depth: dep + 0.06, bevelEnabled: false, curveSegments: 12 }));
+      rg.translate(0, 0, -dep / 2 - 0.03);
+      grp.add(new THREE.Mesh(rg, mat(RIM, { basic: true }))); // the glowing rim
+      for (const s of [-1, 1]) {
+        const [ax, az] = rotL(yaw, s * w / 2, -dep / 2), [bx, bz] = rotL(yaw, s * (w / 2 + t), dep / 2);
+        Z.solid(Math.min(x + ax, x + bx), Math.min(z + az, z + bz), Math.max(x + ax, x + bx), Math.max(z + az, z + bz), y, y + h + 0.6);
+      }
+    };
+    Z.cube = (x, z, y = 0) => {
+      const grp = new THREE.Group(); grp.add(new THREE.Mesh(GEO.box, mat(CUBE))); grp.children[0].scale.setScalar(0.7);
+      for (let i = 0; i < 8; i++) {
+        const c = new THREE.Mesh(GEO.box, mat(CUBE_LIGHT)); c.scale.setScalar(0.2);
+        c.position.set(i & 1 ? 0.27 : -0.27, i & 2 ? 0.27 : -0.27, i & 4 ? 0.27 : -0.27); grp.add(c);
+      }
+      const c = { Z, x: x + ox, y, z, home: { Z, x: x + ox, y, z }, held: false, drop: 0, mesh: grp };
+      L.group.add(grp); L.cubes.push(c); return c;
+    };
+    const mark = (key, s) => new THREE.Mesh(key === 'y' ? GEO.cyl : GEO.tri, mat(0xffffff, { basic: true }));
+    Z.sw = (x, z, key, y = 0) => {
+      Z.box(x - 0.65, y, z - 0.65, x + 0.65, y + 0.06, z + 0.65, th.stone);
+      const plate = Z.box(x - 0.5, y + 0.06, z - 0.5, x + 0.5, y + 0.16, z + 0.5, KEYS[key].color, { em: 0x503800 });
+      const m = mark(key); m.position.set(x, y + 0.17, z); m.scale.set(0.22, 0.02, 0.22); g.add(m);
+      L.switches.push({ Z, x: x + ox, y, z, key, down: false, plate, mk: m, base: y });
+    };
+    Z.door = (x0, z0, x1, z1, key, y = 0, h = 2.8) => { // bars that sink when the switch of their colour is held down
+      const grp = new THREE.Group(); grp.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); g.add(grp);
+      const alongX = x1 - x0 > z1 - z0, len = alongX ? x1 - x0 : z1 - z0, n = Math.max(3, Math.round(len / 0.34));
+      const add = (geo, px, py, pz, sx, sy, sz, color, o) => {
+        const m = new THREE.Mesh(geo, mat(color, o)); m.position.set(px, py, pz); m.scale.set(sx, sy, sz); grp.add(m); return m;
+      };
+      for (let i = 0; i < n; i++) {
+        const t = ((i + 0.5) / n - 0.5) * len;
+        add(GEO.box, alongX ? t : 0, h / 2, alongX ? 0 : t, 0.12, h, 0.12, KEYS[key].color, { em: 0x503800 });
+      }
+      add(GEO.box, 0, h - 0.1, 0, alongX ? len : 0.2, 0.2, alongX ? 0.2 : len, KEYS[key].color, { em: 0x503800 });
+      for (const s of [-1, 1]) { // the same mark as the switch, on both sides
+        const m = add(key === 'y' ? GEO.cyl : GEO.tri, alongX ? 0 : s * 0.12, h * 0.55, alongX ? s * 0.12 : 0, 0.32, 0.04, 0.32, 0xffffff, { basic: true });
+        if (alongX) m.rotation.x = PI / 2; else m.rotation.z = PI / 2;
+      }
+      const col = Z.solid(x0, z0, x1, z1, y, y + h + 2);
+      L.doors.push({ Z, key, col, grp, open: 0, moving: false });
+    };
+    Z.gate = (x, z, yaw, y = 0) => { // the way out: a star over a doorway that fills with light
+      const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = yaw; g.add(grp);
+      const add = (geo, px, py, pz, sx, sy, sz, m) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.scale.set(sx, sy, sz); grp.add(o); return o; };
+      add(GEO.box, -1.0, 1.4, 0, 0.3, 2.8, 0.3, mat(0xffffff)); add(GEO.box, 1.0, 1.4, 0, 0.3, 2.8, 0.3, mat(0xffffff));
+      add(GEO.box, 0, 2.95, 0, 2.6, 0.3, 0.4, mat(0xffffff));
+      const starMat = own(new THREE.MeshLambertMaterial({ color: 0x9aa0a8, flatShading: true }));
+      const star = add(GEO.octa, 0, 3.75, 0, 0.42, 0.6, 0.42, starMat);
+      const sheet = add(GEO.box, 0, 1.4, 0, 1.7, 2.8, 0.06, mat(0xfff3a0, { basic: true, alpha: 0.8 })); sheet.visible = false;
+      const bars = [-0.5, 0, 0.5].map(bx => add(GEO.box, bx, 1.4, 0, 0.08, 2.8, 0.08, mat(0x9aa0a8)));
+      for (const s of [-1, 1]) {
+        const [ax, az] = rotL(yaw, s * 0.85, -0.15), [bx, bz] = rotL(yaw, s * 1.15, 0.15);
+        Z.solid(Math.min(x + ax, x + bx), Math.min(z + az, z + bz), Math.max(x + ax, x + bx), Math.max(z + az, z + bz), y, y + 3);
+      }
+      L.gate = { Z, x: x + ox, y, z, lit: false, star, starMat, sheet, bars };
+    };
+    Z.label = (x, y, z, s) => L.labels.push({ p: new THREE.Vector3(x + ox, y, z), s });
+    return Z;
+  };
+  B.face = (Z, x, y, z, yaw, w, h, kind = 'rect') => {
+    const f = { Z, x: x + Z.ox, y, z, yaw, w, h, nx: Math.sin(yaw), nz: Math.cos(yaw), rx: Math.cos(yaw), rz: -Math.sin(yaw),
+      target: null, twin: null, M: new THREE.Matrix4(), rot: 0 };
+    const geo = new THREE.ExtrudeGeometry(kind === 'arch' ? archOutline(w / 2, h - w / 2) : rectOutline(w / 2, h),
+      { depth: 0.2, bevelEnabled: false, curveSegments: 12 });
+    geo.translate(0, 0, -0.2); // the front sits on the plane; the rest backs it, so the view never tears as you step in
+    f.mat = new THREE.ShaderMaterial({ vertexShader: FACE_VS, fragmentShader: FACE_FS, clipping: true, side: THREE.DoubleSide,
+      uniforms: { map: { value: DUMMY }, res: { value: RES }, flatColor: { value: new THREE.Color() }, flatMix: { value: 1 } } });
+    f.mesh = new THREE.Mesh(geo, f.mat); f.mesh.position.set(f.x, y, z); f.mesh.rotation.y = yaw; f.mesh.frustumCulled = false;
+    L.group.add(f.mesh); L.disp.push(geo, f.mat);
+    f.sphere = new THREE.Sphere(new THREE.Vector3(f.x, y + h / 2, z), 0.5 * Math.hypot(w, h));
+    f.plane = new THREE.Plane(new THREE.Vector3(f.nx, 0, f.nz), -(f.nx * f.x + f.nz * z));
+    f.corners = [[-1, 0], [1, 0], [1, 1], [-1, 1]].map(([sx, sy]) => new THREE.Vector3(f.x + f.rx * sx * w / 2, y + sy * h, z + f.rz * sx * w / 2));
+    const [ax, az] = rotL(yaw, -w / 2, -0.9), [bx, bz] = rotL(yaw, w / 2, 0.15); // floor under the pocket behind it
+    Z.region(Math.min(x + ax, x + bx), Math.min(z + az, z + bz), Math.max(x + ax, x + bx), Math.max(z + az, z + bz), y);
+    for (const o of L.faces) if (o.Z === Z && Math.abs(o.x - f.x) + Math.abs(o.z - z) + Math.abs(o.y - y) < 0.01) { o.twin = f; f.twin = o; }
+    L.faces.push(f); return f;
+  };
+  B.link = (a, b) => { // walk in at a's front, walk out of b's front
+    a.target = b; b.target = a;
+    const T = f => new THREE.Matrix4().makeRotationY(f.yaw).setPosition(f.x, f.y, f.z), half = new THREE.Matrix4().makeRotationY(PI);
+    a.M.copy(T(b)).multiply(half).multiply(T(a).invert()); a.rot = b.yaw + PI - a.yaw;
+    b.M.copy(T(a)).multiply(half).multiply(T(b).invert()); b.rot = a.yaw + PI - b.yaw;
+  };
+  B.seam = (Za, Zb, x, y, z, yaw, w, h, kind) => { // the same opening in two places: step through and you are in the other
+    const a1 = B.face(Za, x, y, z, yaw, w, h, kind), a2 = B.face(Za, x, y, z, yaw + PI, w, h, kind);
+    const b1 = B.face(Zb, x, y, z, yaw, w, h, kind), b2 = B.face(Zb, x, y, z, yaw + PI, w, h, kind);
+    B.link(a1, b2); B.link(a2, b1);
+  };
+  B.arch = (Za, Zb, x, z, yaw) => { // an arch between the two lives, standing in both
+    Za.frame('arch', x, 0, z, yaw, 2.2, 2.8); Zb.frame('arch', x, 0, z, yaw, 2.2, 2.8);
+    B.seam(Za, Zb, x, 0, z, yaw, 2.2, 2.8, 'arch');
+  };
+  B.start = (Z, x, z, yaw, y = 0) => { L.start = { Z, x: x + Z.ox, y, z, yaw }; };
+  return B;
+}
+
+// ---- The five spaces ------------------------------------------------------------------------
+function gardenBase(Z, x0, z0, x1, z1, sd, skip = '') {
+  Z.ground(); Z.region(x0 - 1, z0 - 1, x1 + 1, z1 + 1, 0); Z.tiles(x0, z0, x1, z1);
+  if (!skip.includes('N')) Z.wall(x0 - 0.5, z0 - 0.5, x1 + 0.5, z0);
+  if (!skip.includes('S')) Z.wall(x0 - 0.5, z1, x1 + 0.5, z1 + 0.5);
+  if (!skip.includes('W')) Z.wall(x0 - 0.5, z0, x0, z1);
+  if (!skip.includes('E')) Z.wall(x1, z0, x1 + 0.5, z1);
+  Z.scenery(x0 - 4, z0 - 4, x1 + 4, z1 + 4, sd);
+}
+function ringGarden(Z, sd, bx1 = 9, bz1 = 17) { // a hedge path round a great clipped block
+  Z.ground(); Z.region(-8, -8, 8, 8, 0); Z.tiles(-6.5, -6.5, 6.5, 6.5);
+  Z.box(-3, 0, -3, 3, 0.7, 3, Z.th.stone); Z.box(-2.9, 0.7, -2.9, 2.9, 4.0, 2.9, Z.th.hedge); Z.box(-2.8, 4.0, -2.8, 2.8, 4.25, 2.8, Z.th.hedgeTop);
+  for (let i = 0; i < 4; i++) Z.blob(GEO.ico, (i % 2 ? 1 : -1) * 1.5, 4.5, (i < 2 ? 1 : -1) * 1.5, 1.0, 0.7, 1.0, Z.th.hedgeTop, undefined, i);
+  Z.solid(-3, -3, 3, 3, 0, 4.3);
+  Z.hedge(-7.1, -7.1, 7.1, -6.5); Z.hedge(-7.1, -6.5, -6.5, 6.5); Z.hedge(6.5, -6.5, 7.1, 6.5);
+  Z.hedge(-7.1, 6.5, -2, 7.1); Z.hedge(2, 6.5, 7.1, 7.1);
+  Z.scenery(-9, -9, bx1, bz1, sd);
+}
+function ringHall(Z) { // the same path indoors, under a low ceiling
+  const th = Z.th, h = 3.6;
+  Z.region(-8, -8, 8, 8, 0); Z.tiles(-6.5, -6.5, 6.5, 6.5);
+  Z.wall(-7.1, -7.1, 7.1, -6.5, h); Z.wall(-7.1, -6.5, -6.5, 6.5, h); Z.wall(6.5, -6.5, 7.1, 6.5, h);
+  Z.wall(-7.1, 6.5, -0.65, 7.1, h); Z.wall(0.65, 6.5, 7.1, 7.1, h); Z.box(-0.65, 2.2, 6.5, 0.65, h, 7.1, th.wall);
+  Z.box(-0.77, 0, 6.44, -0.65, 2.32, 6.5, DOORWOOD); Z.box(0.65, 0, 6.44, 0.77, 2.32, 6.5, DOORWOOD); Z.box(-0.77, 2.2, 6.44, 0.77, 2.32, 6.5, DOORWOOD);
+  Z.box(-3, 0, -3, 3, h, 3, th.top); Z.solid(-3, -3, 3, 3, 0, h);
+  Z.box(-7.1, h, -7.1, 7.1, h + 0.3, 7.1, th.ceil);
+  for (const [cx, cz] of [[-5.9, -5.9], [5.9, -5.9], [-5.9, 5.9], [5.9, 5.9]]) Z.crystal(cx, cz, 1.3, (cx > 0 ? 1 : 0) + (cz > 0 ? 2 : 0));
+  for (const [cx, cz, i] of [[-3.25, 0, 0], [3.25, 0, 1], [0, -3.25, 2], [0, 3.25, 1]]) Z.crystal(cx, cz, 0.8, i);
+}
+const LEVELS = [
+  { name: 'A hole in the garden', build(B) {
+    const G = B.zone('green'), R = B.zone('red'), Hl = B.zone('hall');
+    for (const Z of [G, R]) {
+      gardenBase(Z, -7, -21, 7, 11, 11);
+      Z.hedge(-7, 1.7, -1.5, 2.3); Z.hedge(1.5, 1.7, 7, 2.3);             // the only way north is the arch
+      Z.hedge(-2.5, -6.3, -1.9, -3.7); Z.hedge(-2.5, -0.7, -1.9, 1.7);     // and a second arch splits east from west
+      Z.shed(0, -13, Z === G);
+      [[-5, 9.5], [5, 9.3], [-5.6, 5], [5.8, 4.6]].forEach(([x, z], i) => Z.bush(x, z, 1, i));
+      [[-3, 6], [3.2, 7.2], [-4.2, 3.4], [4.4, 3.2], [2.5, 9.8], [-2.2, 10], [5, -1], [4.5, -4.5], [-5.5, -9], [5.5, -9.5], [-4, -17], [4, -18]]
+        .forEach(([x, z], i) => Z.flower(x, z, i));
+      Z.tree(-5.2, -18.5, 0.8, 1); Z.tree(5.4, -15.5, 0.8, 3);
+    }
+    R.wall(-7, -6.3, 7, -5.7); // a wall here, none there
+    B.arch(G, R, 0, 2, 0); B.arch(G, R, -2.2, -2.2, PI / 2);
+    B.link(B.face(G, 0, 0, -11.8, 0, 1.3, 2.2), B.face(Hl, 0, 0, 0, PI, 1.3, 2.2)); // the shed's door opens on a hall
+    Hl.region(-5, -35, 5, 1, 0); Hl.tiles(-4, -34, 4, 0);
+    Hl.wall(-4.5, -34.5, -4, 0.5, 5); Hl.wall(4, -34.5, 4.5, 0.5, 5); Hl.wall(-4, -34.5, 4, -34, 5);
+    Hl.wall(-4, 0, -0.65, 0.5, 5); Hl.wall(0.65, 0, 4, 0.5, 5); Hl.box(-0.65, 2.2, 0, 0.65, 5, 0.5, Hl.th.wall);
+    Hl.box(-0.77, 0, -0.06, -0.65, 2.32, 0, DOORWOOD); Hl.box(0.65, 0, -0.06, 0.77, 2.32, 0, DOORWOOD); Hl.box(-0.77, 2.2, -0.06, 0.77, 2.32, 0, DOORWOOD);
+    Hl.box(-4.5, 5, -34.5, 4.5, 5.3, 0.5, Hl.th.ceil);
+    Hl.box(-0.9, 0.013, -33, 0.9, 0.03, -1, 0xf8b6c9);
+    for (const z of [-5, -11, -17, -23, -29]) for (const s of [-1, 1]) {
+      Hl.box(s * 2.6 - 0.3, 0, z - 0.3, s * 2.6 + 0.3, 5, z + 0.3, Hl.th.top); Hl.solid(s * 2.6 - 0.3, z - 0.3, s * 2.6 + 0.3, z + 0.3, 0, 5);
+      if (z > -29) Hl.box(s * 3.99 - 0.02, 1.2, z - 4.2, s * 3.99 + 0.02, 4.0, z - 1.8, 0xcfefff, { basic: true });
+      Hl.bush(s * 3.3, z, 0.8, 0); Hl.flower(s * 3.3, z + 0.9, z);
+    }
+    Hl.gate(0, -31.5, 0);
+    B.start(G, 0, 8.5, 0);
+  } },
+  { name: 'Round the corner, twice', build(B) {
+    const A = B.zone('green'), C = B.zone('green');
+    for (const Z of [A, C]) {
+      ringGarden(Z, 22);
+      Z.region(-5, 6.4, 5, 15, 0); Z.tiles(-4, 7.1, 4, 14); Z.tiles(-2, 6.5, 2, 7.1);
+      Z.hedge(-4.6, 7.1, -4, 14.6); Z.hedge(4, 7.1, 4.6, 14.6); Z.hedge(-4, 14, 4, 14.6);
+    }
+    A.bench(-2.6, 12.6); [[2.6, 12.8], [2.9, 11.6], [1.8, 13.2], [-2.8, 9]].forEach(([x, z], i) => A.flower(x, z, i)); A.bush(3, 8.2, 1, 1);
+    C.gate(0, 12.6, PI); [-1.9, 1.9].forEach((x, k) => [8.2, 9.6, 11].forEach((z, i) => C.flower(x, z, i + k))); // not where you began
+    B.seam(A, C, 0, 0, -4.75, PI / 2, 3.48, 9);
+    B.start(A, 0, 12, 0);
+  } },
+  { name: 'The long way back', gateKey: 'y', build(B) {
+    const GA = B.zone('green'), GB = B.zone('green'), RA = B.zone('red'), RB = B.zone('red');
+    for (const Z of [GA, GB, RA, RB]) {
+      ringGarden(Z, 33, 12, 18);
+      Z.hedge(3, -0.3, 3.25, 0.3); Z.hedge(6.25, -0.3, 6.5, 0.3);                 // the east path is the arch and nothing else
+      Z.region(-6, 6.4, 11, 16, 0); Z.tiles(-5, 7.1, 5, 15); Z.tiles(-2, 6.5, 2, 7.1);
+      Z.hedge(-5.6, 7.1, -5, 15.6); Z.hedge(-5, 15, 5.6, 15.6);
+      if (Z === GA) { Z.hedge(5, 7.1, 5.6, 10); Z.hedge(5, 12, 5.6, 15); } else Z.hedge(5, 7.1, 5.6, 15);
+      if (Z.th.life === 'colour') Z.water(-6.5, -1.5, -3, 1.5);                    // a pond across the west path, in this life only
+      [[-4, 8.2], [4, 14]].forEach(([x, z], i) => Z.bush(x, z, 1, i));
+    }
+    B.arch(GA, RA, 4.75, 0, 0); B.arch(GB, RB, 4.75, 0, 0);
+    B.seam(GA, GB, 0, 0, -4.75, PI / 2, 3.48, 9); B.seam(RA, RB, 0, 0, -4.75, PI / 2, 3.48, 9);
+    GA.sw(0, 10.5, 'y'); GA.door(5, 10, 5.6, 12, 'y');
+    GA.tiles(5.6, 10, 9.6, 12); GA.hedge(5.6, 9.4, 10.2, 10); GA.hedge(5.6, 12, 10.2, 12.6); GA.hedge(9.6, 10, 10.2, 12);
+    GA.gate(8.6, 11, -PI / 2); GA.bench(-3.4, 14.2);
+    RB.cube(0, 10.5); [[-3.5, 13.5], [3.6, 9], [-3.8, 9.4]].forEach(([x, z], i) => RB.crystal(x, z, 1.2, i));
+    for (const Z of [GB, RA]) [[-3.5, 13.5], [3.6, 9]].forEach(([x, z], i) => Z.flower(x, z, i));
+    B.start(GA, -2.5, 13.5, 0);
+  } },
+  { name: 'A door with two sides', gateKey: 'y', build(B) {
+    const G = B.zone('green'), C = B.zone('cave');
+    gardenBase(G, -8, -12, 8, 10, 44);
+    G.frame('door', 0, 0, 2, 0, 1.3, 2.2);                                          // one door, standing alone
+    G.deck(-8, -10, 8, -7, 2.6);                                                    // a walkway high over the north end
+    for (const x of [-7.7, -2.7, 2.7, 7.7]) { G.post(x, -7.2, 2.3); G.post(x, -9.8, 2.3); }
+    G.frame('door', -5.5, 2.6, -8.5, PI / 2, 1.3, 2.2);
+    G.door(0.9, -10, 1.3, -7, 'y', 2.6, 2.6); G.gate(6, -8.5, -PI / 2, 2.6);
+    G.sw(4, -2, 'y');
+    [[-6, 7], [6, 6.5], [-6.5, -3], [6.6, 1]].forEach(([x, z], i) => G.bush(x, z, 1, i));
+    [[-3, 5], [3, 6], [-5, 1], [2, -4], [-4, -5], [6, -5], [-2, 8.5]].forEach(([x, z], i) => G.flower(x, z, i));
+    G.tree(-6.3, 3, 0.7, 1); G.tree(6.4, -4, 0.7, 2);
+    C.region(-5, -1, 5, 10, 0); C.tiles(-4, 0, 4, 9);
+    C.wall(-4.5, -0.5, -0.65, 0, 3.2); C.wall(0.65, -0.5, 4.5, 0, 3.2); C.box(-0.65, 2.2, -0.5, 0.65, 3.2, 0, C.th.wall);
+    C.box(-0.77, 0, 0, -0.65, 2.32, 0.06, DOORWOOD); C.box(0.65, 0, 0, 0.77, 2.32, 0.06, DOORWOOD); C.box(-0.77, 2.2, 0, 0.77, 2.32, 0.06, DOORWOOD);
+    C.wall(-4.5, 9, 4.5, 9.5, 3.2); C.wall(-4.5, 0, -4, 9, 3.2); C.wall(4, 0, 4.5, 9, 3.2); C.box(-4.5, 3.2, -0.5, 4.5, 3.5, 9.5, C.th.ceil);
+    C.cube(2, 6); [[-3.3, 1], [3.3, 8.2], [-3.2, 8], [3.4, 1.2], [-3.4, 4.5]].forEach(([x, z], i) => C.crystal(x, z, 1.2, i));
+    [[-1.5, 6.5], [1, 3], [-2.5, 2.8]].forEach(([x, z], i) => C.bush(x, z, 1, i));
+    B.link(B.face(G, 0, 0, 2, 0, 1.3, 2.2), B.face(G, -5.5, 2.6, -8.5, PI / 2, 1.3, 2.2)); // from the south: up onto the walkway
+    B.link(B.face(G, 0, 0, 2, PI, 1.3, 2.2), B.face(C, 0, 0, 0, 0, 1.3, 2.2));              // from the north: down into a red cellar
+    B.start(G, 0, 8, 0);
+  } },
+  { name: 'Everything at once', gateKey: 'p', build(B) {
+    const G = B.zone('green'), R = B.zone('red'), HA = B.zone('cave'), HB = B.zone('cave');
+    for (const Z of [G, R]) {
+      gardenBase(Z, -9, -14, 9, 12, 55, 'E');
+      if (Z === G) { Z.wall(9, -14, 9.5, 8); Z.wall(9, 10, 9.5, 12); } else Z.wall(9, -14, 9.5, 12);
+      Z.shed(-5, 5, Z === R);                                                        // boarded in one life, open in the other
+      Z.box(-8, 0, -14, -2, 2.6, -11.5, Z.th.stone); Z.solid(-8, -14, -2, -11.5, 0, 2.5); // a balcony with no stair
+      Z.region(-8, -14, -2, -11.5, 2.6); Z.tiles(-8, -14, -2, -11.5, 2.6);
+      Z.frame('door', -5, 2.6, -13, 0, 1.3, 2.2);
+      Z.ramp(5, -13, 8, -7, 0, 2.6, 'z');                                            // stairs up to a bridge
+      const end = Z === G ? 3 : -4;                                                  // whole in one life, broken in the other
+      Z.deck(5, -7, 8, end, 2.6); Z.rail(4.85, -7, 5, end, 2.6); Z.rail(8, -7, 8.15, end, 2.6);
+      Z.post(5.2, -3.6, 2.3); Z.post(7.8, -3.6, 2.3);
+      if (Z === G) { Z.post(5.2, 1.9, 2.3); Z.post(7.8, 1.9, 2.3); }
+      [[-7.5, 10.5], [7.5, 11], [-7.8, -3.5], [3, -12.5]].forEach(([x, z], i) => Z.bush(x, z, 1, i));
+      [[-2, 9], [2.5, 10.5], [-7, 8], [1, 3], [-6, -4], [2, -5], [-1, -11], [3.5, -3.5]].forEach(([x, z], i) => Z.flower(x, z, i));
+      Z.tree(-7.5, 2.4, 0.7, 2);
+    }
+    G.water(-9, -2, 9, 1); R.wall(-9, -0.8, 9, -0.2);                               // a pond in one life, a wall in the other
+    G.sw(-1, 4, 'p'); G.door(9, 8, 9.5, 10, 'p');
+    G.region(9, 7, 13.5, 11, 0); G.tiles(9.5, 7.4, 13, 10.6);
+    G.wall(9.5, 6.9, 13.5, 7.4); G.wall(9.5, 10.6, 13.5, 11.1); G.wall(13, 7.4, 13.5, 10.6); G.gate(12, 9, -PI / 2);
+    R.cube(-6, -6); [[-7.6, -7], [-4.6, -4.4]].forEach(([x, z], i) => R.crystal(x, z, 1, i));
+    B.arch(G, R, 4, 6.5, PI / 2); B.arch(G, R, 0, -8, 0);
+    for (const Z of [HA, HB]) ringHall(Z);
+    B.seam(HA, HB, 0, 0, -4.75, PI / 2, 3.48, 3.6);
+    B.link(B.face(R, -5, 0, 6.2, 0, 1.3, 2.2), B.face(HA, 0, 0, 6.5, PI, 1.3, 2.2));   // the red shed is a room round a pillar
+    B.link(B.face(HB, 0, 0, 6.5, PI, 1.3, 2.2), B.face(R, -5, 2.6, -13, 0, 1.3, 2.2)); // go round it, and its door opens on the balcony
+    B.start(G, 0, 10.5, 0);
+  } },
+];
+const FIGURES = { name: 'Figures', build(B) { // every kind of thing, side by side, each with its name
+  const G = B.zone('green');
+  G.ground(); G.region(-20, -20, 20, 20, 0); G.tiles(-13, -3, 13, 4);
+  G.frame('arch', -9.6, 0, 0, 0, 2.2, 2.8); G.label(-9.6, 0, 1.6, 'arch');
+  G.frame('door', -6.4, 0, 0, 0, 1.3, 2.2); G.label(-6.4, 0, 1.6, 'door');
+  G.shed(-3.4, -0.5, false); G.label(-3.4, 0, 1.6, 'shed');
+  G.cube(-0.6, 0.4); G.label(-0.6, 0, 1.6, 'cube');
+  G.sw(1.7, 0.4, 'y'); G.label(1.7, 0, 1.6, 'switch');
+  G.door(3.5, -0.1, 5.5, 0.3, 'y'); G.label(4.5, 0, 1.6, 'barred door');
+  G.gate(8.4, 0, 0); G.label(8.4, 0, 1.6, 'gate');
+  G.scenery(-16, -8, 16, 12, 5);
+  B.start(G, 0, 10.5, 0);
+} };
+
+// ---- The player --------------------------------------------------------------------------
+let P = null;
+function unload() {
+  if (!L) return;
+  for (const c of L.cubes) if (c.mesh.parent) c.mesh.parent.remove(c.mesh);
+  world.remove(L.group); L.disp.forEach(o => o.dispose && o.dispose()); L = null;
+}
+function loadLevel(i) {
+  unload();
+  const def = i === 'figures' ? FIGURES : LEVELS[i];
+  L = { index: i, name: def.name, gateKey: def.gateKey || null, group: new THREE.Group(), zones: [], colliders: [], regions: [],
+    faces: [], cubes: [], switches: [], doors: [], waters: [], labels: [], gate: null, start: null, disp: [] };
+  world.add(L.group);
+  def.build(builder(L));
+  const s = L.start;
+  P = { x: s.x, y: s.y, z: s.z, yaw: s.yaw, pitch: 0, yawT: s.yaw, pitchT: 0, vx: 0, vz: 0, vy: 0, Z: s.Z, air: false, walk: 0, steps: 0,
+    ey: s.y + tune.eye_height, hold: null, cross: null, px: s.x, py: s.y, pz: s.z, pyaw: s.yaw, ppitch: 0, pey: s.y + tune.eye_height };
+  if (params.get('at') && i !== 'figures') { // a check may place the walker: at=x,z,yaw in degrees[,zone[,y]]
+    const a = params.get('at').split(',').map(Number), Zt = L.zones[a[3] || 0] || L.zones[0];
+    P.Z = Zt; P.x = P.px = a[0] + Zt.ox; P.z = P.pz = a[1]; P.yaw = P.yawT = P.pyaw = (a[2] || 0) * PI / 180;
+    P.y = P.py = a[4] || 0; P.ey = P.pey = P.y + tune.eye_height;
+  }
+  Object.assign(state, { level: i === 'figures' ? 0 : i + 1, name: L.name, won: false, solved: false, prompt: '' });
+  stepWorld(0); syncState();
+}
+function syncState() {
+  state.life = P.Z.th.life; state.zone = P.Z.idx; state.carrying = !!P.hold;
+  state.x = +(P.x - P.Z.ox).toFixed(2); state.z = +P.z.toFixed(2); state.y = +P.y.toFixed(2);
+}
+function floorAt(x, z, y) { // the highest floor here that can be stepped onto from y
+  let best = -Infinity;
+  for (const r of L.regions) {
+    if (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) continue;
+    const h = r.ya === r.yb ? r.ya : lerp(r.ya, r.yb, r.axis === 'x' ? (x - r.x0) / (r.x1 - r.x0) : (z - r.z0) / (r.z1 - r.z0));
+    if (h <= y + 0.55 && h > best) best = h;
+  }
+  return best;
+}
+function pushOut(x, z, y, r, c) {
+  if (y + 1.7 <= c.y0 || y >= c.y1 - 0.01) return null;
+  const cx = clamp(x, c.x0, c.x1), cz = clamp(z, c.z0, c.z1), dx = x - cx, dz = z - cz, d2 = dx * dx + dz * dz;
+  if (d2 >= r * r) return null;
+  if (d2 > 1e-9) { const d = Math.sqrt(d2); return [cx + dx / d * r, cz + dz / d * r]; }
+  const l = x - c.x0, rr = c.x1 - x, t = z - c.z0, b = c.z1 - z, m = Math.min(l, rr, t, b);
+  return m === l ? [c.x0 - r, z] : m === rr ? [c.x1 + r, z] : m === t ? [x, c.z0 - r] : [x, c.z1 + r];
+}
+const cubeBox = c => ({ x0: c.x - 0.36, x1: c.x + 0.36, z0: c.z - 0.36, z1: c.z + 0.36, y0: c.y, y1: c.y + 0.7 });
+function collide(x, z, y, r = 0.3) {
+  for (let it = 0; it < 3; it++) {
+    for (const c of L.colliders) { if (c.off) continue; const p = pushOut(x, z, y, r, c); if (p) { x = p[0]; z = p[1]; } }
+    for (const c of L.cubes) { if (c.held) continue; const p = pushOut(x, z, y, r, cubeBox(c)); if (p) { x = p[0]; z = p[1]; } }
+  }
+  return [x, z];
+}
+function blocked(x, z, y, r, skipWater) {
+  for (const c of L.colliders) { if (c.off || (skipWater && c.y1 === 0.6 && c.y0 === -1)) continue; if (pushOut(x, z, y, r, c)) return true; }
+  for (const c of L.cubes) if (!c.held && pushOut(x, z, y, r, cubeBox(c))) return true;
+  return false;
+}
+function crossing(x0, z0, x1, z1, y) { // the face this move walks into from the front, if any
+  for (const f of L.faces) {
+    const d0 = (x0 - f.x) * f.nx + (z0 - f.z) * f.nz, d1 = (x1 - f.x) * f.nx + (z1 - f.z) * f.nz;
+    if (!(d0 > 0 && d1 <= 0) || d0 > 5) continue;
+    if (y < f.y - 0.6 || y > f.y + Math.max(0.7, f.h - 1.3)) continue;
+    const t = d0 / (d0 - d1), lx = (lerp(x0, x1, t) - f.x) * f.rx + (lerp(z0, z1, t) - f.z) * f.rz;
+    if (Math.abs(lx) <= f.w / 2) return f;
+  }
+  return null;
+}
+const _v = new THREE.Vector3();
+function through(f) { // carry the walker out of the linked face, with nothing to see but the new place
+  const t = f.target, oy = P.y;
+  _v.set(P.x, P.y, P.z).applyMatrix4(f.M); P.x = _v.x; P.y = _v.y; P.z = _v.z;
+  _v.set(P.px, P.py, P.pz).applyMatrix4(f.M); P.px = _v.x; P.py = _v.y; P.pz = _v.z;
+  P.ey += P.y - oy; P.pey += P.y - oy;
+  const c = Math.cos(f.rot), s = Math.sin(f.rot), vx = P.vx;
+  P.vx = vx * c + P.vz * s; P.vz = -vx * s + P.vz * c;
+  P.yaw += f.rot; P.yawT += f.rot; P.pyaw += f.rot;
+  const d = (P.x - t.x) * t.nx + (P.z - t.z) * t.nz;
+  if (d < 0.002) { P.x += t.nx * (0.002 - d); P.z += t.nz * (0.002 - d); }
+  P.cross = t;
+  if (t.Z.th.life !== P.Z.th.life) { (t.Z.th.life === 'red' ? sfx.toRed : sfx.toColour)(); events.push(['life', t.Z.th.life]); }
+  events.push(['through', f.Z.idx, t.Z.idx]);
+  P.Z = t.Z;
+}
+function stepPlayer(dt) {
+  P.px = P.x; P.py = P.y; P.pz = P.z; P.pyaw = P.yaw; P.ppitch = P.pitch; P.pey = P.ey; P.cross = null;
+  const free = !state.won;
+  if (free) P.yawT += ((down.has('ArrowLeft') ? 1 : 0) - (down.has('ArrowRight') ? 1 : 0)) * tune.turn_rate * dt;
+  const k = tune.look_smooth > 0 ? 1 - Math.exp(-dt / tune.look_smooth) : 1;
+  P.yaw += (P.yawT - P.yaw) * k; P.pitch += (P.pitchT - P.pitch) * k;
+  let f = 0, s = 0;
+  if (free) {
+    f = (down.has('KeyW') || down.has('ArrowUp') ? 1 : 0) - (down.has('KeyS') || down.has('ArrowDown') ? 1 : 0);
+    s = (down.has('KeyD') ? 1 : 0) - (down.has('KeyA') ? 1 : 0);
+  }
+  const n = Math.hypot(f, s); if (n > 1) { f /= n; s /= n; }
+  const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
+  const wx = (-sy * f + cy * s) * tune.move_speed, wz = (-cy * f - sy * s) * tune.move_speed;
+  const dvx = wx - P.vx, dvz = wz - P.vz, dl = Math.hypot(dvx, dvz), md = tune.move_accel * dt;
+  if (dl <= md) { P.vx = wx; P.vz = wz; } else { P.vx += dvx / dl * md; P.vz += dvz / dl * md; }
+  let [nx, nz] = collide(P.x + P.vx * dt, P.z + P.vz * dt, P.y);
+  let fl = floorAt(nx, nz, P.y);
+  if (fl === -Infinity) { // no floor that way: slide along what there is
+    const a = collide(nx, P.z, P.y), b = collide(P.x, nz, P.y);
+    if (floorAt(a[0], a[1], P.y) > -Infinity) [nx, nz] = a; else if (floorAt(b[0], b[1], P.y) > -Infinity) [nx, nz] = b; else { nx = P.x; nz = P.z; }
+    fl = floorAt(nx, nz, P.y);
+    if (fl === -Infinity) fl = P.y;
+  }
+  const x0 = P.x, z0 = P.z, moved = Math.hypot(nx - x0, nz - z0);
+  P.x = nx; P.z = nz;
+  if (P.y > fl + 1e-4) { // off a ledge: fall to the floor below
+    P.vy -= tune.gravity * dt; P.y += P.vy * dt; P.air = true;
+    if (P.y <= fl) { if (P.vy < -5) sfx.land(); P.y = fl; P.vy = 0; P.air = false; }
+  } else { P.y = fl; P.vy = 0; P.air = false; }
+  const fc = crossing(x0, z0, P.x, P.z, P.y); if (fc) through(fc);
+  if (!P.air && moved > 0) { P.walk += moved; if (P.walk > 2.1) { P.walk -= 2.1; sfx.step(P.steps++); } }
+  const speed = Math.hypot(P.vx, P.vz), bob = P.air ? 0 : Math.sin(P.walk / 2.1 * PI * 2) * tune.bob * Math.min(1, speed / 2);
+  P.ey += (P.y + tune.eye_height + bob - P.ey) * Math.min(1, dt * 18);
+}
+
+// ---- Cubes, switches, doors and the gate -------------------------------------------------
+function inWater(Zt, x, z) { return L.waters.some(w => w.Z === Zt && x > w.x0 && x < w.x1 && z > w.z0 && z < w.z1); }
+function reachable() {
+  let best = null, bd = tune.reach;
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  for (const c of L.cubes) {
+    if (c.held || c.Z !== P.Z || Math.abs(c.y - P.y) > 1.6) continue;
+    const dx = c.x - P.x, dz = c.z - P.z, d = Math.hypot(dx, dz);
+    if (d < bd && (d < 0.8 || (dx * fx + dz * fz) / d > 0.55)) { best = c; bd = d; }
+  }
+  return best;
+}
+function putDown() {
+  const c = P.hold, fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), d = tune.put_dist;
+  let tx = P.x + fx * d, tz = P.z + fz * d, ty = P.y, Zt = P.Z;
+  const f = crossing(P.x, P.z, tx, tz, P.y);
+  if (f) { _v.set(tx, ty, tz).applyMatrix4(f.M); tx = _v.x; ty = _v.y; tz = _v.z; Zt = f.target.Z; } // set down through an arch
+  else if (blocked(P.x + fx * d * 0.55, P.z + fz * d * 0.55, P.y, 0.2, true)) { sfx.no(); return; }
+  const wet = inWater(Zt, tx, tz);
+  if (!wet && blocked(tx, tz, ty, 0.36, true)) { sfx.no(); return; }
+  const fl = floorAt(tx, tz, ty);
+  if (fl === -Infinity) { sfx.no(); return; }
+  cam.remove(c.mesh); L.group.add(c.mesh); c.mesh.rotation.set(0, 0, 0); c.held = false; P.hold = null;
+  if (wet) { // lost to the water: it comes back where it began
+    c.Z = c.home.Z; c.x = c.home.x; c.y = c.home.y; c.z = c.home.z; c.drop = 1.2; sfx.splash(); events.push(['cube', 'returned']);
+  } else { c.Z = Zt; c.x = tx; c.z = tz; c.y = fl; c.drop = Math.max(0.5, ty + 0.6 - fl); sfx.put(); events.push(['cube', 'down', Zt.idx]); }
+}
+function interact() {
+  const c = P.hold ? null : reachable();
+  state.prompt = P.hold ? 'E: put the cube down' : c ? 'E: pick up the cube' : '';
+  if (state.won || !(pressed('KeyE') || pressed('Space'))) return;
+  if (P.hold) putDown();
+  else if (c) {
+    c.held = true; P.hold = c; L.group.remove(c.mesh); cam.add(c.mesh);
+    c.mesh.position.set(0.42, -0.46, -1.05); c.mesh.rotation.set(0.15, 0.5, 0); sfx.pick(); events.push(['cube', 'up']);
+  }
+}
+function stepWorld(dt) {
+  const held = new Set();
+  for (const s of L.switches) {
+    const on = (P.Z === s.Z && Math.abs(P.y - s.y) < 0.5 && Math.hypot(P.x - s.x, P.z - s.z) < 0.75)
+      || L.cubes.some(c => !c.held && c.Z === s.Z && Math.abs(c.y - s.y) < 0.5 && Math.hypot(c.x - s.x, c.z - s.z) < 0.8);
+    if (on !== s.down) { s.down = on; if (dt) sfx.sw(); events.push(['switch', s.key, on]); }
+    if (on) held.add(s.key);
+    s.plate.position.y = s.base + (on ? 0.07 : 0.11); s.mk.position.y = s.base + (on ? 0.13 : 0.17);
+  }
+  for (const d of L.doors) {
+    const want = held.has(d.key) ? 1 : 0;
+    if (want !== d.open && !d.moving) { d.moving = true; if (dt) sfx.door(); }
+    d.open = want > d.open ? Math.min(1, d.open + tune.door_speed * dt) : Math.max(0, d.open - tune.door_speed * dt);
+    if (d.open === want) d.moving = false;
+    d.col.off = d.open > 0.85; d.grp.scale.y = Math.max(0.02, 1 - d.open); d.grp.visible = d.open < 0.99;
+  }
+  for (const c of L.cubes) {
+    if (c.held) { c.mesh.rotation.y = 0.5 + Math.sin(state.t * 2) * 0.05; continue; }
+    c.drop = Math.max(0, c.drop - dt * Math.max(2, c.drop * 6));
+    c.mesh.position.set(c.x, c.y + 0.35 + c.drop, c.z);
+  }
+  const g = L.gate;
+  if (g) {
+    const near = P.Z === g.Z && Math.abs(P.y - g.y) < 0.6 ? Math.hypot(P.x - g.x, P.z - g.z) : Infinity;
+    if (!g.lit) {
+      const open = L.gateKey ? L.doors.filter(d => d.key === L.gateKey).every(d => d.open > 0.85) : near < tune.gate_light_dist;
+      if (open) { g.lit = true; state.solved = true; if (dt) sfx.solved(); events.push(['solved', state.level]); }
+    }
+    g.starMat.color.setHex(g.lit ? 0xffe066 : 0x9aa0a8); g.starMat.emissive.setHex(g.lit ? 0xb08a00 : 0);
+    g.sheet.visible = g.lit; g.bars.forEach(b => { b.visible = !g.lit; });
+    g.star.rotation.y = state.t * (g.lit ? 2 : 0.4);
+    if (g.lit && !state.won && near < 1.0 && dt) { state.won = true; state.fadeDir = 1; sfx.win(); events.push(['won', state.level]); }
+  }
+}
+
+// ---- Drawing the world through its faces ------------------------------------------------------
+const frustum = new THREE.Frustum(), _pm = new THREE.Matrix4(), _v4 = new THREE.Vector4(), NOCLIP = [];
+const _cp = [0, 1, 2, 3, 4].map(() => new THREE.Vector3());
+const FULL = [-1, -1, 1, 1];
+function screenRect(f, pm) { // where a face lands on the screen, as a box
+  let x0 = 1, y0 = 1, x1 = -1, y1 = -1;
+  for (const c of f.corners) {
+    _v4.set(c.x, c.y, c.z, 1).applyMatrix4(pm);
+    if (_v4.w <= 0.02) return FULL;
+    const x = _v4.x / _v4.w, y = _v4.y / _v4.w;
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+  }
+  return [Math.max(-1, x0), Math.max(-1, y0), Math.min(1, x1), Math.min(1, y1)];
+}
+function target(depth, i) {
+  const row = pool[depth] || (pool[depth] = []);
+  return row[i] || (row[i] = new THREE.WebGLRenderTarget(RES.x, RES.y, { type: THREE.HalfFloatType, samples: !CHEAP && depth === 0 ? 4 : 0 }));
+}
+function renderView(c, depth, into, skip, clip, theme, rect) {
+  const cp = _cp[depth].setFromMatrixPosition(c.matrixWorld), seen = [];
+  if (depth < tune.portal_depth) {
+    _pm.multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse); frustum.setFromProjectionMatrix(_pm);
+    for (const f of L.faces) {
+      if (skip && (f === skip || f === skip.twin)) continue;
+      const d = (cp.x - f.x) * f.nx + (cp.z - f.z) * f.nz;
+      if (d <= 0.0005 || d > 70 || Math.abs(cp.x - f.x) > 200) continue;
+      if (clip && clip.distanceToPoint(f.sphere.center) < -f.sphere.radius) continue;
+      if (!frustum.intersectsSphere(f.sphere)) continue;
+      const r = screenRect(f, _pm), x0 = Math.max(r[0], rect[0]), y0 = Math.max(r[1], rect[1]), x1 = Math.min(r[2], rect[2]), y1 = Math.min(r[3], rect[3]);
+      if (x1 <= x0 || y1 <= y0) continue;
+      seen.push({ f, rect: [x0, y0, x1, y1], rt: null });
+    }
+  }
+  seen.forEach((e, i) => { // first what each face looks out on, from where this view would stand beyond it
+    const vc = vcams[depth], f = e.f;
+    vc.projectionMatrix.copy(c.projectionMatrix); vc.projectionMatrixInverse.copy(c.projectionMatrixInverse);
+    vc.matrix.multiplyMatrices(f.M, c.matrixWorld); vc.matrix.decompose(vc.position, vc.quaternion, vc.scale); vc.updateMatrixWorld(true);
+    e.rt = target(depth, i);
+    renderView(vc, depth + 1, e.rt, f.target, f.target.plane, f.target.Z.th, e.rect);
+  });
+  cp.setFromMatrixPosition(c.matrixWorld);
+  for (const f of L.faces) {
+    const d = (cp.x - f.x) * f.nx + (cp.z - f.z) * f.nz;
+    f.mesh.visible = d > 0.0005 && !(skip && (f === skip || f === skip.twin));
+    f.mat.uniforms.map.value = DUMMY; f.mat.uniforms.flatMix.value = 1; f.mat.uniforms.flatColor.value.copy(f.target.Z.th.skyC);
+  }
+  for (const e of seen) { e.f.mat.uniforms.map.value = e.rt.texture; e.f.mat.uniforms.flatMix.value = 0; }
+  world.background = theme.skyC; world.fog = theme.fog;
+  renderer.clippingPlanes = clip ? [clip] : NOCLIP;
+  renderer.setRenderTarget(into); renderer.render(world, c);
+}
+function draw3D(x, y, z, yaw, pitch, Zv) {
+  if (cam.fov !== tune.fov) { cam.fov = tune.fov; cam.updateProjectionMatrix(); }
+  cam.position.set(x, y, z); cam.rotation.set(pitch, yaw, 0, 'YXZ'); cam.updateMatrixWorld(true);
+  renderView(cam, 0, null, null, null, Zv.th, FULL);
+}
+function drawPlayerView() {
+  const a = ALPHA;
+  let x = lerp(P.px, P.x, a), y = lerp(P.pey, P.ey, a), z = lerp(P.pz, P.z, a), yaw = lerp(P.pyaw, P.yaw, a), Zv = P.Z;
+  const t = P.cross;
+  if (t && (x - t.x) * t.nx + (z - t.z) * t.nz <= 0.0005) { // between two steps the eye is still on the side it came from
+    _v.set(x, y, z).applyMatrix4(t.M); x = _v.x; y = _v.y; z = _v.z; yaw += t.rot; Zv = t.target.Z;
+  }
+  draw3D(x, y, z, yaw, lerp(P.ppitch, P.pitch, a), Zv);
+}
+
+// ---- The HUD -------------------------------------------------------------------------------
+function diamond(x, y, r, c) {
+  ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+function hud() {
+  const red = P.Z.th.life === 'red', y = H - 30;
+  ctx.fillStyle = 'rgba(12,14,20,0.94)'; ctx.fillRect(0, H - 60, W, 60);
+  ctx.fillStyle = red ? '#ff4d5e' : '#3fe0c5'; ctx.fillRect(0, H - 62, W, 3);
+  text(`Space ${state.level} of ${LEVELS.length}: ${state.name}`, 28, y + 1, 20, '#ffffff', 'left', 'bold');
+  diamond(W / 2 - 80, y, 10, red ? '#d22a3e' : '#58c86a');
+  text(red ? 'Red life' : 'Colourful life', W / 2 - 60, y + 1, 20, '#ffffff', 'left', 'bold');
+  text('E cube   R restart   P pause', W - 28, y + 1, 19, '#cfd6e0', 'right');
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(W / 2, (H - 60) / 2, 4, 0, PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(W / 2, (H - 60) / 2, 6, 0, PI * 2); ctx.stroke();
+  const tip = state.prompt || (!locked && !CHEAP ? 'Click the game to look with the mouse' : '');
+  if (tip) { panel(W / 2 - 210, 22, 420, 44, 12, 'rgba(12,14,20,0.82)'); text(tip, W / 2, 45, 21, '#ffffff'); }
+  if (state.fade > 0) { ctx.fillStyle = `rgba(255,255,255,${state.fade})`; ctx.fillRect(0, 0, W, H); }
+}
+function backdrop(sway) { // the first garden, seen from where you will stand
+  const s = L.start;
+  draw3D(s.x, s.y + tune.eye_height, s.z, s.yaw + Math.sin(state.t * 0.35) * sway, -0.02, s.Z);
+}
+
+// ---- Scenes ---------------------------------------------------------------------------------
+let scene, state = {};
+function reset() {
+  seed = Number(params.get('seed')) || CONFIG.seed;
+  // state.gained: what this run gained or learned, the high the ending shows.
+  state = { t: 0, score: 0, gained: '', fade: 0, fadeDir: 0, done: false };
+  if (params.get('scene') === 'figures') loadLevel('figures');
+  else loadLevel(clamp((Number(params.get('level')) || 1) - 1, 0, LEVELS.length - 1));
+}
+function nextSpace() {
+  if (L.index + 1 < LEVELS.length) { state.score = L.index + 1; loadLevel(L.index + 1); state.fadeDir = -1; return; }
+  state.score = LEVELS.length; state.done = true; state.gained = 'You walked every seam'; state.fade = 0; state.fadeDir = 0;
+  freeMouse(); scene = 'results';
+}
+const scenes = {
+  figures: {
+    update(dt) { state.t += dt; stepWorld(0); },
+    draw() {
+      ctx.clearRect(0, 0, W, H); draw3D(0, 2.4, 8.6, 0, -0.1, L.zones[0]);
+      _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+      for (const l of L.labels) {
+        _v.copy(l.p).applyMatrix4(_pm); const x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H;
+        panel(x - 68, y - 4, 136, 36, 10, 'rgba(12,14,20,0.85)'); text(l.s, x, y + 15, 21, '#ffffff', 'center', 'bold');
+      }
+    },
+  },
+  title: {
+    update(dt) { state.t += dt; stepWorld(0); if (pressed('Enter') || pressed('Space')) { state.t = 0; scene = 'play'; } },
+    draw() {
+      ctx.clearRect(0, 0, W, H); backdrop(0.12);
+      panel(W / 2 - 440, 70, 880, 560, 28, 'rgba(14,20,28,0.84)');
+      text(TITLE, W / 2, 168, 104, '#ffffff', 'center', 'bold');
+      ctx.fillStyle = '#3fe0c5'; ctx.fillRect(W / 2 - 150, 236, 150, 6); ctx.fillStyle = '#ff4d5e'; ctx.fillRect(W / 2, 236, 150, 6);
+      text('one garden, two lives: every arch is a hole into the other', W / 2, 284, 25, '#ffeaa0');
+      CONTROLS.forEach((c, i) => text(c, W / 2, 356 + i * 46, 24, '#ffffff'));
+      text('Lost? R starts the space again. Nothing here can hurt you.', W / 2, 504, 22, '#cfd6e0');
+      text('Click or press Enter to start', W / 2, 582, 30, '#ffe066', 'center', 'bold');
+    },
+  },
+  play: {
+    update(dt) {
+      if (pressed('KeyP') || pressed('Escape')) { freeMouse(); scene = 'pause'; return; }
+      state.t += dt;
+      if (state.fadeDir) {
+        state.fade += state.fadeDir * dt / tune.fade_time;
+        if (state.fadeDir > 0 && state.fade >= 1) { state.fade = 1; nextSpace(); if (scene !== 'play') return; }
+        else if (state.fadeDir < 0 && state.fade <= 0) { state.fade = 0; state.fadeDir = 0; }
+      }
+      if (pressed('KeyR') && !state.won) { const f = state.fade; loadLevel(L.index); state.fade = f; events.push(['restart', state.level]); return; }
+      stepPlayer(dt); interact(); stepWorld(dt); syncState();
+    },
+    draw() { ctx.clearRect(0, 0, W, H); drawPlayerView(); hud(); },
+  },
+  pause: {
+    update() { if (pressed('KeyP') || pressed('Escape') || pressed('Enter')) { scene = 'play'; lockMouse(); } },
+    draw() {
+      scenes.play.draw(); ctx.fillStyle = 'rgba(8,10,16,0.55)'; ctx.fillRect(0, 0, W, H);
+      text('Paused', W / 2, H / 2 - 30, 64, '#ffffff', 'center', 'bold');
+      text('Click, or press P, to go on', W / 2, H / 2 + 36, 26, '#ffe066');
+    },
+  },
+  results: {
+    update(dt) { state.t += dt; stepWorld(0); if (pressed('Enter')) { reset(); scene = 'play'; lockMouse(); } },
+    draw() {
+      ctx.clearRect(0, 0, W, H); backdrop(0.5);
+      panel(W / 2 - 400, 170, 800, 380, 28, 'rgba(14,20,28,0.86)');
+      text(state.gained || 'The end', W / 2, 262, 60, '#ffffff', 'center', 'bold');
+      ctx.fillStyle = '#3fe0c5'; ctx.fillRect(W / 2 - 150, 312, 150, 6); ctx.fillStyle = '#ff4d5e'; ctx.fillRect(W / 2, 312, 150, 6);
+      text(`All ${LEVELS.length} spaces, both lives, and not one straight line home.`, W / 2, 372, 25, '#ffeaa0');
+      text('Enter to walk it again', W / 2, 468, 28, '#ffe066', 'center', 'bold');
+    },
+  },
+};
+
+// ---- Loop: fixed step, frame time clamped ---------------------------------------------
+function step() {
+  if (pressed('KeyM')) { setMuted(!muted); hit.delete('KeyM'); }
+  scenes[scene].update(STEP); hit.clear();
+}
+let last, acc = 0, ALPHA = 1; // ALPHA: how far the frame is between the last two steps
+function tick() {
+  const now = clock.now();
+  acc += Math.min(now - last, 0.25); last = now; // a stall never fast-forwards the game
+  while (acc >= STEP) { step(); acc -= STEP; }
+  ALPHA = acc / STEP; // draw between steps, so the view never judders
+  drawFrame();
+}
+function drawFrame() { scenes[scene].draw(); renderer.setRenderTarget(null); }
+function frame() { tick(); requestAnimationFrame(frame); }
+// A headless browser on a time budget runs timers but almost no animation frames: a timer
+// ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
+function timer() { if (document.visibilityState === 'visible' && clock.now() - last > 0.1) tick(); }
+
+// ---- What a check can read and drive (?manual=1 stops the loop; players never see it) ----
+window.game = {
+  get scene() { return scene; },
+  get state() { return state; },
+  press(code) { hit.add(code); },
+  hold(code, on) { on ? down.add(code) : down.delete(code); },
+  get events() { return events; }, // the loop steps; a check empties it
+  step(n = 1, draw = true, alpha = 1) {
+    for (let i = 0; i < n; i++) step();
+    if (draw) { ALPHA = alpha; drawFrame(); }
+  },
+};
+
+reset();
+scene = params.get('scene') || 'title';
+last = clock.now();
+if (params.get('manual') === '1') drawFrame();
+else { requestAnimationFrame(frame); setInterval(timer, 50); }
+</script>
+</body>
+</html>

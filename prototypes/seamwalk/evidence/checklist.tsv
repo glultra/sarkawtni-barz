@@ -1,0 +1,23 @@
+L1	pass	evidence/l1-start.png	sunny low-poly garden at eye level: hedges and walls taller than the walker, arch brightest, red twin through it; stairs and bridge in evidence/t-l5-start.png
+L2	pass	evidence/t-l1-shed.png	first person, clean spaces, an opening onto a space that cannot fit; no named game's art or levels used
+L3	pass	evidence/play.png	3D, first person at eye height; mouse look with smoothing is in the code (index.html:124), the feel of it is the person's to judge
+F1	pass	evidence/t-l1-red.png	the red garden has a wall where the green has none (index.html:548); sheds, ponds and bridges differ by life in space 5
+F2	pass	evidence/play.png	walked through the first arch in the check run with the view continuous; index.html:734
+F3	pass	evidence/t-l1-shed.png	the 2.8 m shed's door shows and leads to a 34 m hall
+F4	pass	evidence/t-l2-seam.png	the seam on the north path cannot be seen; the scripted run round the pillar arrived at the gate yard, not the start (index.html:565)
+F5	pass	evidence/t-l4-start.png	from the south the door shows the high walkway; from the north the red cellar (evidence/t-l4-north.png)
+F6	pass	index.html:797	the scripted runs carried cubes through arches and doors onto switches in spaces 3, 4 and 5 and the doors opened
+F7	pass	evidence/ending.png	five spaces played from the title to the ending in one scripted run (evidence/run-l12.txt to run-l5.txt)
+F8	not_assessed	index.html:848	the gate lights and a chime is called when a space is solved; the sound itself was not heard by the check
+S1	pass	evidence/play.png	arches between the colourful and the red life, walked through
+S2	pass	evidence/t-l4-start.png	bigger inside, a path that changes, a door with two sides
+S3	pass	index.html:577	cube and switch puzzles in spaces 3, 4 and 5, each solved in the scripted run
+M1	pass	evidence/l1-start.png	the start faces the glowing arch with red ground in it
+M2	pass	evidence/play.png	in the red life after walking through; the green garden shows in the arch looking back
+M3	pass	evidence/t-l1-red.png	the red wall blocks the north; the second arch in the hedge leads back to green and past it
+M4	pass	evidence/t-l1-shed.png	tiny shed, long hall inside
+M5	pass	index.html:847	the hall's gate lights within 9 m; the run won the space there
+C1	pass	index.html:577	space 3 is the first with a cube, a switch and a door; when a player reaches it was not timed
+C2	pass	evidence/t-l3-yard.png	the switch is in the colourful yard, the cube in the red copy of it one turn round the pillar; going on round ends at a pond, going back is the answer
+C3	pass	index.html:808	no death; R reloads the space; a cube put in the pond returns to where it began (the return was not exercised in a run)
+C4	pass	index.html:619	space 4 has the two-sided door; space 5 has the shed bigger inside whose pillar path changes where its door leads

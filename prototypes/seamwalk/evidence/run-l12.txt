@@ -1,0 +1,1 @@
+Enter ArrowUp:2.49 ArrowLeft:0.683 ArrowUp:1.05 ArrowRight:0.683 ArrowUp:1.58 KeyD:1.05 ArrowUp:8.2 wait:1.6 ArrowUp:1.686 ArrowRight:0.683 ArrowUp:1.105 ArrowLeft:0.683 ArrowUp:2.209 ArrowLeft:0.683 ArrowUp:2.209 ArrowLeft:0.683 ArrowUp:2.209 ArrowLeft:0.683 ArrowUp:1.105 ArrowRight:0.683 ArrowUp:2.0 wait:1.6

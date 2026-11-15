@@ -1,0 +1,1 @@
+KeyD:0.465 ArrowUp:2.093 KeyA:0.465 ArrowLeft:1.366 ArrowUp:1.628 KeyA:0.465 KeyE wait:0.3 ArrowLeft:1.366 KeyA:0.465 ArrowUp:1.558 KeyD:0.93 KeyE wait:1 KeyA:0.465 ArrowDown:1.326 KeyA:0.465 ArrowUp:3.6 wait:1.6

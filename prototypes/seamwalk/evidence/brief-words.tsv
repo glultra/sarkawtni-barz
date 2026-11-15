@@ -1,0 +1,6 @@
+3D	built as a walk-through 3D world with height: stairs, a bridge, a balcony and a walkway you drop from	evidence/t-l5-start.png
+first person	the camera is the walker's eyes at 1.6 m, mouse look with W A S D	evidence/play.png
+first-person	the camera is the walker's eyes at 1.6 m, mouse look with W A S D	evidence/play.png
+viewfinder and superliminial	first person, clean readable spaces, and openings that show and lead to places that cannot be there	evidence/t-l1-shed.png
+2.5D	miss: answer 1 chose a first person camera in 3D for this game; 2.5D was the earlier game's view, kept in its own folder
+2D	miss: named as what the earlier game was converted from; nothing here is 2D but the HUD
