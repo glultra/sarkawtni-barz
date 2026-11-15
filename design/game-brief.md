@@ -17,11 +17,15 @@ After play: i played it this is was so good but we need to add a nice main menu 
 
 Co-op: Both (a server on my PC, and bots in the empty seats)
 
+After play: dont run the game kill the server u ran ! i run it myself ! i need a menu when i press the esc ! so i can leave and join another session or smth u know!?
+
+After play: make the ui ux of the menu as simple as u can so i can enter my name before joining the session
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of fifty levels
 
-**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, P to pause, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: E to shove the climber beside you, Q to hold them still. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
+**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: E to shove the climber beside you, Q to hold them still. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
 
 **Question:** Is one long, punishing climb fun to play and to watch for an hour? *(guessed)*
 
@@ -67,7 +71,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A tune for each world, made in code, with a slot for your own song in each
 - [x] The climb is kept at every level, to continue after closing the game
 - [x] A gold star to collect on every level
-- [x] A main menu: climb alone, race the bots, make a room, join a room, your name, check a code
+- [x] A simple main menu: your name in a box at the top, then four big buttons (alone, bots, make a room, join a room); making or joining a room asks for your name first
+- [x] A menu on Esc (and a menu button on screen): go on, start again, sound, or leave for the main menu and out of the room
 - [x] A race of up to five to a level the host picks, with a countdown and live standings
 - [x] Rooms with a code, served from your own PC by server.js, for players on your Wi-Fi or through a tunnel
 - [x] Four named bots that race, slip, and shove you
