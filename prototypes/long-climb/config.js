@@ -51,13 +51,21 @@ window.CONFIG = {
   fan_speed: { value: 430, min: 250, max: 700, step: 10 },       // a fan's column lifts you this fast
   fan_height: { value: 300, min: 150, max: 500, step: 10 },      // and reaches this far above the fan
 
-  // Racing: pushing, grabbing and the bots
+  // Racing: shoving, hanging on to feet, and the bots
   push_speed: { value: 520, min: 250, max: 900, step: 10 },      // a shove throws a climber sideways this fast
   push_cool: { value: 1, min: 0.3, max: 4, step: 0.1 },          // seconds between shoves
-  grab_time: { value: 1.5, min: 0.5, max: 4, step: 0.1 },        // seconds a grabbed climber is held still
-  grab_cool: { value: 4, min: 1, max: 12, step: 0.5 },           // seconds between grabs
+  grab_time: { value: 3, min: 0.5, max: 8, step: 0.1 },          // seconds you can hang on to someone's feet before your grip gives
+  grab_cool: { value: 4, min: 1, max: 12, step: 0.5 },           // seconds after letting go before you can grab again
+  grab_reach: { value: 80, min: 40, max: 160, step: 5 },         // pixels sideways within which you can catch someone's feet
+  grab_up: { value: 130, min: 40, max: 220, step: 10 },          // and how far above you their feet may be
+  carry_jump: { value: 0.9, min: 0.6, max: 1, step: 0.02 },      // with someone on your feet, your jump is this many times as strong (each rider counts, up to three)
+  carry_run: { value: 0.85, min: 0.5, max: 1, step: 0.05 },      // and you run this many times as fast
+  carry_slow: { value: 1.35, min: 1, max: 2.5, step: 0.05 },     // a bot with you on its feet takes this many times as long over a jump
+  hang_leap: { value: 1.1, min: 0.5, max: 1.5, step: 0.05 },     // leaping off the feet you hold is this many times a normal jump
+  bot_grab: { value: 0.25, min: 0, max: 1, step: 0.05 },         // chance a bot that lands just under you catches your feet
   bot_pace: { value: 1.3, min: 0.6, max: 2.5, step: 0.05 },     // seconds a bot takes for one jump on level 1; smaller is a faster bot
   bot_slip: { value: 0.05, min: 0, max: 0.4, step: 0.01 },       // chance a bot slips after a jump on level 1; it grows with the levels
+  room_size: { value: 8, min: 2, max: 25, step: 1 },             // seats in a room you make, until you change it on the room screen
 
   // Machines and the blaster
   ghost_time: { value: 6, min: 3, max: 12, step: 0.5 },          // seconds the timed ledges stay solid after their plate is pressed

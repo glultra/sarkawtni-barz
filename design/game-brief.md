@@ -23,11 +23,13 @@ After play: make the ui ux of the menu as simple as u can so i can enter my name
 
 After play: add english language as well and show language selection on the menu ,  make sure i can play with controller ps5 and xbox controllers and make sure it is playable on mobile with nice ui ux of mechanical inputs please ! since on keyboard pressing q/e is a bit hard i prefer using mouse buttons, and how do i join on mobile on local ? i opened my ip with the port which didnt open it for me :(
 
+After play: add the sound effects first, songs okay i can't provide them now, phone fixed now can be joined, now lets talk about the changes i want  go minimal simple ui menu and in game ui please! add some nice more vfx if u can , please make sure when u hold someone u like sos ops u hold his fit or smth which the other player can take u with him self but maybe different physics what do u say ? and for creating room lemme choose the room size up to 25 players please ! and when u show the url hosted make sure u wrap the text cause the url is long ! and when u are in game players are allowed to rejoin or leave u know this ? so when i press menu i must be able to see the room id pleasse! and  yeah so on please ! make it so fun to play pleasse while playing with others ! and one more thing please i forgot to tell u which is adding spectate view please!! and when the first players win dont end the game let the others finish too please ! and spectate allowing please this is so important to me ! ah one more thing please when i see the players joined my room i must be able to see the empty slots and allow me to kick others or move them to spectate section !? only room creater can do this u know ? yeah so any other important things i missed maybe ?!
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of fifty levels
 
-**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: left click or E to shove the climber beside you, right click or Q to hold them still; left click also fires the blaster. A controller (PS5, Xbox): stick or d-pad to move, Cross/A jump, Circle/B or R1/RB shove, Triangle/Y or L1/LB grab, Square/X or R2/RT fire, Options/Menu for the menu. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, and a fire button where there is a blaster. *(guessed)*
+**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: left click or E to shove the climber beside you (or the one hanging on your feet), right click or Q to catch hold of a climber's feet and be carried; Space leaps off them, Q lets go; left click also fires the blaster. While you watch a race: the arrows change climber. On the room screen: the arrows change the seats and the finish level, 1 2 3 the difficulty, Tab picks a player, V moves them between playing and watching, K kicks them (the host only), C copies the link, Enter starts. A controller (PS5, Xbox): stick or d-pad to move, Cross/A jump, Circle/B or R1/RB shove, Triangle/Y or L1/LB hang on, Square/X or R2/RT fire, Options/Menu for the menu. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, a fire button where there is a blaster, and shove and hang-on buttons in a race; every button of the menus and the room screen is tapped. *(guessed)*
 
 **Question:** Is one long, punishing climb fun to play and to watch for an hour? *(guessed)*
 
@@ -79,19 +81,26 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] The mouse plays it: left click shoves and fires, right click grabs
 - [x] Phone buttons that show only what applies (fire, shove, grab), with a ring while a shove or grab is not ready; a room link that carries the code
 - [x] A menu on Esc (and a menu button on screen): go on, start again, sound, or leave for the main menu and out of the room
-- [x] A race of up to five to a level the host picks, with a countdown and live standings
+- [x] A race of up to twenty-five to a level the host picks, with a countdown and live standings
+- [x] A room's size, 2 to 25 seats, chosen by its host; the room screen shows every seat, taken or empty
+- [x] Spectating: anyone may choose to watch, a full room lets newcomers in to watch, and the camera follows the climber you pick
+- [x] The host alone kicks a player (who cannot come back) or moves anyone between playing and watching
+- [x] A race goes on after the first finish: the finished watch the rest, and the results come when everyone is in
+- [x] Leaving and coming back in the middle of a race: the Esc menu shows the room's code and link, and a returning player goes on from the level they had reached
+- [x] The room's link breaks over as many lines as it needs, and a tap copies it
 - [x] Rooms with a code, served from your own PC by server.js, for players on your Wi-Fi or through a tunnel
-- [x] Four named bots that race, slip, and shove you
-- [x] Shove and grab: E throws the climber beside you sideways, Q holds them still
-- [x] The other climbers always shown: names overhead, arrows at the screen's edge with the distance, dots on the height bar
+- [x] Four named bots that race, slip, shove you and catch your feet
+- [x] Shove and hang on: E throws the climber beside you sideways; Q catches a climber's feet, and they carry you where they go, running slower and jumping lower, until you leap off, let go, your grip gives, or they shake you off with a shove
+- [x] The other climbers always shown: names overhead, arrows at the screen's edge with the distance for the nearest out of sight, dots on the height bar
 - [x] Fans whose column of air lifts you; a held jump hangs a moment at its top; a jump keeps the speed of a moving ledge
 - [x] Falls that drop you to what is below, with gold rest floors that catch long falls
 - [x] Forgiving jump: late jumps, early presses and hold-to-jump-higher
-- [x] Height, timer and fall counter always on screen, with a side height bar
+- [x] Plain screens: flat buttons and no frames; in play only the clock with the level and height, the side height bar, your stars and falls when alone, and the first places when racing
+- [x] Effects: dust, rings, sparks, confetti for a level and a finish, lines of air on a long fall, the metres a fall cost
 - [x] Your best height and best time kept between sessions
 - [x] A finish code with the time in it, and a screen to check a viewer's code against yours
 - [x] Phone touch buttons: two arrows, a jump, and fire
-- [ ] Sound for jump, landing, a long fall and each rest floor
+- [x] Sound for jump, landing, footsteps, a long fall (a whistle, rushing air and a thud), each rest floor, the countdown, a shove and a grab
 
 ## Your systems
 - parkour · in the slice
@@ -101,6 +110,15 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - co-op: race togather up to 5 player, i create session and share the room id · in the slice
 - always indicate where are the other players · in the slice
 - pushing other players or hold other players · in the slice
+- u hold his fit or smth which the other player can take u with him self but maybe different physics · in the slice
+- choose the room size up to 25 players · in the slice
+- spectate view · in the slice
+- see the empty slots and kick others or move them to spectate section, only room creater · in the slice
+- when the first players win dont end the game let the others finish too · in the slice
+- when i press menu i must be able to see the room id · in the slice
+- minimal simple ui menu and in game ui · in the slice
+- nice more vfx · in the slice
+- the sound effects · in the slice
 - the kurdish song · thin stand-in
 - who wins against me i give a gift · thin stand-in *(guessed)*
 
@@ -116,6 +134,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 ## Out of scope
 - A shared online leaderboard kept between races: needs a server that is always on: not built yet
 - Players in a room share positions, shoves and the finish, not the machines: each player's gates, crumbling ledges and turrets are their own
+- A kicked player is kept out by their browser, not by who they are: another browser or a cleared one gets back in: not built yet
 - Real TikTok chat or gift connection: needs a server: not built yet
 - A ghost of your best run: change it after play
 - A speedrun split timer per level: change it after play
