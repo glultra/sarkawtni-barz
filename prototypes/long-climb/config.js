@@ -7,7 +7,7 @@
 window.CONFIG = {
   seed: 1, // the tower is the same for everyone; this seeds only what is random in play (none yet)
 
-  // Your own songs, one per world (a world is 5 levels, so 10 in all). Put the files in
+  // Your own songs, one per world (a world is 3 levels, so 10 in all). Put the files in
   // assets/music/ and write their names here, for example "assets/music/1.mp3".
   // An empty name plays the tune the game makes itself.
   songs: ['', '', '', '', '', '', '', '', '', ''],
@@ -31,11 +31,13 @@ window.CONFIG = {
   air_accel: { value: 2000, min: 400, max: 4000, step: 100 },    // steering in the air
   ice_accel: { value: 420, min: 100, max: 1500, step: 20 },      // on ice: slow to start, slow to stop
 
-  // How hard: level 1 uses the first number of each pair, level 50 the second
-  ledge_wide: { value: 185, min: 120, max: 300, step: 10 },      // width of a ledge on level 1
-  ledge_narrow: { value: 70, min: 50, max: 160, step: 5 },       // and on level 50
-  gap_small: { value: 32, min: 0, max: 80, step: 2 },            // sideways gap between ledges on level 1
-  gap_big: { value: 98, min: 50, max: 104, step: 2 },            // and on level 50 (104 is the most a jump can clear)
+  // How hard: each pair runs from its first number (fully easy) to its second (level 30).
+  // start_hard is where level 1 begins on that run: 0 is fully easy, 1 is as hard as level 30.
+  start_hard: { value: 0.33, min: 0, max: 0.8, step: 0.01 },     // 0.33: level 1 is about as hard as level 17 of the old 50
+  ledge_wide: { value: 185, min: 120, max: 300, step: 10 },      // width of a ledge at the easy end
+  ledge_narrow: { value: 70, min: 50, max: 160, step: 5 },       // and on level 30
+  gap_small: { value: 32, min: 0, max: 80, step: 2 },            // sideways gap between ledges at the easy end
+  gap_big: { value: 98, min: 50, max: 104, step: 2 },            // and on level 30 (104 is the most a jump can clear)
   easy_size: { value: 1.3, min: 1, max: 1.8, step: 0.05 },       // easy: ledges this many times wider
   hard_size: { value: 0.85, min: 0.6, max: 1, step: 0.05 },      // hard: ledges this many times as wide
 

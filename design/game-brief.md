@@ -25,9 +25,11 @@ After play: add english language as well and show language selection on the menu
 
 After play: add the sound effects first, songs okay i can't provide them now, phone fixed now can be joined, now lets talk about the changes i want  go minimal simple ui menu and in game ui please! add some nice more vfx if u can , please make sure when u hold someone u like sos ops u hold his fit or smth which the other player can take u with him self but maybe different physics what do u say ? and for creating room lemme choose the room size up to 25 players please ! and when u show the url hosted make sure u wrap the text cause the url is long ! and when u are in game players are allowed to rejoin or leave u know this ? so when i press menu i must be able to see the room id pleasse! and  yeah so on please ! make it so fun to play pleasse while playing with others ! and one more thing please i forgot to tell u which is adding spectate view please!! and when the first players win dont end the game let the others finish too please ! and spectate allowing please this is so important to me ! ah one more thing please when i see the players joined my room i must be able to see the empty slots and allow me to kick others or move them to spectate section !? only room creater can do this u know ? yeah so any other important things i missed maybe ?!
 
+After play: 50 levels are too much can u reduce to 30 levels but keep the game still hard ! and remove the easy levels make the game more fun after each levels passed
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
-**Genre:** precision platformer, one long climb of fifty levels
+**Genre:** precision platformer, one long climb of thirty levels
 
 **Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: left click or E to shove the climber beside you (or the one hanging on your feet), right click or Q to catch hold of a climber's feet and be carried; Space leaps off them, Q lets go; left click also fires the blaster. While you watch a race: the arrows change climber. On the room screen: the arrows change the seats and the finish level, 1 2 3 the difficulty, Tab picks a player, V moves them between playing and watching, K kicks them (the host only), C copies the link, Enter starts. A controller (PS5, Xbox): stick or d-pad to move, Cross/A jump, Circle/B or R1/RB shove, Triangle/Y or L1/LB hang on, Square/X or R2/RT fire, Options/Menu for the menu. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, a fire button where there is a blaster, and shove and hang-on buttons in a race; every button of the menus and the room screen is tapped. *(guessed)*
 
@@ -52,10 +54,10 @@ After play: add the sound effects first, songs okay i can't provide them now, ph
 - Text: Sorani Kurdish, right to left, or English, picked on the menu; Western digits. *(the digits are guessed)*
 
 ## First minute
-You pick a difficulty and stand in a garden at the foot of the tower with the height bar at zero. Wide, easy ledges teach the jump: tap for a hop, hold for a full jump. You miss one, fall, and land a few ledges down instead of dying. A gold star hangs a full jump above a late ledge. At about 30 metres you land on the first gold floor: a chime plays, a banner shows level 1 of 50, and the climb is kept from there.
+You pick a difficulty and stand in a garden at the foot of the tower with the height bar at zero. There is no warm-up: the first ledges are already a real jump apart, and you learn tap for a hop, hold for a full jump, by missing. You miss one, fall, and land a few ledges down instead of dying. A gold star hangs a full jump above a late ledge. At about 30 metres you land on the first gold floor: a chime plays, a banner shows level 1 of 30 with how long it took, and the climb is kept from there.
 
 ## Challenge
-*(provisional)* Fifty levels in ten worlds of five, about 1,500 metres, each level narrower and wider-gapped than the last until level 50 sits at the limit of the jump. The worlds add, in order: moving ledges, crumbling ledges, buttons that open a gate and timed ledges, ice, wind, a blaster with targets to shoot and red bumpers, bouncers and conveyor belts, turrets, and a last ultimate world with everything at once. Machines and the blaster come only in the worlds that need them. Nothing kills you; a miss costs height. Three difficulties: easy has wider ledges, normal has a gold floor after every level, hard has narrower ledges and a floor only every fifth level, so a miss can cost a whole world. How long a first clear takes is not known yet.
+*(provisional)* Thirty levels in ten worlds of three, about 900 metres, with no easy levels: level 1 starts a third of the way up the difficulty range (`start_hard` in config.js), and each level is narrower and wider-gapped than the last until level 30 sits at the limit of the jump. A new world every three levels keeps something new coming. The worlds add, in order: moving ledges, crumbling ledges, buttons that open a gate and timed ledges, ice, wind, a blaster with targets to shoot and red bumpers, bouncers and conveyor belts, turrets, and a last ultimate world with everything at once. Machines and the blaster come only in the worlds that need them. Nothing kills you; a miss costs height. Three difficulties: easy has wider ledges, normal has a gold floor after every level, hard has narrower ledges and a floor only every third level, so a miss can cost a whole world. How long a first clear takes is not known yet.
 
 ## Core loop
 - Read the next jump and commit to it.
@@ -68,7 +70,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - No death and no game over: a fall costs height. R starts the climb again. *(provisional)*
 
 ## Features
-- [x] A tall tower of fifty levels in ten worlds, each world adding its own idea, the last one ultimate
+- [x] A tall tower of thirty levels in ten worlds of three, each world adding its own idea, the last one ultimate; no easy levels
+- [x] Each level's end cheers louder the higher you are, shows how long the level took, and the end of a world gets a bigger cheer
 - [x] Three difficulties, picked on the title: easy, normal, hard
 - [x] Machines in some worlds: a button that opens the level's gate, a plate that makes timed ledges solid
 - [x] A blaster in some worlds: shoot the target to open the gate, and put bumpers and turrets out for a while
@@ -104,7 +107,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 
 ## Your systems
 - parkour · in the slice
-- up to 50 levels ultimate hard levels included · in the slice
+- 30 levels, still hard, no easy levels, more fun after each level · in the slice
 - guns or some mechanical inputs · in the slice
 - a nice main menu · in the slice
 - co-op: race togather up to 5 player, i create session and share the room id · in the slice
@@ -137,7 +140,6 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - A kicked player is kept out by their browser, not by who they are: another browser or a cleared one gets back in: not built yet
 - Real TikTok chat or gift connection: needs a server: not built yet
 - A ghost of your best run: change it after play
-- A speedrun split timer per level: change it after play
 - Real Kurdish songs: yours to add, since the game ships none; put the files in assets/music/ and name them in config.js
 - New moves over time: grow it
 - A daily course: change it after play

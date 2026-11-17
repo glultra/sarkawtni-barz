@@ -29,7 +29,7 @@ const LETTERS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function newRoomId() { for (;;) { let s = ''; for (const b of crypto.randomBytes(4)) s += LETTERS[b % 32]; if (!rooms.has(s)) return s; } }
 const cleanName = n => String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 14) || 'player';
 const cleanCid = s => String(s || '').replace(/[^0-9A-Za-z]/g, '').slice(0, 24); // the name a browser keeps for itself, so a player can come back to their place
-const GOALS = [3, 5, 10, 25, 50];
+const GOALS = [3, 6, 10, 20, 30];
 const clampInt = (v, a, b) => Math.max(a, Math.min(b, Math.round(Number(v) || 0)));
 const LAN = []; for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) LAN.push(a.address + ':' + PORT); // what players on the same Wi-Fi type
 const racers = room => room.players.filter(p => !p.spec); // those who climb; the rest only watch

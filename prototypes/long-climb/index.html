@@ -18,7 +18,7 @@
 <script src="config.js"></script>
 <script>
 'use strict';
-// Long Climb: one tall tower of fifty levels in a tall 9:16 window. Every ledge is one-way: you
+// Long Climb: one tall tower of thirty levels in a tall 9:16 window. Every ledge is one-way: you
 // rise through it from below and land on its top, so a miss drops you to whatever is underneath.
 // Some worlds add machines (buttons, gates, timed ledges) and some hand you a blaster.
 
@@ -50,7 +50,7 @@ const fxr = fixedRng(4242); // what only decorates (sparks, confetti) draws from
 const CKB = {
   dir: 'rtl', langName: 'کوردی', lang: 'زمان', player: 'یاریزان', bots: ['ئارام', 'شیلان', 'هێمن', 'ڕۆژان'], pad: 'کۆنتڕۆڵەر بەسترا', tapType: 'دەست لێبدە بۆ نووسین',
   title: 'سەرکەوتنی درێژ',
-  tagline: 'پەنجا ئاست، یەک تاوەر، یەک هەڵە و دەکەویتە خوارەوە',
+  tagline: 'سی ئاست، یەک تاوەر، یەک هەڵە و دەکەویتە خوارەوە',
   controls: ['A / D یان تیرەکان: جووڵە', 'Space: باز (بۆ بازی بەرزتر دایبگرە)', 'F: تەقە، لەو ئاستانەی تفەنگت هەیە', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ', 'C: پشکنینی کۆدی بینەر'],
   start: 'Enter یان دەست لێدان بۆ دەستپێکردن', cont: 'B: بەردەوامبوون لە ئاستی',
   pick: 'ئاستی سەختی (تیرەکان یان 1 2 3)', modes: ['ئاسان', 'ئاسایی', 'سەخت'],
@@ -73,7 +73,7 @@ const CKB = {
 };
 CKB.controls = ['A / D یان جۆیستیک: جووڵە     Space: باز     F: تەقە', 'کلیکی چەپ یان E: پاڵنان     کلیکی ڕاست یان Q: گرتن', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ'];
 CKB.needServer = 'بۆ ژوور، یارییەکە بە start-room.bat بکەرەوە';
-// Ten worlds of five levels. Each has its sky, the mix of special ledges it uses, what it adds,
+// Ten worlds of three levels. Each has its sky, the mix of special ledges it uses, what it adds,
 // the hint its banner shows, and the scale and speed of its tune.
 const WORLDS = [
   { name: 'باخچە', sky: ['#8fd6ff', '#dff5ff'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
@@ -87,11 +87,11 @@ const WORLDS = [
   { name: 'قوللەکان', sky: ['#23246a', '#5a4fb0'], cap: '#7f8cff', mix: { i: 0.15, c: 0.15, m: 0.15, v: 0.1 }, gun: true, gate: 'tgt', bumpers: true, turrets: true, hint: 'تەقە لە قوللەکان بکە بۆ وەستاندنیان', scale: [0, 1, 4, 5, 7, 8, 10], root: 233, bpm: 126 },
   { name: 'کۆتایی', sky: ['#0d0e2a', '#3a1040'], cap: '#ff5a7a', mix: { c: 0.18, i: 0.15, m: 0.15, b: 0.1, v: 0.14, f: 0.08 }, gun: true, gate: 'both', timed: true, bumpers: true, turrets: true, wind: true, hint: 'هەموو شتێک پێکەوە', scale: [0, 1, 3, 5, 7, 8, 10], root: 262, bpm: 132 },
 ];
-const LEVELS = 50, PER = 5;
+const LEVELS = 30, PER = 3;
 CKB.worlds = WORLDS.map(w => w.name); CKB.hints = WORLDS.map(w => w.hint || '');
 const EN = {
   dir: 'ltr', langName: 'English', lang: 'Language', player: 'Player', bots: ['Aram', 'Shilan', 'Hemin', 'Rozhan'], pad: 'Controller connected', tapType: 'Tap to type',
-  title: 'Long Climb', tagline: 'Fifty levels, one tower, one slip and down you go',
+  title: 'Long Climb', tagline: 'Thirty levels, one tower, one slip and down you go',
   controls: ['A / D or stick: move     Space: jump     F: fire', 'Left click or E: push     Right click or Q: grab', 'Esc: menu     Hold R: restart     M: mute'],
   start: 'Press Enter or tap to start', cont: 'B: continue from level', pick: 'Difficulty (arrows or 1 2 3)', modes: ['Easy', 'Normal', 'Hard'],
   height: 'Height', time: 'Time', falls: 'Falls', stars: 'Stars', best: 'Best', metre: 'm', level: 'Level', next: 'New world',
@@ -401,9 +401,10 @@ function stepMusic(dt) {
   }
 }
 
-// ---- The tower: fifty levels, laid by one recipe per world from a fixed seed --------------------
+// ---- The tower: thirty levels, laid by one recipe per world from a fixed seed -------------------
 // Each ledge sits within one jump of the one before: the sideways gap and the rise are drawn from
-// the level's range, which runs from easy at level 1 to the limit of the jump at level 50.
+// the level's range. Level 1 already starts part-way up that range (tune.start_hard), with no easy
+// warm-up levels, and it climbs to the limit of the jump at level 30.
 const PW = 30, PH = 38;
 let plats = [], bumpers = [], rests = [], gates = [], targets = [], turrets = [], stars = [], decor = [], route = [], SUMMIT = 0;
 function pickKind(mix, roll) { let a = 0; for (const k in mix) { a += mix[k]; if (roll < a) return k; } return 'n'; }
@@ -414,8 +415,8 @@ function buildTower(mode) {
   let alt = 0, cx = W / 2;
   rests[0] = add({ x: 0, w: W, alt: 0, kind: 'r', level: 0, rest: 0 });
   for (let L = 0; L < LEVELS; L++) {
-    const w = Math.floor(L / PER), Wd = WORLDS[w], d = L / (LEVELS - 1), rnd = fixedRng(2000 + L * 131), n = 10 + Math.floor(d * 3), inW = L % PER, main = [];
-    const timedHere = Wd.timed && inW >= 2, t0 = timedHere ? Math.floor(n * 0.3) + 1 : -9;
+    const w = Math.floor(L / PER), Wd = WORLDS[w], d = lerp(tune.start_hard, 1, L / (LEVELS - 1)), rnd = fixedRng(2000 + L * 131), n = 10 + Math.floor(d * 3), inW = L % PER, main = [];
+    const timedHere = Wd.timed && inW >= 1, t0 = timedHere ? Math.floor(n * 0.3) + 1 : -9;
     let dir = rnd() < 0.5 ? 1 : -1, nearL = cx, nearR = cx, farL = cx, farR = cx, lastDir = dir, after = false, prevKind = 'n';
     for (let i = 0; i < n; i++) {
       let kind = 'n';
@@ -466,7 +467,7 @@ const levelAt = alt => { let n = 0; for (let i = 1; i < rests.length; i++) if (a
 const metres = alt => Math.max(0, Math.round(alt / 40));
 
 // ---- What is kept between sessions, and the finish code ---------------------------------------
-const SAVE = 'long-climb-v2';
+const SAVE = 'long-climb-v3'; // v3: the 30-level tower; progress on the old 50-level one does not carry over
 let save = { best: [{}, {}, {}], run: null };
 try { const s = JSON.parse(localStorage.getItem(SAVE) || 'null'); if (s && Array.isArray(s.best)) save = s; } catch (e) {}
 function store() { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch (e) {} }
@@ -488,7 +489,7 @@ const clockText = (cs, fine) => {
 };
 
 // ---- Racing: bots on this machine, real players through server.js -------------------------------
-const GOALS = [3, 5, 10, 25, 50], MAXP = 25, HANG = PH + 16; // HANG: how far under the feet they hold a hanging climber's own feet are
+const GOALS = [3, 6, 10, 20, 30], MAXP = 25, HANG = PH + 16; // HANG: how far under the feet they hold a hanging climber's own feet are
 const colorOf = i => i < 5 ? ['#e8334a', '#3f8cff', '#3fd66a', '#ffb020', '#c77dff'][i] : `hsl(${Math.round(i * 137.5 + 20) % 360},85%,62%)`; // a colour for every seat
 const game = { kind: 'solo', goal: 5, name: '', color: colorOf(0), slot: 0, fin: null, msg: '', msgT: 0, spec: false, over: false, watch: null, size: tune.room_size, cid: '' };
 try { game.name = localStorage.getItem('long-climb-name') || ''; game.cid = localStorage.getItem('long-climb-cid') || ''; game.size = clamp(Number(localStorage.getItem('long-climb-size')) || tune.room_size, 2, MAXP); } catch (e) {}
@@ -696,7 +697,7 @@ function reset(from) {
   seed = Number(params.get('seed')) || CONFIG.seed;
   if (builtMode !== mode) { buildTower(mode); builtMode = mode; }
   // state.gained: what this run gained or learned, the high the ending shows.
-  state = { t: 0, score: 0, gained: '', time: 0, started: false, falls: 0, stars: 0, height: 0, level: 1, world: 1, mode: mode + 1, banner: 0, bannerN: 0, holdR: 0, code: '', entry: '', verdict: null, done: false, shake: 0, flash: 0, t0: 0, wind: 0, count: 0, ghost: 0, hint: '', hintT: 0, cool: 0, gun: false };
+  state = { t: 0, score: 0, gained: '', time: 0, started: false, falls: 0, stars: 0, height: 0, level: 1, world: 1, mode: mode + 1, banner: 0, bannerN: 0, lt: 0, lapCs: 0, holdR: 0, code: '', entry: '', verdict: null, done: false, shake: 0, flash: 0, t0: 0, wind: 0, count: 0, ghost: 0, hint: '', hintT: 0, cool: 0, gun: false };
   for (const p of plats) { p.x = p.kind === 'm' && p.flip ? p.x0 + p.a : p.x0; p.dx = 0; p.gone = 0; p.shake = 0; p.squash = 0; p.seen = false; }
   for (const b of bumpers) { b.cool = 0; b.off = 0; }
   for (const g of gates) { g.btn = g.tgt = g.open = false; }
@@ -704,7 +705,7 @@ function reset(from) {
   for (const t of turrets) { t.sleep = 0; t.next = 0; }
   for (const s of stars) s.taken = false;
   const lp = Number(params.get('level')) || 1; let n = clamp(lp - 1, 0, LEVELS - 1);
-  if (from) { n = from.top; state.time = from.cs / 100; state.falls = from.falls; state.stars = from.stars || 0; state.started = true; }
+  if (from) { n = clamp(from.top, 0, LEVELS - 1); state.time = state.lt = from.cs / 100; state.falls = from.falls; state.stars = from.stars || 0; state.started = true; }
   const start = rests[n]; for (let i = 0; i <= n; i++) rests[i].seen = true;
   for (const g of gates) if (g.level <= n) g.open = true;
   P = { x: clamp(start.kind === 'p' ? start.x + start.w / 2 - PW / 2 : W / 2 - PW / 2, 0, W - PW), alt: start.alt, vx: 0, vy: 0, on: start, coy: 0, buf: 0, face: 1, squash: 0, stun: 0, last: start.alt, cut: false, whistled: false, hang: null, hangT: 0, load: 0, stepT: 0 };
@@ -740,7 +741,10 @@ function land(p) {
     p.seen = true;
     if (game.kind !== 'solo' && p.rest >= game.goal) { raceFinish(); return; } // in a race the level that ends it is the finish line, and nothing is kept
     if (game.kind === 'solo' && p.summit) { finish(); return; }
-    state.banner = tune.banner_time; state.bannerN = p.rest; state.flash = 0.7; sfx.rest(); ring(cx, P.alt, UI.gold, 340, 0.6); confetti(cx, P.alt + 30, 24);
+    // each level's cheer grows with the climb, and the end of a world gets a bigger one
+    const worldDone = p.rest % PER === 0;
+    state.banner = tune.banner_time; state.bannerN = p.rest; state.lapCs = Math.round((state.time - state.lt) * 100); state.lt = state.time;
+    state.flash = worldDone ? 1 : 0.7; sfx.rest(); if (worldDone) sfx.open(); ring(cx, P.alt, UI.gold, worldDone ? 520 : 340, 0.6); confetti(cx, P.alt + 30, 24 + p.rest * 2 + (worldDone ? 40 : 0));
     if (game.kind !== 'solo') { events.push(['level', p.rest]); return; }
     events.push(['level', p.rest, metres(p.alt)]);
     const b = save.best[mode]; if (!(b.level >= p.rest)) b.level = p.rest;
@@ -865,7 +869,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
     }
   }
   state.wind = 0;
-  if (Wd.wind && (state.world < 10 || state.level % PER === 0 || state.level % PER >= 3)) { // the wind turns every few seconds and carries you while you are in the air
+  if (Wd.wind && (state.world < 10 || state.level % PER !== 1)) { // the wind turns every few seconds and carries you while you are in the air
     state.wind = (state.t / tune.wind_period) % 2 < 1 ? 1 : -1;
     if (!P.on) P.x += state.wind * tune.wind_speed * dt;
   }
@@ -1144,7 +1148,7 @@ function hud() {
   if (state.banner > 0) { // a level is done: its number, its height, and the next world when there is one
     const a = clamp(Math.min(state.banner, tune.banner_time - state.banner) * 4, 0, 1), n = state.bannerN, nw = n % PER === 0 && WORLDS[n / PER];
     ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(0, 300, W, nw ? (nw.hint ? 196 : 158) : 116);
-    text(`${K.level} ${n} / ${LEVELS}`, W / 2, 342, 44, '#ffffff', 'center', true); text(`${metres(rests[n].alt)} ${K.metre}`, W / 2, 388, 24, UI.gold, 'center', true);
+    text(`${K.level} ${n} / ${LEVELS}`, W / 2, 342, 44, '#ffffff', 'center', true); text(`${metres(rests[n].alt)} ${K.metre}` + (state.lapCs > 0 ? `  ·  ${clockText(state.lapCs)}` : ''), W / 2, 388, 24, UI.gold, 'center', true); // how high, and how long this level took
     if (nw) { text(`${K.next}: ${K.worlds[n / PER]}`, W / 2, 428, 24, '#ffffff'); if (nw.hint) text(K.hints[n / PER], W / 2, 466, 22, UI.gold, 'center', true); }
     ctx.globalAlpha = 1;
   }
