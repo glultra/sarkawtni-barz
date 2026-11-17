@@ -8,7 +8,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Long Climb</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #0b0d14; overflow: hidden; }
+  html, body { margin: 0; height: 100%; background: #0b0d14; overflow: hidden; touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   body { font-variant-numeric: tabular-nums; }
   canvas { display: block; margin: 0 auto; touch-action: none; -webkit-user-select: none; user-select: none; }
 </style>
@@ -26,7 +26,7 @@
 const params = new URLSearchParams(location.search);
 const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
 const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
-const W = 720, H = 1280;        // logical size: a phone held upright, as TikTok shows it
+const W = 720; let H = 1280;    // logical size: a phone held upright, as TikTok shows it (sideways on a phone, H is what fits: see fit)
 const FONT = '"Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif';
 const TITLE = 'Long Climb';
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
@@ -139,11 +139,17 @@ Object.assign(CKB, {
 // ---- Screen ---------------------------------------------------------------------------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+// A phone held sideways gets a view of its own: the tower in the middle at the size it has upright, the
+// buttons on the dark panels beside it, and as much of the tower's height as fits. A PC's window never does.
+const phone = params.get('land') === '1' || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+let CW = W, OX = 0, LAND = false; // the canvas's logical width, how far the tower's left edge sits inside it, and whether the sideways view is on
 function fit() { // fills the window at any size and pixel ratio
-  const k = Math.min(innerWidth / W, innerHeight / H), r = k * (devicePixelRatio || 1);
-  canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
-  canvas.style.width = Math.round(W * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
-  canvas.style.marginTop = Math.max(0, Math.floor((innerHeight - H * k) / 2)) + 'px';
+  const iw = innerWidth, ih = innerHeight; LAND = phone && iw > ih * 1.15;
+  H = LAND ? clamp(Math.round(2 * W * ih / iw), 600, 1280) : 1280; CW = LAND ? Math.max(W, H * iw / ih) : W; OX = (CW - W) / 2;
+  const k = LAND ? ih / H : Math.min(iw / W, ih / H), r = k * (devicePixelRatio || 1);
+  canvas.width = Math.round(CW * r); canvas.height = Math.round(H * r);
+  canvas.style.width = Math.round(CW * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
+  canvas.style.marginTop = Math.max(0, Math.floor((ih - H * k) / 2)) + 'px';
   ctx.setTransform(r, 0, 0, r, 0, 0);
 }
 addEventListener('resize', fit); fit();
@@ -173,8 +179,12 @@ function fitText(s, maxW, size, bold = true) { // a name too long for its place 
 // The plain look of every screen: flat dark pills, white words, one gold accent.
 const UI = { bg: 'rgba(10,12,20,0.66)', soft: 'rgba(255,255,255,0.08)', dim: '#aab2c2', gold: '#ffd44f' };
 let zones = [], taps = []; // what can be tapped or clicked: every screen names its buttons as it draws them
-function zone(x, y, w, h, fn) { zones.push({ x, y, w, h, fn }); }
-function dim(a) { ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, 0, W, H); }
+let PASS = 0, VT = null, corner = null, wantToast = false; // set while a tall screen is drawn in slices for a sideways phone (splitDraw)
+function zone(x, y, w, h, fn) {
+  if (VT) { const cy = y + h / 2; if (cy < VT.a || cy > VT.b) return; x = VT.ox + x * VT.s; y = VT.oy + y * VT.s; w *= VT.s; h *= VT.s; } // a button in a slice is where the slice put it
+  zones.push({ x, y, w, h, fn });
+}
+function dim(a) { if (PASS) return; ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, 0, W, H); }
 function pill(x, y, w, h, fill = UI.bg) { rr(x, y, w, h, Math.min(h / 2, 26), fill); }
 function dot(x, y, r, c) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); }
 function chevron(x, y, d, c = '#ffffff', s = 9) { ctx.strokeStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - d * s * 0.5, y - s); ctx.lineTo(x + d * s * 0.5, y); ctx.lineTo(x - d * s * 0.5, y + s); ctx.stroke(); }
@@ -195,8 +205,8 @@ function stepper(label, value, x, y, w, edit, dec, inc, color = '#ffffff') { // 
   text(label, x + w / 2, y, 17, UI.dim); rr(x, y + 16, w, 52, 18, UI.soft); text(value, x + w / 2, y + 43, 22, color, 'center', true);
   if (edit) { chevron(x + 20, y + 42, -1, UI.dim, 8); chevron(x + w - 20, y + 42, 1, UI.dim, 8); zone(x, y + 10, w / 2, 64, dec); zone(x + w / 2, y + 10, w / 2, 64, inc); }
 }
-function backBtn() { pill(14, 14, 52, 52); chevron(38, 40, -1); zone(0, 0, 84, 84, () => hit.add('Escape')); }
-function toastLine(y) { if (!(game.msgT > 0)) return; ctx.font = `bold 21px ${FONT}`; const w = Math.min(W - 60, ctx.measureText(game.msg).width + 44); pill(W / 2 - w / 2, y - 22, w, 44, 'rgba(10,12,20,0.86)'); text(fitText(game.msg, w - 30, 21), W / 2, y + 1, 21, UI.gold, 'center', true); }
+function backBtn(x = 0) { if (PASS) { corner = 'back'; return; } pill(x + 14, 14, 52, 52); chevron(x + 38, 40, -1); zone(x, 0, 84, 84, () => hit.add('Escape')); }
+function toastLine(y) { if (!(game.msgT > 0)) return; if (PASS) { wantToast = true; return; } ctx.font = `bold 21px ${FONT}`; const w = Math.min(W - 60, ctx.measureText(game.msg).width + 44); pill(W / 2 - w / 2, y - 22, w, 44, 'rgba(10,12,20,0.86)'); text(fitText(game.msg, w - 30, 21), W / 2, y + 1, 21, UI.gold, 'center', true); }
 
 // ---- Input: keys by position (event.code), OS key repeat ignored; touch buttons on a phone ---
 const down = new Set(), hit = new Set(), typed = [];
@@ -217,16 +227,34 @@ const BTN = [ // the phone's buttons: where they sit, the key each one holds dow
 ];
 const btnShown = b => !b.when || (b.when === 'gun' ? state.gun : game.kind !== 'solo');
 const fingers = new Map();
-function fingerAt(e) { const b = canvas.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * W, y: (e.clientY - b.top) / b.height * H }; }
-function syncFingers() {
-  for (const b of BTN) {
-    let on = false;
-    for (const f of fingers.values()) if (Math.hypot(f.x - b.x, f.y - b.y) < b.r * 1.2) on = true;
-    if (on && !btnShown(b)) on = false;
-    if (on && !b.on) { down.add(b.code); hit.add(b.code); if (navigator.vibrate) navigator.vibrate(12); } else if (!on && b.on) down.delete(b.code);
-    b.on = on;
-  }
+if (phone) touchSeen = true; // a phone shows its buttons from the start
+function layoutBtns() { // where the phone's buttons sit: over the tower's foot upright, on the panels beside the tower sideways
+  const at = LAND ? [[-OX * 0.74, H - 150, 82], [-OX * 0.26, H - 150, 82], [W + OX * 0.66, H - 130, 92], [W + OX * 0.24, H - 110, 58], [W + OX * 0.76, H - 320, 56], [W + OX * 0.32, H - 290, 54]]
+    : [[104, H - 134, 76], [272, H - 134, 76], [W - 116, H - 140, 90], [W - 268, H - 262, 58], [W - 80, H - 312, 54], [W - 300, H - 112, 52]];
+  BTN.forEach((b, i) => { b.x = at[i][0]; b.y = at[i][1]; b.r = at[i][2]; });
 }
+addEventListener('resize', layoutBtns); layoutBtns();
+function fingerAt(e) { const b = canvas.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * CW - OX, y: (e.clientY - b.top) / b.height * H }; }
+function syncFingers() { // each finger holds the one button nearest it; a button with no finger on it is let go
+  const held = new Set();
+  if (scene === 'play') for (const f of fingers.values()) {
+    let best = null, bd = 1.25; for (const b of BTN) { const d = Math.hypot(f.x - b.x, f.y - b.y) / b.r; if (d < bd && btnShown(b)) { best = b; bd = d; } }
+    if (best) held.add(best);
+  }
+  for (const b of BTN) { const on = held.has(b); if (on && !b.on) { down.add(b.code); hit.add(b.code); if (navigator.vibrate) navigator.vibrate(12); } else if (!on && b.on) down.delete(b.code); b.on = on; }
+}
+// On a touch screen the fingers on the glass are read afresh at every touch event, never tracked one lift at a
+// time: a lift the browser did not report (a swipe from the screen's edge, a long press it took for its own)
+// can then never leave a button held down.
+const hasTouch = 'ontouchstart' in window;
+function onTouch(e) {
+  fingers.clear(); for (const t of e.touches) fingers.set('t' + t.identifier, fingerAt(t)); syncFingers();
+  if (e.type === 'touchend') startAudio();
+  if (e.cancelable) e.preventDefault(); // no long-press menu, magnifier, zoom or scroll starts under a held button
+}
+if (hasTouch) for (const n of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) document.addEventListener(n, onTouch, { passive: false });
+const dropAll = () => { fingers.clear(); for (const b of BTN) { if (b.on) down.delete(b.code); b.on = false; } }; // the page went out of sight: nothing stays held
+addEventListener('pagehide', dropAll); addEventListener('blur', dropAll); document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') dropAll(); });
 addEventListener('keydown', e => { if (e.code === 'Tab') e.preventDefault(); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
@@ -239,7 +267,7 @@ canvas.addEventListener('pointerdown', e => {
   }
   if (scene === 'play') {
     if (e.pointerType === 'mouse') { if (e.button === 2) hit.add('KeyQ'); else if (e.button === 0) { hit.add('KeyE'); down.add('MouseL'); } } // the mouse: left to shove (and to fire, where there is a blaster), right to hang on
-    else if (touchSeen) { fingers.set(e.pointerId, f); syncFingers(); }
+    else if (touchSeen && !hasTouch) { fingers.set(e.pointerId, f); syncFingers(); }
   } else if ((scene === 'name' || scene === 'join') && e.pointerType === 'touch') { // a phone has no keys here: ask with its own keyboard
     const v = prompt(scene === 'name' ? K.nameAsk : K.roomAsk, state.entry || '');
     if (v) { state.entry = scene === 'name' ? v.slice(0, 14) : v.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4); hit.add('Enter'); }
@@ -640,6 +668,8 @@ function roomSet(ch) { // the host changes the room: how many may play, the leve
   if (s.mode === r.mode && s.goal === r.goal && s.size === r.size) return;
   net.send(Object.assign({ t: 'set' }, s)); game.size = s.size; try { localStorage.setItem('long-climb-size', String(s.size)); } catch (e) {} sfx.type();
 }
+const lobbyTop = () => 168 + wrap(roomLink(), W - 150, 21).slice(0, 3).length * 27 + 34 + 88; // where the room screen's seats begin, under the code, the link and the settings
+function pauseTop() { const r = net.room; let y = (r ? 150 : 330) + 62; if (r) y += 106 + wrap(roomLink(), W - 150, 20).slice(0, 3).length * 26 + 50; return y; } // where the Esc menu's buttons begin
 const goalStep = d => GOALS[clamp(GOALS.indexOf(net.room.goal) + d, 0, GOALS.length - 1)];
 function openName(then) { // ask for the name; `then` is the menu line to go on to once it is given
   pendingGo = then;
@@ -1004,8 +1034,10 @@ function nameTag(s, x, y, mark) { // a climber's name over its head; a small arr
   if (mark) { ctx.fillStyle = mark; ctx.beginPath(); ctx.moveTo(x - 9, y + 17); ctx.lineTo(x + 9, y + 17); ctx.lineTo(x, y + 28); ctx.fill(); }
 }
 function drawWorld() {
+  if (PASS) return; // a slice of a tall screen: the tower is already drawn under it
   const t = state.t, vis = y => y > -70 && y < H + 70, live = scene === 'play' || scene === 'pause' || scene === 'board' || scene === 'watch';
   ctx.save();
+  if (LAND) { ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); } // sideways, nothing of the tower spills onto the panels beside it
   if (state.shake > 0) ctx.translate(Math.sin(t * 90) * state.shake * 14, Math.cos(t * 70) * state.shake * 14);
   drawSky();
   if (state.wind && scene !== 'title') { // streaks show which way the wind blows
@@ -1054,7 +1086,7 @@ function drawWorld() {
 }
 
 // ---- What is on the screen over the tower: as little as the climb needs ------------------------
-function menuBtn() { pill(14, 14, 52, 52); ctx.fillStyle = '#ffffff'; for (const yy of [31, 39, 47]) ctx.fillRect(29, yy, 22, 3); zone(0, 0, 84, 84, () => hit.add('Escape')); } // the menu button: Esc, or a tap
+function menuBtn(x = 0) { if (PASS) { corner = 'menu'; return; } pill(x + 14, 14, 52, 52); ctx.fillStyle = '#ffffff'; for (const yy of [31, 39, 47]) ctx.fillRect(x + 29, yy, 22, 3); zone(x, 0, 84, 84, () => hit.add('Escape')); } // the menu button: Esc, or a tap
 function clockPill(sub) { pill(W / 2 - 116, 14, 232, 76); ltr(clockText(Math.floor(state.time * 100)), W / 2, 42, 32, '#ffffff'); text(sub, W / 2, 72, 17, UI.dim); }
 function heightBar(alt, color) { // the whole tower by world, with every level marked, where you are and your best
   const bx = 6, by = 100, bh = H - by - 70, yOf = a => by + bh - clamp(a / SUMMIT, 0, 1) * bh, race = game.kind !== 'solo';
@@ -1077,17 +1109,17 @@ function standings() { // the first three of the race, and you
 function farArrows(ref) { // the nearest climbers out of sight, above and below, each with its distance
   const up = [], dn = []; for (const o of others.values()) { if (o.fin) continue; const y = sy(o.alt); if (y < 96) up.push(o); else if (y > H - 60) dn.push(o); }
   up.sort((a, b) => a.alt - b.alt); dn.sort((a, b) => b.alt - a.alt);
-  const chip = (o, k, d) => { const ax = clamp(o.x, 90, W - 310), ay = d > 0 ? 122 + k * 38 : H - (touchSeen ? 420 : 150) - k * 38;
+  const chip = (o, k, d) => { const ax = clamp(o.x, 90, W - 310), ay = d > 0 ? 122 + k * 38 : H - (LAND ? 110 : touchSeen ? 420 : 150) - k * 38;
     pill(ax - 52, ay - 16, 104, 32, 'rgba(10,12,20,0.78)'); ctx.fillStyle = o.color; ctx.beginPath(); ctx.moveTo(ax - 34, ay - d * 8); ctx.lineTo(ax - 43, ay + d * 6); ctx.lineTo(ax - 25, ay + d * 6); ctx.fill();
     text(`${Math.abs(metres(o.alt) - metres(ref))} ${K.metre}`, ax + 12, ay + 1, 17, '#ffffff', 'center', true); };
   up.slice(0, 2).forEach((o, k) => chip(o, k, 1)); dn.slice(0, 2).forEach((o, k) => chip(o, k, -1));
 }
 function countdown() {
   if (!(state.count > 0)) return;
-  const c = state.count - 0.4, n = Math.ceil(c), since = n - c, pop = 1 + Math.max(0, 0.22 - since) * 2.4;
-  ctx.fillStyle = 'rgba(10,12,20,0.62)'; ctx.fillRect(0, 440, W, 250);
-  ctx.save(); ctx.translate(W / 2, 545); ctx.scale(pop, pop); if (n > 0) ltr(String(n), 0, 0, 130, UI.gold); else text(K.go, 0, 0, 88, UI.gold, 'center', true); ctx.restore();
-  text(`${K.goal} ${game.goal}`, W / 2, 652, 24, '#ffffff', 'center', true);
+  const c = state.count - 0.4, n = Math.ceil(c), since = n - c, pop = 1 + Math.max(0, 0.22 - since) * 2.4, y0 = Math.round(H * 0.344);
+  ctx.fillStyle = 'rgba(10,12,20,0.62)'; ctx.fillRect(0, y0, W, 250);
+  ctx.save(); ctx.translate(W / 2, y0 + 105); ctx.scale(pop, pop); if (n > 0) ltr(String(n), 0, 0, 130, UI.gold); else text(K.go, 0, 0, 88, UI.gold, 'center', true); ctx.restore();
+  text(`${K.goal} ${game.goal}`, W / 2, y0 + 212, 24, '#ffffff', 'center', true);
 }
 function hud() {
   const t = state.t, race = game.kind !== 'solo';
@@ -1145,6 +1177,12 @@ function watchHud() { // watching a race: whose climb you see, the standings, an
   menuBtn(); clockPill(game.fin ? `${K.youPlace}  #${game.fin.place}  ·  ${clockText(game.fin.cs, true)}` : `${K.goal} ${game.goal}`);
   standings(); heightBar(o ? o.alt : null, o ? o.color : '#ffffff'); if (o) farArrows(o.alt); countdown();
   if (scene === 'watch' && game.msgT > 0 && !(state.count > 0)) toastLine(212);
+  if (LAND) { // sideways: the name sits small at the tower's foot, and the panels beside the tower are the two arrows
+    pill(W / 2 - 170, H - 62, 340, 48, 'rgba(10,12,20,0.8)'); eye(W / 2 - 138, H - 38, 10, UI.dim); if (o) { dot(W / 2 - 106, H - 38, 8, o.color); text(fitText(o.name, 210, 22), W / 2 + 16, H - 37, 22, '#ffffff', 'center', true); }
+    for (const d of [-1, 1]) { const x = d < 0 ? -OX / 2 : W + OX / 2; dot(x, H / 2, 70, 'rgba(255,255,255,0.08)'); chevron(x, H / 2, d, '#ffffff', 26); zone(d < 0 ? -OX : W, 0, OX, H, () => watchNext(d)); }
+    if (bots) button(K.board, W + OX / 2 - 110, H - 72, 220, 50, false, () => hit.add('Enter'), { size: 19 });
+    return;
+  }
   const y = H - 170; pill(W / 2 - 230, y, 460, 92, 'rgba(10,12,20,0.8)');
   eye(W / 2 - 4 - 60, y + 26, 11, UI.dim); text(K.watching, W / 2 + 14, y + 27, 17, UI.dim);
   if (o) { dot(W / 2 - 120, y + 62, 9, o.color); text(fitText(o.name, 200, 26), W / 2, y + 63, 26, '#ffffff', 'center', true); }
@@ -1172,6 +1210,7 @@ const scenes = {
     },
   },
   title: { // the main menu: the language, your name, four buttons and the difficulty
+    cols: () => [[[0, 446]], [[446, 1100]]], // sideways: the name on the left, the buttons on the right
     update(dt) {
       state.t += dt; stepWorld(dt); if (game.msgT > 0) game.msgT -= dt;
       if (pressed('ArrowUp') || pressed('KeyW')) { menuSel = (menuSel + 4) % 5; sfx.type(); }
@@ -1206,6 +1245,7 @@ const scenes = {
     },
   },
   name: { // type the name the others will see; then on to the room, when that was asked
+    cols: () => [[[360, 650]]],
     update(dt) {
       state.t += dt; if (pressed('Escape')) { pendingGo = -1; scene = 'title'; return; }
       while (typed.length) { const k = typed.shift(); if (k === 'Backspace') state.entry = state.entry.slice(0, -1); else if (state.entry.length < 14) { state.entry += k; sfx.type(); } }
@@ -1217,6 +1257,7 @@ const scenes = {
     },
   },
   join: { // type the room's code
+    cols: () => [[[360, 660]]],
     update(dt) {
       state.t += dt; if (game.msgT > 0) game.msgT -= dt; if (pressed('Escape')) { scene = 'title'; return; }
       while (typed.length) { const k = typed.shift(); if (k === 'Backspace') state.entry = state.entry.slice(0, -1); else if (/^[a-zA-Z0-9]$/.test(k) && state.entry.length < 4) { state.entry += k.toUpperCase(); sfx.type(); } }
@@ -1228,6 +1269,7 @@ const scenes = {
     },
   },
   lobby: { // the room: its code and link to share, every seat taken or empty, who watches, and the host's controls
+    cols: () => { const top = lobbyTop(); return [[[0, top - 8], [1046, 1214]], [[top - 8, 1046]]]; }, // sideways: the code, the settings and the start on the left, the seats on the right
     update(dt) {
       state.t += dt; stepWorld(dt); if (game.msgT > 0) game.msgT -= dt; const r = net.room;
       if (!r) { scene = 'title'; return; }
@@ -1279,6 +1321,7 @@ const scenes = {
     },
   },
   board: { // the race's results: everyone who is in, by time, then the rest by height
+    cols: () => { const n = Math.max(1, entries().length), rowH = clamp(Math.floor(790 / n), 30, 76); return [[[50, 184], [1046, 1146]], [[188, 200 + n * rowH]]]; },
     update(dt) {
       state.t += dt; if (!game.over) state.time += dt; stepWorld(dt); stepOthers(dt); raceTick(dt);
       if (pressed('Escape') || pressed('KeyP')) { pauseSel = 0; pauseFrom = 'board'; scene = 'pause'; return; }
@@ -1317,6 +1360,8 @@ const scenes = {
     draw() { drawWorld(); watchHud(); },
   },
   pause: { // the menu on Esc: go on, sound, the room's code and link, and the ways out
+    cols() { const y = pauseTop(), n = this.items().length; return net.room ? [[[96, y - 12]], [[y - 12, y + n * 76]]] : [[[280, y + n * 76]]]; },
+    under() { const u = scenes[pauseFrom]; if (u.cols) drawWorld(); else u.draw(); },
     items() {
       const list = [[K.pauseMenu[0], resume]], inRoom = game.kind === 'net';
       if (game.kind === 'solo') list.push([K.pauseMenu[1], () => { save.run = null; store(); reset(); scene = 'play'; }]);
@@ -1340,7 +1385,7 @@ const scenes = {
       hit.clear(); sfx.pick(); list[pauseSel][1]();
     },
     draw() {
-      scenes[pauseFrom].draw(); zones = []; dim(0.78);
+      if (!PASS) { scenes[pauseFrom].draw(); zones = []; } dim(0.78);
       const r = net.room, list = this.items(); let y = r ? 150 : 330;
       text(r ? K.menuT : K.paused, W / 2, y, 46, '#ffffff', 'center', true); y += 62;
       if (r) { // the room's code and link, to send to whoever wants to come in or come back
@@ -1354,6 +1399,7 @@ const scenes = {
     },
   },
   results: {
+    cols: () => [[[240, 530]], [[560, 950]]],
     update(dt) { state.t += dt; stepWorld(dt); if (state.t > 1 && pressed('Enter')) { reset(); scene = 'play'; } },
     draw() {
       drawWorld(); dim(0.76);
@@ -1368,6 +1414,7 @@ const scenes = {
     },
   },
   code: { // the streamer types a viewer's code to see their time against their own
+    cols: () => [[[240, 860]]],
     update(dt) {
       state.t += dt;
       if (pressed('Escape')) { scene = 'title'; return; }
@@ -1395,6 +1442,7 @@ const scenes = {
 // ---- Loop: fixed step, frame time clamped ---------------------------------------------
 function step() {
   while (taps.length) taps.shift()(); // what was tapped or clicked since the last step
+  if (scene !== 'play' && BTN.some(b => b.on)) syncFingers(); // off the climb, the phone's buttons hold nothing
   if (pressed('KeyM') && scene !== 'code' && scene !== 'name' && scene !== 'join') { setMuted(!muted); hit.delete('KeyM'); }
   scenes[scene].update(STEP); hit.clear();
   fallWind(scene === 'play' && !P.on && !P.hang && P.vy < -520 ? clamp((-P.vy - 520) / 630, 0, 1) : 0);
@@ -1408,7 +1456,29 @@ function tick() {
   ALPHA = acc / STEP; // draw between steps, so the view never judders
   drawFrame();
 }
-function drawFrame() { zones = []; scenes[scene].draw(); }
+function splitDraw(sc) { // sideways, a tall screen is shown as its parts side by side, each at the size it has upright
+  if (sc.under) sc.under(); else drawWorld();
+  ctx.fillStyle = 'rgba(8,10,16,0.85)'; ctx.fillRect(-OX, 0, CW, H);
+  zones = []; corner = null; wantToast = false;
+  const cols = sc.cols(), colW = CW / cols.length;
+  cols.forEach((ranges, c) => { // a column is one or more slices of the tall screen, stacked
+    const total = ranges.reduce((a, r) => a + r[1] - r[0], 0), s = Math.min(1, (H - 12) / total, colW / W), x0 = -OX + c * colW + (colW - W * s) / 2; let y = (H - total * s) / 2;
+    for (const [a, b] of ranges) {
+      VT = { ox: x0, oy: y - a * s, s, a, b };
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, y, W * s, (b - a) * s); ctx.clip(); ctx.translate(VT.ox, VT.oy); ctx.scale(s, s); PASS = 1;
+      try { sc.draw(); } finally { PASS = 0; VT = null; ctx.restore(); }
+      y += (b - a) * s;
+    }
+  });
+  if (corner === 'back') backBtn(-OX); else if (corner === 'menu') menuBtn(-OX); // the way back sits in the screen's corner, not the tall screen's
+  if (wantToast) toastLine(H - 44);
+}
+function drawFrame() {
+  zones = []; const sc = scenes[scene];
+  ctx.save(); if (LAND) { ctx.fillStyle = '#0b0d14'; ctx.fillRect(0, 0, CW, H); ctx.translate(OX, 0); }
+  if (LAND && sc.cols) splitDraw(sc); else sc.draw();
+  ctx.restore();
+}
 function frame() { tick(); requestAnimationFrame(frame); }
 // A headless browser on a time budget runs timers but almost no animation frames: a timer
 // ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
