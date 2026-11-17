@@ -53,6 +53,8 @@ After play: in a room we must hear each other's piano, gifts should affect them,
 
 After play: a bit slow and not correct; make the gifts for all (friends lag, effects late, different places for each, gifts too slow: all fixed)
 
+After play: the breakable boxes come back too late; the moving cars are not collided nicely, i can't even go on the edges, make a nice rigidbody 2d for the furnitures; for some furnitures add custom sounds, a bed sound, a car horn
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -101,7 +103,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
 - [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
 - [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right
-- [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers
+- [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers; the whole car is solid as drawn: you stand on the roof or step down onto the hood or the boot
+- [x] Each thing sounds like itself when you land on it, and the room hears it: a bed springs, a sofa puffs, wood knocks, a counter clinks, a car honks, a bus horns and sighs its brakes, a truck and a van honk, a plane whooshes, a rocket clangs, a satellite beeps, ice tinkles; crates come back after 1.2 seconds
 - [x] The climber has arms in blue sleeves with white cartoon mittens and short legs with big brown shoes: hands at the sides standing, swinging and striding running, both arms up jumping, flailing falling; the arms come from behind the body, so the shoulders are clean
 - [x] A room shares more than where everyone is: the piano's notes (quieter the farther away), crates giving way, blaster shots (to see; they hurt nobody), red bumpers and turrets shot out, and every gift and like of the streamer's for everyone (gifts.share in config.js: all, chaos or none); gift bumpers and falling things are placed once, by every climber, and stand at the same places on every screen; positions go out 30 times a second with speeds, so friends are shown where they are now; a game newer than its server says so
 - [x] A real-looking sky: the sun with corona and rays, the Moon painted with seas, lit craters and a rayed crater, the galaxy with thousands of stars, glowing arms and dust, the universe as a great cloud of coloured gas with dust lanes and stars of every colour

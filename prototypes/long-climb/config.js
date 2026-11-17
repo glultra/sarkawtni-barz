@@ -52,7 +52,7 @@ window.CONFIG = {
   wind_speed: { value: 115, min: 0, max: 260, step: 5 },         // the wind carries you sideways in the air
   wind_period: { value: 3.6, min: 1.5, max: 8, step: 0.1 },      // seconds before the wind turns
   crumble_delay: { value: 0.5, min: 0.15, max: 1.5, step: 0.05 },// seconds a crumbling ledge holds you
-  crumble_back: { value: 2.6, min: 1, max: 8, step: 0.1 },       // seconds until it comes back
+  crumble_back: { value: 1.2, min: 0.5, max: 8, step: 0.1 },       // seconds until it comes back
   bump_push: { value: 430, min: 150, max: 800, step: 10 },       // a red bumper or a turret's shot knocks you away this fast
   bump_stun: { value: 0.28, min: 0, max: 0.8, step: 0.02 },      // seconds you cannot steer after a knock
 

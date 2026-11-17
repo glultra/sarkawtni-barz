@@ -851,6 +851,7 @@ function land(p) {
   if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(cx, P.alt, 6, '#ff8fd8'); ring(cx, P.alt, '#ff8fd8', 70); return; } // a bouncer throws you straight back up
   P.on = p; P.vy = 0; P.squash = 0.22;
   if (p.kind === 'n' && thingOf(p) === 'piano') pianoAt(p, cx, true); // a chord, where you came down on the keys
+  else { const snd = thingSound(p); if (snd && !(p === live.sndOn && state.t - live.sndT < 0.6)) { live.sndOn = p; live.sndT = state.t; THING_SFX[snd](1); fxSend({ k: 'snd', s: snd, a: Math.round(P.alt) }); } } // a bed springs, a car honks...
   if (!hard) { sfx.land(); puff(cx, P.alt, 4, 'rgba(255,255,255,0.8)', 70); }
   if (p.kind === 'c' && !p.shake) { p.shake = tune.crumble_delay; sfx.crack(); fxSend({ k: 'cr', n: plats.indexOf(p), a: Math.round(p.alt) }); }
   if (p.timer) { state.ghost = tune.ghost_time; sfx.click(); ring(cx, P.alt, '#3fdcff', 80); events.push(['timer', p.level]); }                          // a plate that makes the timed ledges solid for a while
@@ -922,7 +923,11 @@ function stepWorld(dt) {
   if (state.cool > 0) state.cool -= dt;
 }
 const solid = p => !(p.gone > 0) && (p.kind !== 'g' || state.ghost > 0);
-const topAt = (p, x) => p.tilt ? p.alt + p.tilt * (clamp(x, p.x, p.x + p.w) - (p.x + p.w / 2)) : p.alt; // a leaning ledge's top, under x
+const extOf = p => p.kind === 'm' ? Math.min(30, p.w * 0.24) : 0; // how far a thing's solid shape reaches past its ledge: a car's hood and boot
+const topAt = (p, x) => { // a ledge's top under x: tilted for a leaning one; for a car the roof, down the glass, then the hood or the boot
+  if (p.kind === 'm') { const n = extOf(p), out = x > p.x + p.w ? x - p.x - p.w : x < p.x ? p.x - x : 0; return p.alt - Math.min(14, out / Math.max(1, n * 0.55) * 14); }
+  return p.tilt ? p.alt + p.tilt * (clamp(x, p.x, p.x + p.w) - (p.x + p.w / 2)) : p.alt;
+};
 function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so no key counts and the climber is left to gravity
   const key = c => !idle && down.has(c), tap = c => !idle && pressed(c), me = meId();
   const left = key('KeyA') || key('ArrowLeft'), right = key('KeyD') || key('ArrowRight');
@@ -997,8 +1002,9 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
   const prev = P.alt;
   if (P.on) {
     const p = P.on;
-    if (!solid(p) || P.x + PW < p.x + tune.edge || P.x > p.x + p.w - tune.edge) { P.on = null; P.coy = tune.coyote; P.cut = false; }
+    if (!solid(p) || P.x + PW < p.x - extOf(p) + tune.edge || P.x > p.x + p.w + extOf(p) - tune.edge) { P.on = null; P.coy = tune.coyote; P.cut = false; }
     else if (Math.abs(P.vx) > 120) { P.stepT -= dt; if (P.stepT <= 0) { P.stepT = 0.21; if (p.kind === 'n' && thingOf(p) === 'piano') pianoAt(p, P.x + PW / 2, false); else sfx.step(); parts.push({ x: P.x + PW / 2 - P.face * 10, alt: P.alt + 2, vx: -P.face * 40, vy: 50, g: 200, life: 0.3, max: 0.3, color: 'rgba(255,255,255,0.7)', s: 4 }); } } // footsteps, and the dust they kick up
+    if (P.on && P.on.kind === 'm') { P.alt = topAt(P.on, P.x + PW / 2); P.last = P.alt; } // on a car: up on the roof, down on the hood
     if (P.on && P.on.tilt) { const p2 = P.on; P.x = clamp(P.x - Math.sign(p2.tilt) * tune.tilt_slide * (Math.abs(p2.tilt) / Math.tan(tune.tilt_max * PI / 180)) * (p2.kind === 'i' ? 2.2 : 1) * dt, 0, W - PW); P.alt = topAt(p2, P.x + PW / 2); P.last = P.alt; } // on a lean the feet follow it, and it slides you
     if (load && Math.floor(state.t * 3) !== Math.floor((state.t - dt) * 3)) { parts.push({ x: P.x + PW / 2 + P.face * 16, alt: P.alt + 44, vx: P.face * 60, vy: 120, g: 600, life: 0.4, max: 0.4, color: '#8fd6ff', s: 4 }); } // sweat, under the weight
   } else {
@@ -1010,7 +1016,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
       for (const g of gates) if (!g.open && prev + PH <= g.alt && P.alt + PH > g.alt) { P.alt = g.alt - PH; P.vy = -140; P.cut = false; sfx.bonk(); hint(g.needBtn && !g.btn ? K.needBtn : K.needTgt); break; }
     } else { // falling: the highest ledge your feet pass through catches you
       let hitP = null;
-      for (const p of plats) if (solid(p) && prev >= topAt(p, P.x + PW / 2) - 0.01 && P.alt <= topAt(p, P.x + PW / 2) && P.x + PW > p.x + tune.edge && P.x < p.x + p.w - tune.edge && (!hitP || topAt(p, P.x + PW / 2) > topAt(hitP, P.x + PW / 2))) hitP = p;
+      for (const p of plats) if (solid(p) && prev >= topAt(p, P.x + PW / 2) - 0.01 && P.alt <= topAt(p, P.x + PW / 2) && P.x + PW > p.x - extOf(p) + tune.edge && P.x < p.x + p.w + extOf(p) - tune.edge && (!hitP || topAt(p, P.x + PW / 2) > topAt(hitP, P.x + PW / 2))) hitP = p;
       if (hitP) land(hitP);
       else if (!P.whistled && P.last - P.alt > tune.fall_min * 40) { P.whistled = true; sfx.whistle(); }
     }
@@ -2008,6 +2014,32 @@ function drawConsole() {
 }
 function drawDevBadge() { pill(14, 80, 120, 34, 'rgba(20,90,40,0.85)'); ctx.direction = 'ltr'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = '#c8ffd4'; ctx.fillText('DEV  ` ', 74, 98); }
 
+// ---- Each thing sounds like itself when you land on it ----------------------------------------
+// A bed springs, a sofa puffs, wood knocks, a counter clinks, a car honks, a bus sighs its brakes, a
+// plane whooshes, a rocket clangs, a satellite beeps, ice tinkles. The room hears it too, softer farther off.
+const THING_SFX = {
+  bed: v => { tone(150, 0.32, 'triangle', 0.13 * v, 290); tone(290, 0.22, 'sine', 0.06 * v, 150, 0.08); noise(0.12, 0.05 * v, 500, 200); },
+  sofa: v => { noise(0.22, 0.12 * v, 600, 180); tone(110, 0.14, 'sine', 0.08 * v, 70); },
+  table: v => { tone(430, 0.06, 'triangle', 0.16 * v, 300); tone(700, 0.04, 'square', 0.035 * v); noise(0.05, 0.08 * v, 1900, 900); },
+  desk: v => { tone(380, 0.07, 'triangle', 0.16 * v, 260); noise(0.05, 0.08 * v, 1600, 800); },
+  counter: v => { tone(1800, 0.14, 'sine', 0.06 * v); tone(2650, 0.12, 'sine', 0.04 * v, 0, 0.03); noise(0.04, 0.04 * v, 6000); },
+  car: v => { for (const d of [0, 0.17]) { tone(440, 0.11, 'square', 0.05 * v, 0, d); tone(554, 0.11, 'square', 0.04 * v, 0, d); } },
+  hover: v => { tone(300, 0.3, 'sine', 0.07 * v, 900); noise(0.3, 0.05 * v, 1500, 4000); },
+  bus: v => { tone(220, 0.4, 'sawtooth', 0.05 * v); tone(277, 0.4, 'sawtooth', 0.04 * v); noise(0.45, 0.06 * v, 4200, 2600, 0.32); },
+  truck: v => { tone(150, 0.5, 'sawtooth', 0.06 * v); tone(190, 0.5, 'sawtooth', 0.045 * v); },
+  van: v => { tone(500, 0.1, 'square', 0.05 * v); tone(630, 0.1, 'square', 0.04 * v); },
+  plane: v => { noise(0.55, 0.09 * v, 500, 2600); tone(180, 0.5, 'sawtooth', 0.025 * v, 260); },
+  rocket: v => { tone(310, 0.32, 'triangle', 0.1 * v, 280); tone(930, 0.2, 'sine', 0.05 * v); noise(0.45, 0.05 * v, 5200, 3000, 0.1); },
+  satellite: v => { tone(1200, 0.08, 'sine', 0.07 * v); tone(900, 0.08, 'sine', 0.07 * v, 0, 0.11); tone(1500, 0.06, 'sine', 0.05 * v, 0, 0.22); },
+  ice: v => { tone(2000, 0.18, 'sine', 0.05 * v); tone(2700, 0.15, 'sine', 0.04 * v, 0, 0.05); tone(3300, 0.12, 'sine', 0.03 * v, 0, 0.1); },
+};
+function thingSound(p) { // which sound a ledge makes, if any of its own
+  if (p.kind === 'm') return (p.world || 0) >= 7 ? 'hover' : 'car';
+  if (p.kind === 'i') return 'ice';
+  if (p.kind === 'n') { const k = thingOf(p); return THING_SFX[k] ? k : null; }
+  return null;
+}
+
 // ---- What a room shares besides where everyone is ---------------------------------------------------
 // In a room's race these go to everyone: the piano's notes (quieter the farther away), a crate starting to
 // give, a blaster's shot (only to see: it hurts nobody), a red bumper or a turret shot out, and the chaos of
@@ -2021,7 +2053,8 @@ function climbersNow(all) { // you, and with all the others climbing in the room
 function shareGift(k) { const sh = (CONFIG.gifts && CONFIG.gifts.share) || 'chaos'; return sh === 'all' || (sh === 'chaos' && ['wind', 'bumper', 'shake', 'drop'].includes(k)); }
 function onFx(m) { // something another climber did
   const far = P ? Math.abs((Number(m.a) || P.alt) - P.alt) : 0, near = clamp(1 - far / 1200, 0.12, 1);
-  if (m.k === 'pn') pianoPlay(clamp(Math.round(m.i) || 0, 0, PIANO_STEPS.length - 1), !!m.c, near);
+  if (m.k === 'snd') { if (THING_SFX[m.s] && audio && !muted) THING_SFX[m.s](near * 0.8); }
+  else if (m.k === 'pn') pianoPlay(clamp(Math.round(m.i) || 0, 0, PIANO_STEPS.length - 1), !!m.c, near);
   else if (m.k === 'cr') { const p = plats[m.n]; if (p && p.kind === 'c' && !p.shake && !(p.gone > 0)) { p.shake = tune.crumble_delay; if (near > 0.5) sfx.crack(); } }
   else if (m.k === 'sh') { shots.push({ x: Number(m.x) || 0, alt: Number(m.a) || 0, vx: (m.d < 0 ? -1 : 1) * tune.shot_speed, remote: true }); if (near > 0.6) sfx.shot(); }
   else if (m.k === 'bo') { const b = bumpers[m.n]; if (b && b.gift === undefined && !(b.off > 0)) { b.off = tune.off_time; puff(b.x, b.alt, 8, '#ff3b4e', 180); } }
