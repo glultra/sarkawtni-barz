@@ -196,6 +196,7 @@ async function startTikTok() {
     conn.on(EV.GIFT || 'gift', d => { try { onGift(d); } catch (e) { console.error('gift error:', e.message); } });
     conn.on(EV.FOLLOW || 'follow', d => liveAll({ t: 'cheer', user: viewer(d), what: 'follow' }));
     conn.on(EV.SHARE || 'share', d => liveAll({ t: 'cheer', user: viewer(d), what: 'share' }));
+    conn.on(EV.LIKE || 'like', d => { const n = Math.max(1, Math.min(500, Math.round(Number(d && (d.likeCount || d.count)) || 1))); liveAll({ t: 'like', user: viewer(d), n }); }); // a viewer's taps, a few seconds' worth at a time
     conn.on(EV.STREAM_END || 'streamEnd', () => again('the LIVE ended.'));
     conn.on(EV.DISCONNECTED || 'disconnected', () => again('the connection dropped.'));
     conn.on('error', e => console.log('TikTok LIVE: ' + String((e && (e.info || e.message)) || e).slice(0, 160))); // reported, never a crash of the room server
@@ -208,6 +209,7 @@ if (TIKTOK) startTikTok();
 if (TEST_GIFTS) { // made-up gifts, one every 7 seconds, through every kind
   const fake = [['Rose', 1, 5], ['Finger Heart', 5, 1], ['Doughnut', 30, 1], ['Hat and Mustache', 99, 1], ['Lion', 29999, 1]]; let i = 0; liveState = 'on';
   setInterval(() => { const [gift, d, n] = fake[i++ % fake.length]; liveAll({ t: 'gift', user: 'test viewer', gift, n, d }); console.log('test gift: ' + gift); }, 7000);
+  let k = 0; setInterval(() => liveAll({ t: 'like', user: 'liker ' + (1 + k++ % 6), n: 15 }), 2000); // and a stream of likes
 }
 
 server.listen(PORT, '0.0.0.0', () => {

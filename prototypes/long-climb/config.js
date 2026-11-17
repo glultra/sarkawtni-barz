@@ -82,7 +82,12 @@ window.CONFIG = {
   gift_wind_speed: { value: 170, min: 50, max: 400, step: 10 },   // how hard a gust pushes, pixels per second
   gift_jump: { value: 1.4, min: 1.1, max: 2, step: 0.05 },         // a super jump is this many times a jump
   gift_bumper_time: { value: 10, min: 3, max: 30, step: 1 },      // seconds a gift's red bumper stays
-  gift_rocket: { value: 2300, min: 1200, max: 3200, step: 50 },   // a rocket's upward speed, pixels per second (2300 is about a level)             // seats in a room you make, until you change it on the room screen
+  gift_rocket: { value: 2300, min: 1200, max: 3200, step: 50 },   // a rocket's upward speed, pixels per second (2300 is about a level)
+  // Likes: every like_drop of them, a heart, a shoe or a flowerpot falls at you with the liker's name. A share gives a super jump.
+  like_drop: { value: 50, min: 5, max: 500, step: 5 },            // likes for one falling thing
+  drop_speed: { value: 430, min: 150, max: 900, step: 10 },       // how fast it falls, pixels per second
+  drop_push: { value: 1, min: 0, max: 2, step: 0.1 },             // how hard a hit knocks you, as a share of a red bumper's push (0: they never hurt)
+  drop_gap: { value: 2, min: 0.5, max: 8, step: 0.5 },            // seconds at least between two falling things             // seats in a room you make, until you change it on the room screen
 
   // Machines and the blaster
   ghost_time: { value: 6, min: 3, max: 12, step: 0.5 },          // seconds the timed ledges stay solid after their plate is pressed
