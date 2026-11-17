@@ -31,6 +31,12 @@ window.CONFIG = {
   air_accel: { value: 2000, min: 400, max: 4000, step: 100 },    // steering in the air
   ice_accel: { value: 420, min: 100, max: 1500, step: 20 },      // on ice: slow to start, slow to stop
 
+  // Leaning ledges: some furniture, boxes and ice are tilted; you stand on the slope and slide slowly down it
+  tilt_share: { value: 0.4, min: 0, max: 1, step: 0.05 },        // share of those ledges that lean (0: every ledge flat)
+  tilt_min: { value: 4, min: 0, max: 15, step: 1 },              // the least lean, degrees
+  tilt_max: { value: 9, min: 1, max: 15, step: 1 },              // the most lean, degrees (past about 10 some jumps get very hard)
+  tilt_slide: { value: 45, min: 0, max: 200, step: 5 },          // how fast you slide down the steepest lean, pixels per second (ice slides more)
+
   // How hard: each pair runs from its first number (fully easy) to its second (level 30).
   // start_hard is where level 1 begins on that run: 0 is fully easy, 1 is as hard as level 30.
   start_hard: { value: 0.33, min: 0, max: 0.8, step: 0.01 },     // 0.33: level 1 is about as hard as level 17 of the old 50

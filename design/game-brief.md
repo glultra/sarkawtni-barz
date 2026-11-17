@@ -41,6 +41,10 @@ After play: do the viewer gifts one (TikTok gifts change the game live)
 
 After play: likes: maybe smth falls from sky and show who likes it (yes: every 50 likes something falls you can dodge, shares give something good)
 
+After play: can u make the furnitures diagonally postioned ? like the map is not a fully flatted
+
+After play: the breaking one is not looking good, the bus looks so tiny, the universe and the sun and the moon look not real, highly work on the small detailed appearance; the piano: play a piano sound when we jump on it and make it nice
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -87,6 +91,9 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A tall tower of thirty levels in ten worlds of three, each world adding its own idea, the last one ultimate; no easy levels
 - [x] A level picker (the Levels button on the menu, or the room's Levels box for its host): the ten worlds in rows of three, tap the first level and then the last; it sets where a climb alone, a race with the bots and a room's race start and end. Only a climb of the whole tower gives a finish code and a best time
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
+- [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
+- [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right
+- [x] A real-looking sky: the sun with corona and rays, the Moon painted with seas, lit craters and a rayed crater, the galaxy with thousands of stars, glowing arms and dust, the universe as a great cloud of coloured gas with dust lanes and stars of every colour
 - [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
 - [x] TikTok LIVE gifts change the climb (start-live.bat asks your TikTok name): by worth, a gust of wind, super jumps, red bumpers, an earthquake, a rocket about a level up; set by worth or by gift name in config.js; one at a time, a feed down the left says who sent what, a banner for the big ones; follows and shares get confetti. Only the game on the server's own PC hears them. "gift 30" in the dev console, or node server.js 8080 --test-gifts, tries them without going live
