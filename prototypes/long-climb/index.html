@@ -1303,13 +1303,29 @@ function drawThing(p, x, y, w) {
     rr(cx - bw / 2, y, bw, 26, 4, '#e6b84a', OUT, 3); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx - bw / 2 + 4, y + 4, bw - 8, 4);
   }
 }
-function drawCar(p, x, y, w, t) { // a moving ledge: a blue car, or high up a hover car on two flames
-  const space = (p.world || 0) >= 7, dir = (p.dx || 0) < 0 ? -1 : 1, front = dir > 0 ? x + w - 6 : x + 6;
-  if (space) { for (const f of [0.25, 0.75]) { const fl = 10 + Math.sin(t * 30 + f * 9) * 4; ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.ellipse(x + w * f, y + 28 + fl / 2, 6, fl / 2 + 3, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.ellipse(x + w * f, y + 28 + fl / 3, 3, fl / 3 + 2, 0, 0, 7); ctx.fill(); } }
-  else { wheel(x + Math.min(20, w * 0.22), y + 25, 9, x / 9); wheel(x + w - Math.min(20, w * 0.22), y + 25, 9, x / 9); }
-  rr(x, y, w, 26, 11, '#4f9cf0', '#16407e'); ctx.fillStyle = '#d6ebff'; ctx.fillRect(x + 8, y + 4, w - 16, 3);
-  rr(x + 10, y + 8, w / 2 - 14, 9, 4, '#d6ebff', '#16407e', 2); rr(x + w / 2 + 4, y + 8, w / 2 - 14, 9, 4, '#d6ebff', '#16407e', 2);
-  dot(front, y + 18, 3.5, '#fff6a0');
+function drawCar(p, x, y, w, t) { // a moving ledge: a blue car (high up, a hover car on two flames). Its roof is the ledge you stand on;
+  // the windshield and rear window slope down past the roof's ends to a lower hood and boot, which are only to look at
+  const space = (p.world || 0) >= 7, dir = (p.dx || 0) < 0 ? -1 : 1, nose = Math.min(30, w * 0.24), L = x - nose, R = x + w + nose, low = y + 14, bot = y + 32;
+  const BLUE = '#4f9cf0', DARK = '#16407e', GLASS = '#cfe8ff';
+  if (space) for (const f of [0.18, 0.82]) { const fx = L + (R - L) * f, fl = 10 + Math.sin(t * 30 + f * 9) * 4; ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.ellipse(fx, bot + 2 + fl / 2, 7, fl / 2 + 3, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.ellipse(fx, bot + fl / 3, 3.5, fl / 3 + 2, 0, 0, 7); ctx.fill(); }
+  // the body: roof, sloping glass, hood and boot, one outline
+  ctx.beginPath(); ctx.moveTo(x + 4, y); ctx.lineTo(x + w - 4, y); ctx.quadraticCurveTo(x + w + 2, y, x + w + nose * 0.55, low); // roof, then down the front glass
+  ctx.lineTo(R - 6, low + 1); ctx.quadraticCurveTo(R, low + 2, R, low + 8); ctx.lineTo(R, bot - 6); ctx.quadraticCurveTo(R, bot, R - 6, bot); // hood and nose
+  ctx.lineTo(L + 6, bot); ctx.quadraticCurveTo(L, bot, L, bot - 6); ctx.lineTo(L, low + 8); ctx.quadraticCurveTo(L, low + 2, L + 6, low + 1); // underneath, the tail
+  ctx.lineTo(x - nose * 0.55, low); ctx.quadraticCurveTo(x - 2, y, x + 4, y); ctx.closePath(); // boot, up the rear glass
+  ctx.fillStyle = BLUE; ctx.fill(); ctx.strokeStyle = DARK; ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.stroke();
+  // the windows: sloped glass at each end, side windows between, a pillar in the middle
+  ctx.fillStyle = GLASS; ctx.strokeStyle = DARK; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x + w - 6, y + 4); ctx.quadraticCurveTo(x + w - 1, y + 4, x + w + nose * 0.42, low - 1); ctx.lineTo(x + w - 6, low - 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + 6, y + 4); ctx.quadraticCurveTo(x + 1, y + 4, x - nose * 0.42, low - 1); ctx.lineTo(x + 6, low - 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (w > 50) { rr(x + 10, y + 4, w / 2 - 14, low - y - 5, 3, GLASS, DARK, 2); rr(x + w / 2 + 4, y + 4, w / 2 - 14, low - y - 5, 3, GLASS, DARK, 2); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2; for (const gx of [x + w * 0.22, x + w * 0.7]) { ctx.beginPath(); ctx.moveTo(gx, low - 3); ctx.lineTo(gx + 6, y + 6); ctx.stroke(); } // glints
+  ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(x + 6, y + 1.5, w - 12, 2); // the roof's shine
+  ctx.fillStyle = DARK; ctx.fillRect(L + 4, low + 10, R - L - 8, 2); ctx.fillRect(x + w / 2 - 6, low + 4, 10, 2); // a crease, a door handle
+  const fx = dir > 0 ? R - 4 : L + 4, bx = dir > 0 ? L + 4 : R - 4; // lights: white-yellow ahead, red behind
+  ctx.fillStyle = '#fff6a0'; ctx.beginPath(); ctx.ellipse(fx, low + 7, 3.5, 3, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ff4b4b'; ctx.beginPath(); ctx.ellipse(bx, low + 7, 3, 2.6, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c7ced8'; ctx.fillRect(R - 3, bot - 7, 3, 5); ctx.fillRect(L, bot - 7, 3, 5); // bumpers
+  if (!space) { const wr = Math.min(10, (R - L) * 0.09); for (const wx of [L + (R - L) * 0.2, L + (R - L) * 0.8]) { ctx.fillStyle = '#0f2a54'; ctx.beginPath(); ctx.arc(wx, bot, wr + 3, Math.PI, 0); ctx.fill(); wheel(wx, bot, wr, x / wr); } }
 }
 function drawLedge(p, x, y, t) {
   const w = p.w, h = 26;
@@ -1405,23 +1421,36 @@ function drawBumper(x, y, t, s = 1, off = false) { // a red spiked ball with a s
   ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, -11); ctx.lineTo(-4, -7); ctx.moveTo(14, -11); ctx.lineTo(4, -7); ctx.stroke();
   ctx.restore();
 }
-function drawClimber(cx, footY, face, squash, vx, vy, t, s = 1, gun = false, col = '#e8334a', hang = false) { // a small round climber with a scarf, a blaster where the world gives one, and arms up when it hangs from someone's feet
+function drawClimber(cx, footY, face, squash, vx, vy, t, s = 1, gun = false, col = '#e8334a', hang = false) { // a small round climber with a scarf, arms with white gloves, legs in big shoes, a blaster where the world gives one; arms up when it hangs from someone's feet
   ctx.save(); ctx.translate(cx, footY);
   if (hang) { ctx.translate(0, -HANG); ctx.rotate(Math.sin(t * 6 + cx * 0.05) * 0.14); ctx.translate(0, HANG); } // swinging from the feet above
   ctx.scale(s * (1 + squash * 0.7), s * (1 - squash * 0.7));
-  if (hang) { // two arms up to the feet it holds
-    ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.lineCap = 'round'; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * 13, -30); ctx.lineTo(d * 7, -HANG + 4); ctx.stroke(); }
-    for (const d of [-1, 1]) { ctx.beginPath(); ctx.arc(d * 7, -HANG + 3, 5, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); }
+  const ground = vy === 0 && !hang, running = ground && Math.abs(vx) > 30, ph = Math.sin(t * 22), run = running ? ph : 0, sway = hang ? Math.sin(t * 6) * 3 : 0;
+  const PANTS = '#2e3d6b', SLEEVE = '#4157a0', SHOE = '#8a4a22', glove = (x, y, ang) => { // a cartoon mitten: round, two finger creases, a cuff at the wrist
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.roundRect(-3.2, 4.2, 6.4, 3.4, 1.5); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 6.4, 5.8, 0, 0, 7); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-1.8, -5); ctx.lineTo(-1.8, -1.5); ctx.moveTo(1.8, -5); ctx.lineTo(1.8, -1.5); ctx.stroke(); ctx.restore(); };
+  // where the hands go: at the sides standing, swinging against the legs running, up for a jump, flailing in a fall
+  const handAt = d => hang ? [d * 7, -HANG + 3] : gun && d === face ? [face * 16, -19] : running ? [d * 18 + (d === face ? -1 : 1) * run * 7, -18 - Math.abs(run) * 2] : vy > 0 ? [d * 20, -42] : vy < 0 ? [d * 23, -36 + Math.sin(t * 30 + d) * 4] : [d * 20, -16 + Math.sin(t * 3) * 0.8];
+  const arm = d => { const [hx, hy] = handAt(d); ctx.strokeStyle = OUT; ctx.lineWidth = 7.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(d * 13, -26); ctx.quadraticCurveTo((d * 13 + hx) / 2 + d * 3, (-26 + hy) / 2, hx, hy); ctx.stroke(); ctx.strokeStyle = SLEEVE; ctx.lineWidth = 4; ctx.stroke(); glove(hx, hy, Math.atan2(hy + 26, hx - d * 13) - Math.PI / 2 + Math.PI); }; // the glove's cuff toward the shoulder
+  // legs and shoes: striding when running, tucked in the air
+  for (const d of [-1, 1]) {
+    const air = !ground && !hang, fx = (air ? d * 6 : d * 8 + (d < 0 ? run : -run) * 6) + sway, fy = air ? -6 : -3;
+    ctx.strokeStyle = OUT; ctx.lineWidth = 8.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(d * 6, -14); ctx.lineTo(fx, fy - 2); ctx.stroke(); ctx.strokeStyle = PANTS; ctx.lineWidth = 5; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(fx + face * 3, fy, 9, 5.4, 0, 0, 7); ctx.fillStyle = SHOE; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,220,180,0.45)'; ctx.beginPath(); ctx.ellipse(fx + face * 5, fy - 2, 3, 1.6, 0, 0, 7); ctx.fill(); // the shine on its toe
   }
-  const run = !hang && Math.abs(vx) > 30 && vy === 0 ? Math.sin(t * 22) * 5 : 0, sway = hang ? Math.sin(t * 6) * 3 : 0;
-  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(-8 + run + sway, -3, 8, 5, 0, 0, 7); ctx.ellipse(8 - run + sway, -3, 8, 5, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0, -22, 18, 19, 0, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
+  arm(-face); // the far arm, behind the body
+  ctx.beginPath(); ctx.ellipse(0, -28, 17.5, 16.5, 0, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
   const flap = clamp(-vx / 260, -1, 1) || -face * 0.5, lift = clamp(-vy / 900, -0.6, 0.9);
   ctx.fillStyle = col; ctx.strokeStyle = '#3a1218'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(flap * 10, -15); ctx.quadraticCurveTo(flap * 26, -18 - lift * 18, flap * 40, -10 - lift * 26 + Math.sin(t * 12) * 3); ctx.lineTo(flap * 34, -4 - lift * 20); ctx.quadraticCurveTo(flap * 22, -8, flap * 10, -9); ctx.fill(); ctx.stroke();
-  rr(-18, -17, 36, 9, 4, col, '#3a1218', 3);
-  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(face * 5 - 5, -28, 3, 4.5, 0, 0, 7); ctx.ellipse(face * 5 + 6, -28, 3, 4.5, 0, 0, 7); ctx.fill();
-  if (gun) { rr(face > 0 ? 12 : -34, -24, 22, 9, 3, '#3a404c', '#1c2028', 3); rr(face > 0 ? 12 : -20, -18, 8, 11, 2, '#3a404c', '#1c2028', 3); ctx.fillStyle = '#ffd44f'; ctx.fillRect(face > 0 ? 30 : -34, -22, 4, 5); }
+  ctx.beginPath(); ctx.moveTo(flap * 10, -21); ctx.quadraticCurveTo(flap * 26, -24 - lift * 18, flap * 40, -16 - lift * 26 + Math.sin(t * 12) * 3); ctx.lineTo(flap * 34, -10 - lift * 20); ctx.quadraticCurveTo(flap * 22, -14, flap * 10, -15); ctx.fill(); ctx.stroke();
+  rr(-17, -23, 34, 9, 4, col, '#3a1218', 3);
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(face * 5 - 5, -34, 3, 4.5, 0, 0, 7); ctx.ellipse(face * 5 + 6, -34, 3, 4.5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(face * 5 - 4, -35.5, 1.2, 0, 7); ctx.arc(face * 5 + 7, -35.5, 1.2, 0, 7); ctx.fill(); // a glint in each eye
+  if (gun) { rr(face > 0 ? 12 : -34, -28, 22, 9, 3, '#3a404c', '#1c2028', 3); rr(face > 0 ? 12 : -20, -22, 8, 11, 2, '#3a404c', '#1c2028', 3); ctx.fillStyle = '#ffd44f'; ctx.fillRect(face > 0 ? 30 : -34, -26, 4, 5); }
+  arm(face); // the near arm, in front
   ctx.restore();
 }
 function nameTag(s, x, y, mark) { // a climber's name over its head; a small arrow marks you, or the one you watch

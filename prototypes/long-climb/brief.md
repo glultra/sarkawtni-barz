@@ -45,6 +45,8 @@ After play: can u make the furnitures diagonally postioned ? like the map is not
 
 After play: the breaking one is not looking good, the bus looks so tiny, the universe and the sun and the moon look not real, highly work on the small detailed appearance; the piano: play a piano sound when we jump on it and make it nice
 
+After play: the car has an edge in front of the windshields, it is likely fully rectangle please fix it; can u make the character having hands and foot maybe smth looks like mario
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -93,6 +95,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
 - [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
 - [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right
+- [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers
+- [x] The climber has arms in blue sleeves with white cartoon mittens and short legs with big brown shoes: hands at the sides standing, swinging and striding running, both arms up jumping, flailing falling
 - [x] A real-looking sky: the sun with corona and rays, the Moon painted with seas, lit craters and a rayed crater, the galaxy with thousands of stars, glowing arms and dust, the universe as a great cloud of coloured gas with dust lanes and stars of every colour
 - [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
