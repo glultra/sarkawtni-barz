@@ -3,12 +3,14 @@
 // Date: 2026-11-16
 // Long Climb's room server. Run it on the PC that hosts the race:   node server.js   (or: node server.js 9000)
 // It serves this folder as a website and passes messages between the players of a room.
-// It needs nothing installed but Node. Players on the same Wi-Fi open the address it prints;
+// Rooms need nothing installed but Node; TikTok LIVE gifts (node server.js 8080 @yourname) need the one
+// package start-live.bat installs. Players on the same Wi-Fi open the address it prints;
 // players elsewhere need a tunnel to this port (for example: cloudflared tunnel --url http://localhost:8080).
 // A room seats up to 25 climbers, as many as its host chose, and lets others in to watch.
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
-const PORT = Number(process.argv[2]) || 8080, ROOT = __dirname;
+const ARGS = process.argv.slice(2), PORT = Number(ARGS.find(a => /^\d+$/.test(a))) || 8080, ROOT = __dirname;
+const TIKTOK = (ARGS.find(a => a.startsWith('@')) || '').slice(1).trim(), TEST_GIFTS = ARGS.includes('--test-gifts'); // whose LIVE to hear gifts from, or made-up gifts to try with
 const MAXP = 25, MAXALL = 60, TICK = 66; // the most climbers in a room, the most people in it with those who watch, and how often (ms) positions go out
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.png': 'image/png' };
 const SERVED = /^(index\.html|config\.js|tune\.js|assets\/music\/[\w .()-]+\.(mp3|ogg|wav))$/; // only the game's own files
@@ -60,6 +62,7 @@ function leave(c) {
 }
 function onMessage(c, m) {
   if (!m || typeof m.t !== 'string') return;
+  if (m.t === 'live') { c.live = true; liveSubs.add(c); send(c, { t: 'livestate', s: liveState }); return; } // the game on this PC listens for gifts
   if (m.t === 'create' && !c.room) {
     const room = { id: newRoomId(), host: c.id, players: [c], mode: [0, 1, 2].includes(m.mode) ? m.mode : 1, start: clampInt(m.start || 1, 1, LEVELS), goal: 0, size: clampInt(m.size || 8, 2, MAXP), racing: false, over: false, place: 0, t0: 0, saved: new Map(), banned: new Set() };
     room.goal = clampInt(m.goal || LEVELS, room.start, LEVELS);
@@ -156,14 +159,62 @@ server.on('upgrade', (req, sock) => {
       if (op === 1) { let m = null; try { m = JSON.parse(body.toString('utf8')); } catch (e) {} try { onMessage(c, m); } catch (e) { console.error('message error:', e.message); } }
     }
   });
-  const gone = () => leave(c);
+  const gone = () => { liveSubs.delete(c); leave(c); };
   sock.on('close', gone); sock.on('error', gone);
 });
+
+// ---- TikTok LIVE: viewers' gifts, to the game open on this PC ----------------------------------
+// Off unless a TikTok name is given:   node server.js 8080 @yourname   (start-live.bat asks for it).
+// It needs the tiktok-live-connector package (start-live.bat installs it once); that package reads the
+// public LIVE of that name through a free signing service, so this is the one part that goes online.
+// The game itself never does: it hears the gifts from this server. node server.js 8080 --test-gifts
+// sends a made-up gift every few seconds instead, to try the effects without going live.
+const liveSubs = new Set(); let liveState = TIKTOK ? 'connecting' : 'off';
+const liveAll = m => { const f = frame(m); if (f) for (const c of liveSubs) put(c, f); };
+const setLive = s => { liveState = s; liveAll({ t: 'livestate', s }); };
+const viewer = d => cleanName(String((d && d.user && (d.user.nickname || d.user.uniqueId || d.user.displayId)) || (d && (d.nickname || d.uniqueId)) || 'viewer')).slice(0, 24);
+function onGift(d) {
+  const type = d.giftType !== undefined ? d.giftType : d.gift && d.gift.type !== undefined ? d.gift.type : d.giftDetails && d.giftDetails.giftType;
+  if (type === 1 && !d.repeatEnd) return; // a streak still going: wait for its end, which carries the whole count
+  const x = d.extendedGiftInfo || {}, g = d.gift || {}, gd = d.giftDetails || {};
+  const name = cleanName(String(x.name || g.name || d.giftName || gd.giftName || 'Gift')).slice(0, 24);
+  const dia = Math.max(1, Number(x.diamond_count !== undefined ? x.diamond_count : x.diamondCount !== undefined ? x.diamondCount : d.diamondCount !== undefined ? d.diamondCount : g.diamondCount !== undefined ? g.diamondCount : g.diamond_count !== undefined ? g.diamond_count : gd.diamondCount) || 1);
+  const n = Math.max(1, Math.min(99, Number(d.repeatCount) || 1)), who = viewer(d);
+  console.log('gift: ' + who + ' sent ' + name + (n > 1 ? ' x' + n : '') + ' (' + dia + ' diamonds each)');
+  liveAll({ t: 'gift', user: who, gift: name, n, d: dia });
+}
+async function startTikTok() {
+  let lib;
+  try { lib = await import('tiktok-live-connector'); } catch (e) { console.log('TikTok LIVE: the tiktok-live-connector package is not installed. Run start-live.bat, or in this folder: npm install'); setLive('missing'); return; }
+  const Conn = lib.TikTokLiveConnection || lib.WebcastPushConnection || (lib.default && (lib.default.TikTokLiveConnection || lib.default.WebcastPushConnection)), EV = lib.WebcastEvent || {};
+  if (!Conn) { console.log('TikTok LIVE: this version of tiktok-live-connector is not one this server knows.'); setLive('missing'); return; }
+  let wait = 5000, timer = null;
+  const again = why => { if (timer) return; setLive('lost'); console.log('TikTok LIVE: ' + why + ' Trying again in ' + Math.round(wait / 1000) + ' s.'); timer = setTimeout(() => { timer = null; go(); }, wait); wait = Math.min(wait * 2, 60000); };
+  const go = () => {
+    let conn;
+    try { conn = new Conn(TIKTOK, { enableExtendedGiftInfo: true }); } catch (e) { again('could not start (' + e.message + ').'); return; }
+    conn.on(EV.GIFT || 'gift', d => { try { onGift(d); } catch (e) { console.error('gift error:', e.message); } });
+    conn.on(EV.FOLLOW || 'follow', d => liveAll({ t: 'cheer', user: viewer(d), what: 'follow' }));
+    conn.on(EV.SHARE || 'share', d => liveAll({ t: 'cheer', user: viewer(d), what: 'share' }));
+    conn.on(EV.STREAM_END || 'streamEnd', () => again('the LIVE ended.'));
+    conn.on(EV.DISCONNECTED || 'disconnected', () => again('the connection dropped.'));
+    conn.on('error', e => console.log('TikTok LIVE: ' + String((e && (e.info || e.message)) || e).slice(0, 160))); // reported, never a crash of the room server
+    conn.connect().then(() => { wait = 5000; setLive('on'); console.log('TikTok LIVE: connected to @' + TIKTOK + '. Gifts now change the climb.'); })
+      .catch(e => again('could not connect to @' + TIKTOK + ' (' + ((e && e.message) || e) + '). Are you LIVE right now?'));
+  };
+  go();
+}
+if (TIKTOK) startTikTok();
+if (TEST_GIFTS) { // made-up gifts, one every 7 seconds, through every kind
+  const fake = [['Rose', 1, 5], ['Finger Heart', 5, 1], ['Doughnut', 30, 1], ['Hat and Mustache', 99, 1], ['Lion', 29999, 1]]; let i = 0; liveState = 'on';
+  setInterval(() => { const [gift, d, n] = fake[i++ % fake.length]; liveAll({ t: 'gift', user: 'test viewer', gift, n, d }); console.log('test gift: ' + gift); }, 7000);
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('Long Climb is being served. Open one of these in a browser:');
   console.log('  on this PC:        http://localhost:' + PORT);
   for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) console.log('  on the same Wi-Fi: http://' + a.address + ':' + PORT);
   console.log('Players far away need a tunnel to this port, for example:  cloudflared tunnel --url http://localhost:' + PORT);
+  if (TIKTOK) console.log('TikTok LIVE: listening for gifts on @' + TIKTOK + ' (go LIVE on TikTok first).'); else if (TEST_GIFTS) console.log('Test gifts: a made-up gift every 7 seconds.');
   console.log('Stop the server with Ctrl+C.');
 });

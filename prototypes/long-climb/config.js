@@ -67,7 +67,22 @@ window.CONFIG = {
   bot_grab: { value: 0.25, min: 0, max: 1, step: 0.05 },         // chance a bot that lands just under you catches your feet
   bot_pace: { value: 1.3, min: 0.6, max: 2.5, step: 0.05 },     // seconds a bot takes for one jump on level 1; smaller is a faster bot
   bot_slip: { value: 0.05, min: 0, max: 0.4, step: 0.01 },       // chance a bot slips after a jump on level 1; it grows with the levels
-  room_size: { value: 8, min: 2, max: 25, step: 1 },             // seats in a room you make, until you change it on the room screen
+  room_size: { value: 8, min: 2, max: 25, step: 1 },
+
+  // TikTok LIVE gifts (start-live.bat): each gift does one thing. By its worth in diamonds: a gift worth
+  // at least the number does that, the highest that fits. Or by its name, which wins over its worth.
+  // The things: 'wind' a gust that pushes you, 'jump' super jumps, 'bumper' red bumpers by you,
+  // 'shake' an earthquake that throws you off your ledge, 'rocket' a blast about a level up.
+  gifts: {
+    rules: [[1, 'wind'], [5, 'jump'], [30, 'bumper'], [99, 'shake'], [500, 'rocket']],
+    names: { /* 'Rose': 'wind', 'Lion': 'rocket' */ },
+  },
+  gift_gap: { value: 1.5, min: 0.3, max: 6, step: 0.1 },          // seconds between two gifts' effects (the rest wait their turn)
+  gift_wind_time: { value: 3, min: 1, max: 8, step: 0.5 },        // seconds a gust blows, for each gift in a streak (up to 4)
+  gift_wind_speed: { value: 170, min: 50, max: 400, step: 10 },   // how hard a gust pushes, pixels per second
+  gift_jump: { value: 1.4, min: 1.1, max: 2, step: 0.05 },         // a super jump is this many times a jump
+  gift_bumper_time: { value: 10, min: 3, max: 30, step: 1 },      // seconds a gift's red bumper stays
+  gift_rocket: { value: 2300, min: 1200, max: 3200, step: 50 },   // a rocket's upward speed, pixels per second (2300 is about a level)             // seats in a room you make, until you change it on the room screen
 
   // Machines and the blaster
   ghost_time: { value: 6, min: 3, max: 12, step: 0.5 },          // seconds the timed ledges stay solid after their plate is pressed

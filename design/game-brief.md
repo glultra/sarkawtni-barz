@@ -37,6 +37,8 @@ After play: about the backgrounds can u show moon, earth, jupiter, other planets
 
 After play: add a dev mode where i can see the entire map maybe by opening command promp with tilda` key then enable dev mode
 
+After play: do the viewer gifts one (TikTok gifts change the game live)
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -85,6 +87,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
 - [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
+- [x] TikTok LIVE gifts change the climb (start-live.bat asks your TikTok name): by worth, a gust of wind, super jumps, red bumpers, an earthquake, a rocket about a level up; set by worth or by gift name in config.js; one at a time, a feed down the left says who sent what, a banner for the big ones; follows and shares get confetti. Only the game on the server's own PC hears them. "gift 30" in the dev console, or node server.js 8080 --test-gifts, tries them without going live
 - [x] Each level's end cheers louder the higher you are, shows how long the level took, and the end of a world gets a bigger cheer
 - [x] Three difficulties, picked on the title: easy, normal, hard
 - [x] Machines in some worlds: a button that opens the level's gate, a plate that makes timed ledges solid
@@ -152,7 +155,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - A shared online leaderboard kept between races: needs a server that is always on: not built yet
 - Players in a room share positions, shoves and the finish, not the machines: each player's gates, crumbling ledges and turrets are their own
 - A kicked player is kept out by their browser, not by who they are: another browser or a cleared one gets back in: not built yet
-- Real TikTok chat or gift connection: needs a server: not built yet
+- TikTok chat commands (viewers typing to change the game): not built yet; gifts are
 - A ghost of your best run: change it after play
 - Real Kurdish songs: yours to add, since the game ships none; put the files in assets/music/ and name them in config.js
 - New moves over time: grow it
