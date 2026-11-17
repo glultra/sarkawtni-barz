@@ -11,7 +11,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const ARGS = process.argv.slice(2), PORT = Number(ARGS.find(a => /^\d+$/.test(a))) || 8080, ROOT = __dirname;
 const TIKTOK = (ARGS.find(a => a.startsWith('@')) || '').slice(1).trim(), TEST_GIFTS = ARGS.includes('--test-gifts'); // whose LIVE to hear gifts from, or made-up gifts to try with
-const MAXP = 25, MAXALL = 60, TICK = 66; // the most climbers in a room, the most people in it with those who watch, and how often (ms) positions go out
+const MAXP = 25, MAXALL = 60, TICK = 33; // the most climbers in a room, the most people in it with those who watch, and how often (ms) positions go out
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.png': 'image/png' };
 const SERVED = /^(index\.html|config\.js|tune\.js|assets\/music\/[\w .()-]+\.(mp3|ogg|wav))$/; // only the game's own files
 
@@ -31,13 +31,14 @@ const LETTERS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function newRoomId() { for (;;) { let s = ''; for (const b of crypto.randomBytes(4)) s += LETTERS[b % 32]; if (!rooms.has(s)) return s; } }
 const cleanName = n => String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 14) || 'player';
 const cleanCid = s => String(s || '').replace(/[^0-9A-Za-z]/g, '').slice(0, 24); // the name a browser keeps for itself, so a player can come back to their place
+const SERVER_V = 4; // which game this server speaks for: the game warns when it is older than itself (3: rooms share the piano, crates, shots and gifts)
 const LEVELS = 30; // the tower's levels: a race runs from any of them to any later one
 const clampInt = (v, a, b) => Math.max(a, Math.min(b, Math.round(Number(v) || 0)));
 const LAN = []; for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) LAN.push(a.address + ':' + PORT); // what players on the same Wi-Fi type
 const racers = room => room.players.filter(p => !p.spec); // those who climb; the rest only watch
 const all = (room, m) => { const f = frame(m); if (f) for (const p of room.players) put(p, f); };
 function roster(room, type, to) {
-  const m = { t: type, id: room.id, host: room.host, mode: room.mode, start: room.start, goal: room.goal, size: room.size, racing: room.racing ? 1 : 0, lan: LAN[0] || '', players: room.players.map(p => ({ id: p.id, name: p.name, spec: p.spec ? 1 : 0, c: p.color })) };
+  const m = { t: type, sv: SERVER_V, id: room.id, host: room.host, mode: room.mode, start: room.start, goal: room.goal, size: room.size, racing: room.racing ? 1 : 0, lan: LAN[0] || '', players: room.players.map(p => ({ id: p.id, name: p.name, spec: p.spec ? 1 : 0, c: p.color })) };
   if (to) send(to, Object.assign({ you: to.id }, m)); else all(room, m);
 }
 function freeColor(room) { for (let i = 0; ; i++) if (!room.players.some(p => p.color === i)) return i; }
@@ -85,8 +86,9 @@ function onMessage(c, m) {
   if (m.t === 's') { // where this climber is now; it goes out to the room on the next tick
     if (!room.racing || c.spec || c.done) return;
     const h = room.players.some(p => p.id === m.h && p !== c && !p.spec && !p.done) ? m.h : 0; // whose feet they hang on, if anyone's
-    c.st = [c.id, clampInt(m.x, -100, 900), clampInt(m.a, -1000, 200000), m.f < 0 ? -1 : 1, h]; c.top = clampInt((Number(m.l) || 1) - 1, room.start - 1, Math.max(0, room.goal - 1)); return;
+    c.st = [c.id, clampInt(m.x, -100, 900), clampInt(m.a, -1000, 200000), m.f < 0 ? -1 : 1, h, clampInt(m.vx, -2000, 2000), clampInt(m.vy, -4000, 4000)]; c.top = clampInt((Number(m.l) || 1) - 1, room.start - 1, Math.max(0, room.goal - 1)); return;
   }
+  if (m.t === 'fx') { if (room.racing && !c.spec) { const f = frame(Object.assign({}, m, { from: c.id })); if (f) for (const p of room.players) if (p !== c) put(p, f); } return; } // what one climber did that the room sees or hears
   if (m.t === 'hit') { const to = room.players.find(p => p.id === m.to); if (room.racing && to && to !== c && !c.spec && !to.spec && !to.done) send(to, { t: 'hit', from: c.id, d: m.d < 0 ? -1 : 1 }); return; }
   if (m.t === 'fin') {
     if (room.racing && !c.spec && !c.done) { c.done = true; room.place++; all(room, { t: 'fin', id: c.id, cs: Math.max(0, Math.round(+m.cs || 0)), place: room.place }); checkOver(room); }
@@ -137,6 +139,7 @@ function frame(obj) {
 function put(c, f) { if (!c.sock.destroyed) c.sock.write(f); }
 function send(c, obj) { const f = frame(obj); if (f) put(c, f); }
 server.on('upgrade', (req, sock) => {
+  sock.setNoDelay(true); // each small message goes at once
   const key = req.headers['sec-websocket-key'];
   if (!key) { sock.destroy(); return; }
   const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');

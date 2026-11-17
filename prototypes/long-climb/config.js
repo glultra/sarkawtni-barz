@@ -82,8 +82,9 @@ window.CONFIG = {
   gifts: {
     rules: [[1, 'wind'], [5, 'jump'], [30, 'bumper'], [99, 'shake'], [500, 'rocket']],
     names: { /* 'Rose': 'wind', 'Lion': 'rocket' */ },
+    share: 'all', // in a room: 'chaos' sends wind, bumpers, earthquakes and falling things to everyone and keeps super jumps and rockets yours; 'all' sends everything; 'none' keeps it all yours
   },
-  gift_gap: { value: 1.5, min: 0.3, max: 6, step: 0.1 },          // seconds between two gifts' effects (the rest wait their turn)
+  gift_gap: { value: 0.6, min: 0.3, max: 6, step: 0.1 },          // seconds between two gifts' effects (the rest wait their turn)
   gift_wind_time: { value: 3, min: 1, max: 8, step: 0.5 },        // seconds a gust blows, for each gift in a streak (up to 4)
   gift_wind_speed: { value: 170, min: 50, max: 400, step: 10 },   // how hard a gust pushes, pixels per second
   gift_jump: { value: 1.4, min: 1.1, max: 2, step: 0.05 },         // a super jump is this many times a jump
@@ -93,7 +94,7 @@ window.CONFIG = {
   like_drop: { value: 50, min: 5, max: 500, step: 5 },            // likes for one falling thing
   drop_speed: { value: 430, min: 150, max: 900, step: 10 },       // how fast it falls, pixels per second
   drop_push: { value: 1, min: 0, max: 2, step: 0.1 },             // how hard a hit knocks you, as a share of a red bumper's push (0: they never hurt)
-  drop_gap: { value: 2, min: 0.5, max: 8, step: 0.5 },            // seconds at least between two falling things             // seats in a room you make, until you change it on the room screen
+  drop_gap: { value: 1, min: 0.5, max: 8, step: 0.5 },            // seconds at least between two falling things             // seats in a room you make, until you change it on the room screen
 
   // Machines and the blaster
   ghost_time: { value: 6, min: 3, max: 12, step: 0.5 },          // seconds the timed ledges stay solid after their plate is pressed

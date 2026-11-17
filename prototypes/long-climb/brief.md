@@ -47,6 +47,12 @@ After play: the breaking one is not looking good, the bus looks so tiny, the uni
 
 After play: the car has an edge in front of the windshields, it is likely fully rectangle please fix it; can u make the character having hands and foot maybe smth looks like mario
 
+After play: the shoulder is a bit ugly, not a perfect character with body hands and foot
+
+After play: in a room we must hear each other's piano, gifts should affect them, breakable blocks and everything must be affected both sides, even shooters, maybe except the opening doors (yes: shared, gates and timed ledges stay each player's own, chaos gifts for all, boosts for the streamer)
+
+After play: a bit slow and not correct; make the gifts for all (friends lag, effects late, different places for each, gifts too slow: all fixed)
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -96,7 +102,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
 - [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right
 - [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers
-- [x] The climber has arms in blue sleeves with white cartoon mittens and short legs with big brown shoes: hands at the sides standing, swinging and striding running, both arms up jumping, flailing falling
+- [x] The climber has arms in blue sleeves with white cartoon mittens and short legs with big brown shoes: hands at the sides standing, swinging and striding running, both arms up jumping, flailing falling; the arms come from behind the body, so the shoulders are clean
+- [x] A room shares more than where everyone is: the piano's notes (quieter the farther away), crates giving way, blaster shots (to see; they hurt nobody), red bumpers and turrets shot out, and every gift and like of the streamer's for everyone (gifts.share in config.js: all, chaos or none); gift bumpers and falling things are placed once, by every climber, and stand at the same places on every screen; positions go out 30 times a second with speeds, so friends are shown where they are now; a game newer than its server says so
 - [x] A real-looking sky: the sun with corona and rays, the Moon painted with seas, lit craters and a rayed crater, the galaxy with thousands of stars, glowing arms and dust, the universe as a great cloud of coloured gas with dust lanes and stars of every colour
 - [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
@@ -167,7 +174,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 
 ## Out of scope
 - A shared online leaderboard kept between races: needs a server that is always on: not built yet
-- Players in a room share positions, shoves and the finish, not the machines: each player's gates, crumbling ledges and turrets are their own
+- Each player's gates (button and target) and timed ledges stay their own in a room, so nobody opens the puzzle for the others
 - A kicked player is kept out by their browser, not by who they are: another browser or a cleared one gets back in: not built yet
 - TikTok chat commands (viewers typing to change the game): not built yet; gifts are
 - A ghost of your best run: change it after play
