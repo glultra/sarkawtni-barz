@@ -85,4 +85,5 @@ window.CONFIG = {
 
   volume: { value: 0.5, min: 0, max: 1, step: 0.05 },
   music_volume: { value: 0.5, min: 0, max: 1, step: 0.05 },      // the built-in tunes and your songs
+  music_tempo: { value: 72, min: 55, max: 110, step: 1 },        // beats a minute of the built-in tunes in the first world; each world after adds 1.5
 };

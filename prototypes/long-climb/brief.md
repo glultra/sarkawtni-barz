@@ -27,11 +27,17 @@ After play: add the sound effects first, songs okay i can't provide them now, ph
 
 After play: 50 levels are too much can u reduce to 30 levels but keep the game still hard ! and remove the easy levels make the game more fun after each levels passed
 
+After play: add a better background music please i didn't load my songs yet
+
+After play: i don't like zurna try smth  simple and relaxful
+
+After play: allow me to start level from anywhere i want till end please ! while creating the room for example i just wanna play the hard levels or allow me to select which level i play ! please nice ui  menu i need
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
 
-**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: left click or E to shove the climber beside you (or the one hanging on your feet), right click or Q to catch hold of a climber's feet and be carried; Space leaps off them, Q lets go; left click also fires the blaster. While you watch a race: the arrows change climber. On the room screen: the arrows change the seats and the finish level, 1 2 3 the difficulty, Tab picks a player, V moves them between playing and watching, K kicks them (the host only), C copies the link, Enter starts. A controller (PS5, Xbox): stick or d-pad to move, Cross/A jump, Circle/B or R1/RB shove, Triangle/Y or L1/LB hang on, Square/X or R2/RT fire, Options/Menu for the menu. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, a fire button where there is a blaster, and shove and hang-on buttons in a race; every button of the menus and the room screen is tapped. *(guessed)*
+**Controls:** A and D or the arrows to move, Space or W to jump (hold for a higher jump), F to fire the blaster in the worlds that give one, hold R to start the climb again, Esc for the menu, M to mute, C on the title to check a viewer's code, 1 2 3 or the arrows on the title to pick the difficulty, B to continue. In a race: left click or E to shove the climber beside you (or the one hanging on your feet), right click or Q to catch hold of a climber's feet and be carried; Space leaps off them, Q lets go; left click also fires the blaster. While you watch a race: the arrows change climber. On the room screen: the arrows change the seats and the finish level, G opens the level picker, 1 2 3 the difficulty, Tab picks a player, V moves them between playing and watching, K kicks them (the host only), C copies the link, Enter starts. A controller (PS5, Xbox): stick or d-pad to move, Cross/A jump, Circle/B or R1/RB shove, Triangle/Y or L1/LB hang on, Square/X or R2/RT fire, Options/Menu for the menu. The main menu is worked with the arrows and Enter, or by tapping. On a phone: two arrow buttons on the left, a jump button on the right, a fire button where there is a blaster, and shove and hang-on buttons in a race; every button of the menus and the room screen is tapped. *(guessed)*
 
 **Question:** Is one long, punishing climb fun to play and to watch for an hour? *(guessed)*
 
@@ -71,11 +77,12 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 
 ## Features
 - [x] A tall tower of thirty levels in ten worlds of three, each world adding its own idea, the last one ultimate; no easy levels
+- [x] A level picker (the Levels button on the menu, or the room's Levels box for its host): the ten worlds in rows of three, tap the first level and then the last; it sets where a climb alone, a race with the bots and a room's race start and end. Only a climb of the whole tower gives a finish code and a best time
 - [x] Each level's end cheers louder the higher you are, shows how long the level took, and the end of a world gets a bigger cheer
 - [x] Three difficulties, picked on the title: easy, normal, hard
 - [x] Machines in some worlds: a button that opens the level's gate, a plate that makes timed ledges solid
 - [x] A blaster in some worlds: shoot the target to open the gate, and put bumpers and turrets out for a while
-- [x] A tune for each world, made in code, with a slot for your own song in each
+- [x] A calm tune for each world, made in code: soft electric piano, warm chords, a round bass, a light kick and shaker, slow (music_tempo), minor in the night worlds, with a slot for your own song in each
 - [x] The climb is kept at every level, to continue after closing the game
 - [x] A gold star to collect on every level
 - [x] A simple main menu: your name in a box at the top, then four big buttons (alone, bots, make a room, join a room); making or joining a room asks for your name first

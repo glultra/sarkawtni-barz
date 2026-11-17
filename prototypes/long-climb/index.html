@@ -124,7 +124,7 @@ Object.assign(EN, {
   spectators: 'Watching', watching: 'Watching', watch: 'Watch only', play: 'Play', kick: 'Kick', toWatch: 'Move to watching', toPlay: 'Move to players',
   startRace: 'Start the race', copy: 'tap the link to copy it', copied: 'Link copied', kicked: 'The host removed you from the room', nowWatching: 'You are watching now', noSlot: 'No free place: you are watching',
   endRace: 'End the race for everyone', joinRace: 'Join the race', youPlace: 'You finished', skip: 'Enter: results', rider: 'is on your feet: shove to shake them off', hangHint: 'Jump to leap off',
-  menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
+  levels: 'Levels', pickTitle: 'Choose your levels', startL: 'Start', finishL: 'Finish', doneL: 'Done', allL: 'All 30', levelsN: 'levels', pickHint: 'Tap a level to set the start, then the finish', menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
   hostKeys: 'Enter: start     Tab: pick a player     V: watch / play     K: kick', guestKeys: 'V: watch / play     Esc: leave', watchKeys: 'Arrows: next climber     Esc: menu',
 });
 Object.assign(CKB, {
@@ -132,7 +132,7 @@ Object.assign(CKB, {
   spectators: 'بینەران', watching: 'سەیرکردنی', watch: 'تەنیا سەیر بکە', play: 'یاری بکە', kick: 'دەرکردن', toWatch: 'بیکە بە بینەر', toPlay: 'بیکە بە یاریزان',
   startRace: 'پێشبڕکێ دەست پێبکە', copy: 'دەست لە بەستەرەکە بدە بۆ کۆپیکردنی', copied: 'بەستەرەکە کۆپی کرا', kicked: 'خاوەنی ژوور دەریکردیت', nowWatching: 'ئێستا تۆ بینەریت', noSlot: 'شوێنی بەتاڵ نییە: تۆ بینەریت',
   endRace: 'پێشبڕکێکە بۆ هەمووان تەواو بکە', joinRace: 'بچۆ ناو پێشبڕکێکە', youPlace: 'تەواوت کرد', skip: 'Enter: ئەنجامەکان', rider: 'خۆی بە پێیەکانتەوە هەڵواسیوە: پاڵی پێوە بنێ', hangHint: 'باز بدە بۆ خۆبەردان',
-  menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
+  levels: 'ئاستەکان', pickTitle: 'ئاستەکانت هەڵبژێرە', startL: 'دەستپێک', finishL: 'کۆتایی', doneL: 'تەواو', allL: 'هەموو 30', levelsN: 'ئاست', pickHint: 'ئاستێک دابگرە بۆ دەستپێک، پاشان بۆ کۆتایی', menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
   hostKeys: 'Enter: دەستپێکردن     Tab: هەڵبژاردنی یاریزان     V: بینەر / یاریزان     K: دەرکردن', guestKeys: 'V: بینەر / یاریزان     Esc: دەرچوون', watchKeys: 'تیرەکان: یاریزانی داهاتوو     Esc: مینیو',
 });
 
@@ -191,7 +191,7 @@ function chevron(x, y, d, c = '#ffffff', s = 9) { ctx.strokeStyle = c; ctx.lineW
 function eye(x, y, s, c) { ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y, s, s * 0.6, 0, 0, 7); ctx.stroke(); dot(x, y, s * 0.3, c); }
 function button(label, x, y, w, h, on, fn, opt = {}) { // a flat button; the chosen one is white
   rr(x, y, w, h, Math.min(h / 2, 22), on ? '#ffffff' : opt.fill || (opt.off ? 'rgba(255,255,255,0.03)' : UI.soft));
-  text(label, x + w / 2, y + h / 2 + 1, opt.size || 26, on ? '#0c0e16' : opt.off ? '#666e80' : opt.color || '#ffffff', 'center', true);
+  text(fitText(label, w - 24, opt.size || 26), x + w / 2, y + h / 2 + 1, opt.size || 26, on ? '#0c0e16' : opt.off ? '#666e80' : opt.color || '#ffffff', 'center', true);
   if (fn) zone(x, y, w, h, fn);
 }
 function seg(labels, sel, x, y, w, h, fn, colors) { // a row of choices with one picked
@@ -372,33 +372,123 @@ const sfx = {
   grab: () => { tone(260, 0.1, 'square', 0.09, 520); noise(0.06, 0.07, 1400, 500); },
   letgo: () => tone(520, 0.1, 'triangle', 0.09, 260),
 };
-// Each world has a tune: your own song when config.js names one, otherwise a short melody the game
-// writes itself in that world's scale, over a hand-drum beat.
-const song = { world: -1, el: null, beat: 0, acc: 0, phrase: [] };
+// Each world has a tune: your own song when config.js names one, otherwise a calm one the game
+// writes itself from a fixed seed: soft electric-piano notes, warm seventh chords, a round bass,
+// a light kick and a quiet shaker, with an echo on the keys. Slow (tune.music_tempo, a touch
+// quicker each world), in a major key, minor in the night worlds; the tune keeps to the five
+// notes of the key that never clash. Eight bars, phrased A B A' C / A B A' D, over four chords;
+// two bars of chords and bass lead in, and the higher worlds add a soft bell line. Notes are set
+// a moment ahead on the audio clock, so the beat holds steady whatever the frame rate.
+const song = { world: -1, el: null, beat: 0, t: 0, bars: null, chords: null, bus: null, send: null, on: false };
+const PROGS = [[0, 5, 3, 4], [0, 3, 5, 4], [0, 4, 5, 3], [5, 3, 0, 4], [0, 2, 3, 4], [3, 4, 0, 0]]; // chords as scale degrees
+const RHY = [[1, 0, 0, 1, 0, 0, 1, 0], [1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 1, 0, 0, 0], [1, 0, 1, 1, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0]]; // where the keys' notes start in a bar: unhurried, with room to breathe
+const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10];
+const keyOf = w => w >= 6 ? MIN : MAJ, AVOID = w => w >= 6 ? [1, 5] : [3, 6]; // the two notes left out of the tune, so it never clashes
+const degF = (Wd, base, d) => { const sc = keyOf(WORLDS.indexOf(Wd)); return base * Math.pow(2, (sc[((d % 7) + 7) % 7] + Math.floor(d / 7) * 12) / 12); }; // a scale degree, any octave, as a pitch
+function musicBus() { // the band's own mix: warmed, gently squeezed, and an echo the keys and bells are sent to
+  if (song.bus) return;
+  const ac = audio.ac, bus = ac.createGain(), warm = ac.createBiquadFilter(), comp = ac.createDynamicsCompressor(), send = ac.createGain(), dl = ac.createDelay(1), fb = ac.createGain(), lp = ac.createBiquadFilter(), wet = ac.createGain();
+  bus.gain.value = 0; warm.type = 'lowpass'; warm.frequency.value = 4200; comp.threshold.value = -20; comp.ratio.value = 2.5; comp.attack.value = 0.02; comp.release.value = 0.3;
+  bus.connect(warm); warm.connect(comp); comp.connect(audio.out);
+  lp.type = 'lowpass'; lp.frequency.value = 1800; fb.gain.value = 0.35; wet.gain.value = 0.28;
+  send.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(wet); wet.connect(bus);
+  song.bus = bus; song.send = send; song.delay = dl;
+}
+function compose(w) { // the world's eight bars, from its own seed
+  const r = fixedRng(900 + w * 77), pick = a => a[Math.floor(r() * a.length)], prog = pick(PROGS), avoid = AVOID(w);
+  const safe = d => avoid.includes(((d % 7) + 7) % 7) ? d - 1 : d; // a note outside the five moves down to its neighbour
+  let prev = 4;
+  const bar = (c, rhy, end) => {
+    const n = []; let d = prev;
+    for (let i = 0; i < 8; i++) {
+      if (!rhy[i]) { n.push(null); continue; }
+      if (i === 0 || i === 4) { // strong beats land on a note of the chord, the nearest one mostly
+        const tones = [c - 3, c, c + 2, c + 4, c + 7].filter(x => x >= -1 && x <= 10);
+        d = r() < 0.75 ? tones.reduce((a, b) => Math.abs(b - d) < Math.abs(a - d) ? b : a) : pick(tones);
+      } else { const s = r(); d += s < 0.38 ? 1 : s < 0.74 ? -1 : s < 0.88 ? (r() < 0.5 ? 2 : -2) : 0; } // the rest step along the scale
+      d = safe(clamp(d, -1, 10)); n.push({ d, orn: false });
+    }
+    if (end !== undefined) { let k = 7; while (k > 0 && n[k] === null) k--; n[k] = { d: safe(end), orn: false }; }
+    if (n.every(x => x === null)) n[0] = { d: safe(c), orn: false };
+    for (let k = 7; k >= 0; k--) if (n[k]) { prev = n[k].d; break; }
+    return n;
+  };
+  const A = bar(prog[0], pick(RHY)), B = bar(prog[1], pick(RHY)), C = bar(prog[3], pick(RHY), prog[3] + 2), D = bar(prog[3], pick(RHY), prog[3]);
+  const A2 = A.map(x => x && { d: safe(clamp(x.d + prog[2] - prog[0], -1, 11)), orn: false }); // the opening bar again, moved to the third chord
+  song.bars = [A, B, A2, C, A, B, A2, D]; song.chords = [0, 1, 2, 3, 0, 1, 2, 3].map(i => prog[i]);
+}
+function mNoise(t, dur, vol, type, freq, q = 1, dest = song.bus) {
+  const ac = audio.ac, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = hissBuf(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f); f.connect(g); g.connect(dest); s.start(t, (t * 7.3) % 0.9); s.stop(t + dur + 0.02);
+}
+function mVoice(kind, t, f, dur, vol, orn) { // one note of one part of the band
+  const ac = audio.ac, g = ac.createGain(), end = t + dur;
+  g.connect(song.bus);
+  if (kind === 'keys') { // a soft electric piano: a round tone with a faint bell on top, and a slow shimmer
+    const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g2 = ac.createGain(), trem = ac.createOscillator(), tg = ac.createGain();
+    o1.type = 'sine'; o2.type = 'sine'; o1.frequency.value = f; o2.frequency.value = f * 2; g2.gain.setValueAtTime(0.22, t); g2.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+    trem.frequency.value = 4; tg.gain.value = vol * 0.12; trem.connect(tg); tg.connect(g.gain);
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(song.send);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.012); g.gain.setTargetAtTime(vol * 0.35, t + 0.02, 0.35); g.gain.setTargetAtTime(0, end, 0.18);
+    for (const o of [o1, o2, trem]) { o.start(t); o.stop(end + 1); }
+  } else if (kind === 'bass') { // round and low, a little warmth at the start
+    const o = ac.createOscillator(), sub = ac.createOscillator(), lp = ac.createBiquadFilter();
+    o.type = 'triangle'; sub.type = 'sine'; o.frequency.value = f; sub.frequency.value = f / 2;
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(700, t); lp.frequency.exponentialRampToValueAtTime(220, t + 0.3);
+    o.connect(lp); sub.connect(lp); lp.connect(g);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.02); g.gain.setTargetAtTime(0, t + dur * 0.6, dur * 0.3);
+    for (const x of [o, sub]) { x.start(t); x.stop(end + 0.6); }
+  } else if (kind === 'pad') { // two slightly apart soft tones, slow to swell, kept quiet
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; lp.connect(g);
+    for (const dt of [-7, 7]) { const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = dt; o.connect(lp); o.start(t); o.stop(end + 0.8); }
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + dur * 0.4); g.gain.setTargetAtTime(0, end - dur * 0.1, 0.25);
+  } else { // 'bell': a short struck note with a faint overtone, sent to the echo
+    const o = ac.createOscillator(), o2 = ac.createOscillator(), g2 = ac.createGain();
+    o.type = 'sine'; o2.type = 'sine'; o.frequency.value = f; o2.frequency.value = f * 3.01; g2.gain.value = 0.25;
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(song.send);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    for (const x of [o, o2]) { x.start(t); x.stop(end + 0.05); }
+  }
+}
+function musicStep(b, t) { // everything the band plays on one eighth note
+  const w = song.world, Wd = WORLDS[w], len = musicLen(w), i = b % 8, barN = Math.floor(b / 8) % 8, loop = Math.floor(b / 64), c = song.chords[barN];
+  const intro = b < 16;
+  // the beat, kept light: a soft kick on one and three, a hushed brush on two and four, a quiet shaker
+  if (i === 0 || i === 4 || (i === 5 && barN % 2 === 1)) { const o = audio.ac.createOscillator(), g = audio.ac.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(85, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.15); g.gain.setValueAtTime(i === 5 ? 0.14 : 0.24, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g); g.connect(song.bus); o.start(t); o.stop(t + 0.3); }
+  if (!intro && (i === 2 || i === 6)) mNoise(t, 0.22, 0.045, 'bandpass', 1800, 0.7);
+  if (!intro || loop > 0) mNoise(t, 0.05, i % 2 === 0 ? 0.016 : 0.024, 'highpass', 7000);
+  // the bass: the chord's root on the bar, and its fifth halfway in the second half of the tune
+  if (i === 0 || (i === 4 && barN >= 4)) { let d = i === 4 ? c + 4 : c; if (d > 4) d -= 7; mVoice('bass', t, degF(Wd, Wd.root / 2, d), len * 3.5, 0.2); }
+  // the pad holds the chord through each bar, with its seventh for warmth
+  if (i === 0) for (const k of [0, 2, 4, 6]) mVoice('pad', t, degF(Wd, Wd.root, c + k), len * 8, k === 6 ? 0.012 : 0.018);
+  if (intro) return;
+  // the keys: each note rings until the next starts
+  const n = song.bars[barN][i];
+  if (n) { let k = i + 1; while (k < 8 && song.bars[barN][k] === null) k++; mVoice('keys', t, degF(Wd, Wd.root * 2, n.d), len * Math.max(2, k - i), 0.11); }
+  // soft bells in the higher worlds, every other time round: the chord, a note a beat
+  if ((w >= 3 && loop % 2 === 1) || w >= 7) if (i % 2 === 0) mVoice('bell', t, degF(Wd, Wd.root * 2, c + [0, 4, 2, 7][i / 2]), len * 3, 0.02);
+}
+const musicLen = w => 60 / (tune.music_tempo + w * 1.5) / 2; // one eighth note, in seconds: a touch quicker each world
 function playWorld(w) {
   if (song.world === w) return;
-  song.world = w; song.beat = 0; song.acc = 0;
+  song.world = w; song.beat = 0; song.t = 0;
   if (song.el) { song.el.pause(); song.el = null; }
   const file = (CONFIG.songs || [])[w];
-  if (file) { const el = new Audio(file); el.loop = true; el.volume = tune.music_volume; el.muted = muted; el.play().catch(() => {}); song.el = el; events.push(['song', w + 1, file]); return; }
-  const r = fixedRng(500 + w * 31), ph = []; let d = 0;
-  for (let i = 0; i < 32; i++) { // a wandering line that comes home at the end of each half
-    if (i % 16 === 15) d = 0; else if (r() < 0.72) d = clamp(d + (r() < 0.5 ? -1 : 1) * (r() < 0.8 ? 1 : 2), -2, 8);
-    ph.push(r() < 0.18 && i % 4 !== 0 ? null : d);
-  }
-  song.phrase = ph; events.push(['tune', w + 1]);
+  if (file) { if (song.bus) song.bus.gain.setTargetAtTime(0, audio.ac.currentTime, 0.05); const el = new Audio(file); el.loop = true; el.volume = tune.music_volume; el.muted = muted; el.play().catch(() => {}); song.el = el; events.push(['song', w + 1, file]); return; }
+  compose(w); events.push(['tune', w + 1]);
 }
-function stepMusic(dt) {
-  if (song.world < 0 || song.el || !audio || muted) return;
-  const Wd = WORLDS[song.world], len = 60 / Wd.bpm / 2, v = tune.music_volume;
-  song.acc += dt;
-  while (song.acc >= len) {
-    song.acc -= len; const i = song.beat++ % 32, d = song.phrase[i];
-    if (d !== null) { const oct = Math.floor(d / 7), semi = Wd.scale[((d % 7) + 7) % 7] + oct * 12; tone(Wd.root * Math.pow(2, semi / 12), len * 1.7, 'triangle', 0.075 * v); }
-    if (i % 8 === 0) tone(Wd.root / 2, len * 7, 'sine', 0.05 * v);                       // a low drone under the line
-    const b = i % 8; if (b === 0 || b === 5) tone(92, 0.16, 'sine', 0.2 * v, 50);          // the drum's deep stroke
-    else if (b === 2 || b === 3 || b === 6) tone(1500, 0.035, 'square', 0.035 * v, 900);   // and its sharp one
-  }
+function musicHush() { song.t = 0; song.on = false; if (song.bus) song.bus.gain.setTargetAtTime(0, audio.ac.currentTime, 0.08); } // paused or left: the band stops at once
+function stepMusic() {
+  if (song.world < 0 || song.el || !audio || muted) { if (song.on) musicHush(); return; }
+  try {
+    musicBus();
+    const ac = audio.ac, now = ac.currentTime, len = musicLen(song.world);
+    if (!song.on) { song.on = true; song.bus.gain.setTargetAtTime(0.6 * tune.music_volume, now, 0.1); song.delay.delayTime.value = len * 1.5; }
+    if (song.t < now) song.t = now + 0.05; // first note, or after a stall: start again just ahead
+    while (song.t < now + 0.18) { musicStep(song.beat, song.t); song.beat++; song.t += len; }
+  } catch (e) {}
 }
 
 // ---- The tower: thirty levels, laid by one recipe per world from a fixed seed -------------------
@@ -489,9 +579,9 @@ const clockText = (cs, fine) => {
 };
 
 // ---- Racing: bots on this machine, real players through server.js -------------------------------
-const GOALS = [3, 6, 10, 20, 30], MAXP = 25, HANG = PH + 16; // HANG: how far under the feet they hold a hanging climber's own feet are
+const MAXP = 25, HANG = PH + 16; // HANG: how far under the feet they hold a hanging climber's own feet are
 const colorOf = i => i < 5 ? ['#e8334a', '#3f8cff', '#3fd66a', '#ffb020', '#c77dff'][i] : `hsl(${Math.round(i * 137.5 + 20) % 360},85%,62%)`; // a colour for every seat
-const game = { kind: 'solo', goal: 5, name: '', color: colorOf(0), slot: 0, fin: null, msg: '', msgT: 0, spec: false, over: false, watch: null, size: tune.room_size, cid: '' };
+const game = { kind: 'solo', goal: LEVELS, from: 1, name: '', color: colorOf(0), slot: 0, fin: null, msg: '', msgT: 0, spec: false, over: false, watch: null, size: tune.room_size, cid: '' };
 try { game.name = localStorage.getItem('long-climb-name') || ''; game.cid = localStorage.getItem('long-climb-cid') || ''; game.size = clamp(Number(localStorage.getItem('long-climb-size')) || tune.room_size, 2, MAXP); } catch (e) {}
 if (!game.cid) { // a name for this browser that the room server knows it by, so a player who drops out can come back to their place
   const a = new Uint8Array(10); try { crypto.getRandomValues(a); } catch (e) {}
@@ -503,10 +593,14 @@ let others = new Map(), pushCool = 0, grabCool = 0, menuSel = 1, pauseSel = 0, p
 const meId = () => game.kind === 'net' ? net.id : 'me', hangAlt = a => Math.max(0, a - HANG); // where a hanging climber's feet are, under feet at altitude a: never below the tower's foot
 function resume() { if (song.el) song.el.play().catch(() => {}); scene = pauseFrom; }
 function toMenu() { // leave the climb, and the room if you are in one, for the main menu
-  if (song.el) { song.el.pause(); song.el = null; } song.world = -1;
+  if (song.el) { song.el.pause(); song.el = null; } song.world = -1; if (audio) musicHush();
   if (net.ws) net.leave(); others = new Map(); game.kind = 'solo'; game.spec = false; game.fin = null; reset(); menuSel = 1; scene = 'title';
 }
 function toast(s) { game.msg = s; game.msgT = 3; }
+try { const g = JSON.parse(localStorage.getItem('long-climb-range') || 'null'); if (Array.isArray(g)) { game.from = clamp(Math.round(g[0]) || 1, 1, LEVELS); game.goal = clamp(Math.round(g[1]) || LEVELS, game.from, LEVELS); } } catch (e) {}
+function startSolo() { // climb alone over the chosen levels: from the floor under the first, to the end of the last
+  game.kind = 'solo'; others = new Map(); reset(game.from > 1 ? { top: game.from - 1, cs: 0, falls: 0, stars: 0 } : undefined); scene = 'play';
+}
 function setName(n) { n = String(n || '').trim().slice(0, 14); if (!n) return; game.name = n; game.named = true; try { localStorage.setItem('long-climb-name', n); } catch (e) {} }
 function startRace(kind, goal, opt = {}) { // opt: spec (you only watch), el (milliseconds the race has already run), from (the level a returning player had reached)
   game.kind = kind; game.goal = goal; game.fin = null; game.over = false; game.spec = !!opt.spec; game.watch = null;
@@ -516,7 +610,8 @@ function startRace(kind, goal, opt = {}) { // opt: spec (you only watch), el (mi
   }
   reset(opt.from ? { top: opt.from, cs: 0, falls: 0, stars: 0 } : undefined);
   const el = (opt.el || 0) / 1000; state.t = el; state.count = Math.max(0, 3.4 - el); state.time = Math.max(0, el - 3.4); state.started = el >= 3.4; pushCool = grabCool = 0;
-  let k = 0; for (const o of others.values()) { o.fin = null; o.h = null; if (o.bot) { o.x = o.sx = 90 + [0, 1, 3, 4][k++] * 135; o.alt = 0; } else if (!el) { o.alt = o.talt = 0; } }
+  const bi = Math.max(0, route.indexOf(rests[clamp(opt.from || 0, 0, LEVELS - 1)])); // the floor the race starts on
+  let k = 0; for (const o of others.values()) { o.fin = null; o.h = null; if (o.bot) { o.x = o.sx = 90 + [0, 1, 3, 4][k++] * 135; o.i = o.base = bi; o.prog = 0; o.fall = -1; o.alt = route[bi].alt; } else if (!el) { o.alt = o.talt = 0; } }
   if (state.count > 0) sfx.beep();
   scene = game.spec ? 'watch' : 'play';
 }
@@ -601,7 +696,7 @@ const net = { ws: null, can: location.protocol.startsWith('http'), room: null, i
 function onNet(m) {
   if (m.t === 'room' || m.t === 'roster') {
     if (m.t === 'room') { net.id = m.you; lobbySel = m.you; scene = 'lobby'; }
-    net.room = { id: m.id, players: m.players, host: m.host, mode: m.mode, goal: m.goal, size: m.size, lan: m.lan, racing: !!m.racing }; net.host = m.host === net.id;
+    net.room = { id: m.id, players: m.players, host: m.host, mode: m.mode, start: m.start || 1, goal: m.goal, size: m.size, lan: m.lan, racing: !!m.racing }; net.host = m.host === net.id;
     const keep = new Map(); let slot = 0, mine = null;
     for (const p of m.players) { // the climbers of the room; those who only watch have no climber
       if (p.id === net.id) mine = p; if (p.spec) continue;
@@ -663,32 +758,45 @@ function copyLink() {
     const ok = document.execCommand('copy'); ta.remove(); if (ok) done();
   } catch (e) {}
 }
-function roomSet(ch) { // the host changes the room: how many may play, the level that ends the race, the difficulty
+function roomSet(ch) { // the host changes the room: how many may play, the levels the race runs over, the difficulty
   const r = net.room; if (!r || !net.host) return;
-  const s = Object.assign({ mode: r.mode, goal: r.goal, size: r.size }, ch); s.size = clamp(s.size, 2, MAXP); s.goal = GOALS[clamp(GOALS.indexOf(s.goal), 0, GOALS.length - 1)];
-  if (s.mode === r.mode && s.goal === r.goal && s.size === r.size) return;
+  const s = Object.assign({ mode: r.mode, start: r.start || 1, goal: r.goal, size: r.size }, ch); s.size = clamp(s.size, 2, MAXP); s.start = clamp(s.start, 1, LEVELS); s.goal = clamp(s.goal, s.start, LEVELS);
+  if (s.mode === r.mode && s.start === (r.start || 1) && s.goal === r.goal && s.size === r.size) return;
   net.send(Object.assign({ t: 'set' }, s)); game.size = s.size; try { localStorage.setItem('long-climb-size', String(s.size)); } catch (e) {} sfx.type();
 }
 const lobbyTop = () => 168 + wrap(roomLink(), W - 150, 21).slice(0, 3).length * 27 + 34 + 88; // where the room screen's seats begin, under the code, the link and the settings
 function pauseTop() { const r = net.room; let y = (r ? 150 : 330) + 62; if (r) y += 106 + wrap(roomLink(), W - 150, 20).slice(0, 3).length * 26 + 50; return y; } // where the Esc menu's buttons begin
-const goalStep = d => GOALS[clamp(GOALS.indexOf(net.room.goal) + d, 0, GOALS.length - 1)];
+const goalStep = d => clamp(net.room.goal + d, net.room.start || 1, LEVELS);
 function openName(then) { // ask for the name; `then` is the menu line to go on to once it is given
   pendingGo = then;
   if (touchSeen) { const n = prompt(K.nameAsk, game.named ? game.name : ''); if (n) setName(n); pendingGo = -1; if (then >= 0 && game.named) menuGo(then); }
   else { state.entry = game.named ? game.name : ''; typed.length = 0; scene = 'name'; }
 }
+let pick = { end: 0, cur: 0, back: 'title' }; // the level picker: which end is being set (0 the start, 1 the finish), the level under the cursor, the screen to go back to
+function openLevels() { const r = scene === 'lobby' && net.room; pick = { end: 0, cur: (r ? r.start || 1 : game.from) - 1, back: scene }; scene = 'levels'; }
+const pickRange = () => { const r = pick.back === 'lobby' && net.room; return r ? [r.start || 1, r.goal] : [game.from, game.goal]; };
+function setRange(a, b) { // in a room the host's choice goes to the room; alone or with bots it is yours, and kept
+  a = clamp(a, 1, LEVELS); b = clamp(b, a, LEVELS);
+  if (pick.back === 'lobby') { roomSet({ start: a, goal: b }); return; }
+  game.from = a; game.goal = b; try { localStorage.setItem('long-climb-range', JSON.stringify([a, b])); } catch (e) {}
+}
+function pickLevel(n) { // set the end being chosen to level n; choosing the start moves on to the finish
+  const [a, b] = pickRange();
+  if (pick.end === 0) { setRange(n, Math.max(n, b)); pick.end = 1; } else if (n < a) setRange(n, n); else setRange(a, n);
+  pick.cur = n - 1; sfx.pick(); events.push(['levels', ...pickRange()]);
+}
 function menuGo(i) {
   if (i === 0) openName(-1);
-  else if (i === 1) { game.kind = 'solo'; others = new Map(); if (save.run && save.run.mode === mode) { save.run = null; store(); } reset(); scene = 'play'; }
-  else if (i === 2) startRace('bots', game.goal);
+  else if (i === 1) { if (save.run && save.run.mode === mode) { save.run = null; store(); } startSolo(); }
+  else if (i === 2) startRace('bots', game.goal, { from: game.from - 1 });
   else if (i === 3 || i === 4) {
     if (!net.can) toast(K.needServer);
     else if (!game.named) openName(i); // a room shows your name to the others, so it is asked first
-    else if (i === 3) net.open({ t: 'create', name: game.name, mode, goal: game.goal, size: game.size, cid: game.cid });
+    else if (i === 3) net.open({ t: 'create', name: game.name, mode, start: game.from, goal: game.goal, size: game.size, cid: game.cid });
     else if (pendingRoom) { const id = pendingRoom; pendingRoom = ''; net.open({ t: 'join', id, name: game.name, cid: game.cid }); } // a room link: the code came with the address
     else if (touchSeen) { const id = prompt(K.roomAsk, ''); if (id) net.open({ t: 'join', id: id.trim(), name: game.name, cid: game.cid }); }
     else { state.entry = ''; typed.length = 0; scene = 'join'; }
-  } else { state.entry = ''; state.verdict = null; typed.length = 0; scene = 'code'; }
+  } else if (i === 6) openLevels(); else { state.entry = ''; state.verdict = null; typed.length = 0; scene = 'code'; }
 }
 
 // ---- The climber ------------------------------------------------------------------------------
@@ -740,7 +848,7 @@ function land(p) {
   if (p.rest && !p.seen) { // the end of a level: a chime, a banner, and the climb is kept from here
     p.seen = true;
     if (game.kind !== 'solo' && p.rest >= game.goal) { raceFinish(); return; } // in a race the level that ends it is the finish line, and nothing is kept
-    if (game.kind === 'solo' && p.summit) { finish(); return; }
+    if (game.kind === 'solo' && (p.summit || p.rest >= game.goal)) { finish(); return; }
     // each level's cheer grows with the climb, and the end of a world gets a bigger one
     const worldDone = p.rest % PER === 0;
     state.banner = tune.banner_time; state.bannerN = p.rest; state.lapCs = Math.round((state.time - state.lt) * 100); state.lt = state.time;
@@ -748,7 +856,7 @@ function land(p) {
     if (game.kind !== 'solo') { events.push(['level', p.rest]); return; }
     events.push(['level', p.rest, metres(p.alt)]);
     const b = save.best[mode]; if (!(b.level >= p.rest)) b.level = p.rest;
-    save.run = { mode, top: p.rest, cs: Math.round(state.time * 100), falls: state.falls, stars: state.stars }; store();
+    save.run = { mode, from: game.from, goal: game.goal, top: p.rest, cs: Math.round(state.time * 100), falls: state.falls, stars: state.stars }; store();
   }
 }
 function openGate(g) {
@@ -756,10 +864,10 @@ function openGate(g) {
   if (g.open && !was) { sfx.open(); for (let x = 60; x < W; x += 100) sparks(x, g.alt, 4, '#4fd66a', 160); events.push(['gate', g.level]); }
 }
 function finish() {
-  const cs = Math.round(state.time * 100), b = save.best[mode];
-  state.done = true; state.code = makeCode(cs, state.falls, mode); state.cs = cs; state.gained = K.summit; state.t = 0;
-  if (!b.cs || cs < b.cs) { b.cs = cs; b.falls = state.falls; }
-  b.level = LEVELS; save.run = null; store();
+  const cs = Math.round(state.time * 100), b = save.best[mode], full = game.from === 1 && game.goal >= LEVELS;
+  state.done = true; state.code = full ? makeCode(cs, state.falls, mode) : ''; state.cs = cs; state.gained = K.summit; state.t = 0;
+  if (full && (!b.cs || cs < b.cs)) { b.cs = cs; b.falls = state.falls; }
+  if (full) b.level = LEVELS; save.run = null; store();
   sfx.win(); confetti(W / 2, P.alt + 60, 90); events.push(['summit', cs, state.falls, state.code]); scene = 'results';
 }
 function knock(fromX, y) { // thrown away from what hit you, and down
@@ -1217,17 +1325,17 @@ const scenes = {
     cols: () => [[[0, 446]], [[446, 1100]]], // sideways: the name on the left, the buttons on the right
     update(dt) {
       state.t += dt; stepWorld(dt); if (game.msgT > 0) game.msgT -= dt;
-      if (pressed('ArrowUp') || pressed('KeyW')) { menuSel = (menuSel + 4) % 5; sfx.type(); }
-      if (pressed('ArrowDown') || pressed('KeyS')) { menuSel = (menuSel + 1) % 5; sfx.type(); }
+      if (pressed('ArrowUp') || pressed('KeyW')) { menuSel = (menuSel + 5) % 6; sfx.type(); }
+      if (pressed('ArrowDown') || pressed('KeyS')) { menuSel = (menuSel + 1) % 6; sfx.type(); }
       const m0 = mode, side = (pressed('ArrowRight') ? 1 : 0) - (pressed('ArrowLeft') ? 1 : 0); if (side) mode = clamp(mode + side * (K.dir === 'rtl' ? -1 : 1), 0, 2);
       for (let i = 0; i < 3; i++) if (pressed('Digit' + (i + 1))) mode = i;
       if (mode !== m0) { const t = state.t; sfx.type(); game.kind = 'solo'; reset(); state.t = t; }
-      if (pressed('KeyG')) { game.goal = GOALS[(GOALS.indexOf(game.goal) + 1) % GOALS.length]; sfx.type(); }
+      if (pressed('KeyG')) { hit.clear(); sfx.pick(); openLevels(); return; }
       if (pressed('KeyL')) { setLang(lang === 'en' ? 'ckb' : 'en'); sfx.type(); }
       if (pressed('KeyN')) { hit.clear(); menuGo(0); return; }
       if (pressed('KeyC')) { hit.clear(); menuGo(5); return; }
-      if (pressed('KeyB') && save.run && save.run.mode === mode) { game.kind = 'solo'; others = new Map(); reset(save.run); hit.clear(); scene = 'play'; return; }
-      if (pressed('Enter') || pressed('Space')) { hit.clear(); sfx.pick(); menuGo(menuSel); }
+      if (pressed('KeyB') && save.run && save.run.mode === mode) { game.from = save.run.from || 1; game.goal = save.run.goal || LEVELS; game.kind = 'solo'; others = new Map(); reset(save.run); hit.clear(); scene = 'play'; return; }
+      if (pressed('Enter') || pressed('Space')) { hit.clear(); sfx.pick(); menuGo(menuSel === 5 ? 6 : menuSel); }
     },
     draw() {
       drawWorld(); dim(0.8);
@@ -1237,15 +1345,51 @@ const scenes = {
       zone(110, 358, W - 220, 70, () => { menuSel = 0; hit.add('Enter'); });
       K.simple.forEach((m, k) => { // four big buttons
         const i = k + 1, y = 462 + k * 88; button(m, 110, y, W - 220, 72, i === menuSel, () => { menuSel = i; hit.add('Enter'); }, { off: k >= 2 && !net.can, size: 28 });
-        if (k === 1) { const on = i === menuSel; rr(W - 198, y + 16, 72, 40, 20, on ? 'rgba(12,14,22,0.12)' : 'rgba(10,12,20,0.4)'); ltr(String(game.goal), W - 152, y + 37, 20, on ? '#0c0e16' : '#ffffff'); // the level the bots race to: tap it, or press G
-          ctx.strokeStyle = ctx.fillStyle = on ? '#0c0e16' : UI.gold; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(W - 182, y + 26); ctx.lineTo(W - 182, y + 48); ctx.stroke(); ctx.beginPath(); ctx.moveTo(W - 181, y + 26); ctx.lineTo(W - 168, y + 31); ctx.lineTo(W - 181, y + 36); ctx.fill(); zone(W - 204, y + 6, 88, 60, () => hit.add('KeyG')); }
       });
-      if (save.run && save.run.mode === mode) button(`${K.cont2} ${save.run.top + 1}`, 180, 822, W - 360, 52, false, () => hit.add('KeyB'), { size: 21, color: '#7be08a' });
+      { // the levels every climb runs over: tap to choose them; beside it, the climb to go on with
+        const cont = save.run && save.run.mode === mode, lw = cont ? 250 : W - 220, on = menuSel === 5, rtl = K.dir === 'rtl';
+        button('', 110, 814, lw, 62, on, () => { menuSel = 5; hit.add('Enter'); });
+        text(K.levels, 110 + lw * (rtl ? 0.7 : 0.3), 846, 22, on ? '#0c0e16' : '#ffffff', 'center', true); ltr(`${game.from} – ${game.goal}`, 110 + lw * (rtl ? 0.28 : 0.72), 846, 24, on ? '#0c0e16' : UI.gold);
+        if (cont) button(`${K.cont2} ${save.run.top + 1}`, 372, 814, W - 482, 62, false, () => hit.add('KeyB'), { size: 20, color: '#7be08a' });
+      }
       const ord = K.dir === 'rtl' ? [2, 1, 0] : [0, 1, 2];
       text(K.diff, W / 2, 906, 18, UI.dim); seg(ord.map(i => K.modes[i]), ord.indexOf(mode), 110, 924, W - 220, 58, v => hit.add('Digit' + (ord[v] + 1)), ord.map(i => ['#1f8a3a', '#b98a00', '#b3202e'][i]));
       const b = save.best[mode]; if (b.level) text(`${K.best}: ${K.level} ${b.level}` + (b.cs ? `  ·  ${clockText(b.cs)}` : ''), W / 2, 1022, 18, UI.dim);
       text(K.menu[5], W / 2, 1066, 19, '#ffffff'); zone(160, 1042, W - 320, 48, () => hit.add('KeyC'));
       toastLine(1130);
+    },
+  },
+  levels: { // choose the first and the last level: ten worlds of three, the chosen run lit up
+    cols: () => [[[0, 656]], [[656, 1190]]], // sideways: the top half of the worlds on the left, the rest and the buttons on the right
+    update(dt) {
+      state.t += dt; stepWorld(dt);
+      if (pressed('Escape') || pressed('Backspace')) { hit.clear(); sfx.type(); scene = pick.back; return; }
+      const mv = (pressed('ArrowRight') || pressed('KeyD') ? 1 : 0) - (pressed('ArrowLeft') || pressed('KeyA') ? 1 : 0) + (pressed('ArrowDown') || pressed('KeyS') ? 3 : 0) - (pressed('ArrowUp') || pressed('KeyW') ? 3 : 0);
+      if (mv) { pick.cur = clamp(pick.cur + mv, 0, LEVELS - 1); sfx.type(); }
+      if (pressed('Tab')) { pick.end = 1 - pick.end; sfx.type(); }
+      if (pressed('Enter') || pressed('Space')) pickLevel(pick.cur + 1);
+    },
+    draw() {
+      drawWorld(); dim(0.84); backBtn();
+      const [a, b] = pickRange();
+      text(K.pickTitle, W / 2, 70, 38, '#ffffff', 'center', true);
+      seg([K.startL, K.finishL], pick.end, 160, 112, 400, 56, i => { pick.end = i; sfx.type(); }, ['#2f9a4a', '#b98a00']);
+      ltr(`${a}  →  ${b}`, W / 2, 204, 34, UI.gold); text(`${b - a + 1} ${K.levelsN}`, W / 2, 240, 18, UI.dim);
+      for (let w = 0; w < WORLDS.length; w++) { // a row a world: its name and colour, then its three levels
+        const y = 268 + w * 78, Wd = WORLDS[w];
+        rr(32, y, 252, 64, 18, UI.soft); dot(62, y + 32, 15, Wd.sky[0]); ctx.strokeStyle = Wd.cap; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(62, y + 32, 15, 0, 7); ctx.stroke();
+        text(fitText(K.worlds[w], 178, 19), 176, y + 33, 19, '#ffffff', 'center', true);
+        for (let j = 0; j < 3; j++) {
+          const n = w * 3 + j + 1, x = 298 + j * 136, cx = x + 63, isA = n === a, isB = n === b && !isA, inR = n >= a && n <= b, cur = pick.cur === n - 1;
+          rr(x, y, 126, 64, 18, isA ? '#7be08a' : isB ? UI.gold : inR ? 'rgba(255,212,79,0.2)' : UI.soft, cur ? '#ffffff' : null, 3);
+          ltr(String(n), cx, isA || isB ? y + 26 : y + 33, 28, isA || isB ? '#0c0e16' : inR ? '#ffffff' : UI.dim);
+          if (isA || isB) text(isA ? (a === b ? `${K.startL} · ${K.finishL}` : K.startL) : K.finishL, cx, y + 50, 13, '#0c0e16', 'center', true);
+          zone(x, y, 126, 64, () => pickLevel(n));
+        }
+      }
+      text(K.pickHint, W / 2, 1072, 17, UI.dim);
+      button(K.allL, 60, 1102, 250, 66, false, () => { pick.end = 0; setRange(1, LEVELS); sfx.type(); }, { size: 22 });
+      button(K.doneL, 330, 1102, 330, 66, true, () => hit.add('Escape'), { size: 26 });
     },
   },
   name: { // type the name the others will see; then on to the room, when that was asked
@@ -1281,6 +1425,7 @@ const scenes = {
       if (pressed('KeyC')) copyLink();
       const me = r.players.find(p => p.id === net.id);
       if (!net.host) { lobbySel = net.id; if (pressed('KeyV') && me) net.send({ t: 'spec', on: !me.spec }); return; } // a guest may only choose to watch or to play
+      if (pressed('KeyG')) { hit.clear(); sfx.pick(); openLevels(); return; }
       if (!r.players.some(p => p.id === lobbySel)) lobbySel = net.id;
       if (pressed('ArrowLeft')) roomSet({ goal: goalStep(-1) }); if (pressed('ArrowRight')) roomSet({ goal: goalStep(1) });
       if (pressed('ArrowUp')) roomSet({ size: r.size + 1 }); if (pressed('ArrowDown')) roomSet({ size: r.size - 1 });
@@ -1299,7 +1444,7 @@ const scenes = {
       const ly = 168 + lines.length * 27; text(K.copy, W / 2, ly, 15, UI.dim); zone(60, 150, W - 120, ly - 138, () => hit.add('KeyC'));
       const sy0 = ly + 34; // the room's three settings: the host's to change
       stepper(K.size, `${racers.length} / ${r.size}`, 50, sy0, 196, host, () => roomSet({ size: r.size - 1 }), () => roomSet({ size: r.size + 1 }));
-      stepper(K.finishAt, `${K.level} ${r.goal}`, 262, sy0, 196, host, () => roomSet({ goal: goalStep(-1) }), () => roomSet({ goal: goalStep(1) }));
+      stepper(K.levels, '', 262, sy0, 196, false); ltr(`${r.start || 1} – ${r.goal}`, 360, sy0 + 43, 22, UI.gold); if (host) { chevron(262 + 176, sy0 + 42, 1, UI.dim, 8); zone(262, sy0 + 10, 196, 64, () => hit.add('KeyG')); } // the levels: the host taps to choose them
       stepper(K.diff, K.modes[r.mode], 474, sy0, 196, host, () => roomSet({ mode: (r.mode + 2) % 3 }), () => roomSet({ mode: (r.mode + 1) % 3 }), ['#7be08a', '#ffe58a', '#ff6a78'][r.mode]);
       const top = sy0 + 88, cols = r.size > 8 ? 2 : 1, rows = Math.ceil(r.size / cols), rowH = clamp(Math.floor((930 - top) / rows), 36, 62), cw = (W - 100 - (cols - 1) * 12) / cols, fs = clamp(rowH * 0.42, 16, 24);
       for (let i = 0; i < r.size; i++) { // every seat: taken, or empty
@@ -1345,17 +1490,17 @@ const scenes = {
   },
   play: {
     update(dt) {
-      if (pressed('KeyP') || pressed('Escape')) { if (song.el) song.el.pause(); pauseSel = 0; pauseFrom = 'play'; scene = 'pause'; return; }
+      if (pressed('KeyP') || pressed('Escape')) { if (song.el) song.el.pause(); if (audio) musicHush(); pauseSel = 0; pauseFrom = 'play'; scene = 'pause'; return; }
       state.t += dt;
       state.holdR = down.has('KeyR') ? state.holdR + dt : 0; // held, so a slip of the finger never ends a climb
-      if (state.holdR >= 0.8 && game.kind === 'solo') { events.push(['restart']); save.run = null; store(); reset(); return; }
+      if (state.holdR >= 0.8 && game.kind === 'solo') { events.push(['restart']); save.run = null; store(); startSolo(); return; }
       stepWorld(dt); stepPlayer(dt); stepOthers(dt); raceTick(dt); if (scene === 'play') { playWorld(state.world - 1); stepMusic(dt); }
     },
     draw() { drawWorld(); hud(); },
   },
   watch: { // watching the race: as a spectator, or once you have finished while the others still climb
     update(dt) {
-      if (pressed('KeyP') || pressed('Escape')) { pauseSel = 0; pauseFrom = 'watch'; scene = 'pause'; return; }
+      if (pressed('KeyP') || pressed('Escape')) { if (audio) musicHush(); pauseSel = 0; pauseFrom = 'watch'; scene = 'pause'; return; }
       state.t += dt; stepWorld(dt); watchStep(dt); stepOthers(dt); raceTick(dt);
       if (pressed('ArrowLeft') || pressed('KeyA')) watchNext(-1); if (pressed('ArrowRight') || pressed('KeyD') || pressed('Space')) watchNext(1);
       if (game.kind === 'bots' && (pressed('Enter') || !stillRacing())) { state.t0 = state.t; scene = 'board'; return; } // with bots the results are yours to call up; a room's come when everyone is in
@@ -1368,7 +1513,7 @@ const scenes = {
     under() { const u = scenes[pauseFrom]; if (u.cols) drawWorld(); else u.draw(); },
     items() {
       const list = [[K.pauseMenu[0], resume]], inRoom = game.kind === 'net';
-      if (game.kind === 'solo') list.push([K.pauseMenu[1], () => { save.run = null; store(); reset(); scene = 'play'; }]);
+      if (game.kind === 'solo') list.push([K.pauseMenu[1], () => { save.run = null; store(); startSolo(); }]);
       list.push([`${K.pauseMenu[2]}: ${muted ? K.off : K.on}`, () => setMuted(!muted)]);
       if (inRoom && !game.fin && !game.over) list.push([game.spec ? K.joinRace : K.watch, () => { net.send({ t: 'spec', on: !game.spec }); resume(); }]);
       if (inRoom && net.host) list.push([game.over ? K.backRoom : K.endRace, () => net.send({ t: 'end' })]);
@@ -1404,15 +1549,15 @@ const scenes = {
   },
   results: {
     cols: () => [[[240, 530]], [[560, 950]]],
-    update(dt) { state.t += dt; stepWorld(dt); if (state.t > 1 && pressed('Enter')) { reset(); scene = 'play'; } },
+    update(dt) { state.t += dt; stepWorld(dt); if (state.t > 1 && pressed('Enter')) startSolo(); },
     draw() {
       drawWorld(); dim(0.76);
       text(K.summit, W / 2, 286, 56, UI.gold, 'center', true); text(K.modes[mode], W / 2, 348, 24, ['#7be08a', '#ffe58a', '#ff6a78'][mode], 'center', true);
       text(K.time, W / 2 + 200, 430, 20, UI.dim); text(clockText(state.cs || 0, true), W / 2 + 200, 480, 42, '#ffffff', 'center', true);
       text(K.falls, W / 2 - 30, 430, 20, UI.dim); text(String(state.falls), W / 2 - 30, 480, 42, '#ffffff', 'center', true);
       text(K.stars, W / 2 - 210, 430, 20, UI.dim); ltr(state.stars + ' / ' + LEVELS, W / 2 - 210, 480, 42, '#ffffff');
-      text(K.yourCode, W / 2, 590, 20, UI.dim); rr(W / 2 - 270, 618, 540, 90, 24, UI.soft, '#ffffff', 3); ltr(state.code, W / 2, 665, 46, '#ffffff');
-      text(K.sendCode, W / 2, 750, 21, UI.gold);
+      if (state.code) { text(K.yourCode, W / 2, 590, 20, UI.dim); rr(W / 2 - 270, 618, 540, 90, 24, UI.soft, '#ffffff', 3); ltr(state.code, W / 2, 665, 46, '#ffffff'); text(K.sendCode, W / 2, 750, 21, UI.gold); }
+      else { text(K.levels, W / 2, 590, 20, UI.dim); rr(W / 2 - 270, 618, 540, 90, 24, UI.soft, '#ffffff', 3); ltr(`${game.from} – ${game.goal}`, W / 2, 665, 46, UI.gold); } // part of the tower: no code to share
       if (save.best[mode].cs) text(`${K.bestTime}: ${clockText(save.best[mode].cs, true)}`, W / 2, 812, 22, '#ffffff');
       text(K.again, W / 2, 916, 26, '#ffffff', 'center', true);
     },

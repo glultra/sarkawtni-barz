@@ -29,13 +29,13 @@ const LETTERS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function newRoomId() { for (;;) { let s = ''; for (const b of crypto.randomBytes(4)) s += LETTERS[b % 32]; if (!rooms.has(s)) return s; } }
 const cleanName = n => String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 14) || 'player';
 const cleanCid = s => String(s || '').replace(/[^0-9A-Za-z]/g, '').slice(0, 24); // the name a browser keeps for itself, so a player can come back to their place
-const GOALS = [3, 6, 10, 20, 30];
+const LEVELS = 30; // the tower's levels: a race runs from any of them to any later one
 const clampInt = (v, a, b) => Math.max(a, Math.min(b, Math.round(Number(v) || 0)));
 const LAN = []; for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) LAN.push(a.address + ':' + PORT); // what players on the same Wi-Fi type
 const racers = room => room.players.filter(p => !p.spec); // those who climb; the rest only watch
 const all = (room, m) => { const f = frame(m); if (f) for (const p of room.players) put(p, f); };
 function roster(room, type, to) {
-  const m = { t: type, id: room.id, host: room.host, mode: room.mode, goal: room.goal, size: room.size, racing: room.racing ? 1 : 0, lan: LAN[0] || '', players: room.players.map(p => ({ id: p.id, name: p.name, spec: p.spec ? 1 : 0, c: p.color })) };
+  const m = { t: type, id: room.id, host: room.host, mode: room.mode, start: room.start, goal: room.goal, size: room.size, racing: room.racing ? 1 : 0, lan: LAN[0] || '', players: room.players.map(p => ({ id: p.id, name: p.name, spec: p.spec ? 1 : 0, c: p.color })) };
   if (to) send(to, Object.assign({ you: to.id }, m)); else all(room, m);
 }
 function freeColor(room) { for (let i = 0; ; i++) if (!room.players.some(p => p.color === i)) return i; }
@@ -44,8 +44,8 @@ function checkOver(room) { // the race is over once every climber still in the r
   if (!room.racing || room.over || !racers(room).every(p => p.done)) return;
   room.over = true; all(room, { t: 'over' }); console.log('room ' + room.id + ': everyone is in');
 }
-function sendGo(room, c) { // start this player in the running race: at the bottom, or where they had got to before they left
-  const top = !c.spec && c.cid && room.saved.has(c.cid) ? room.saved.get(c.cid) : 0; if (c.cid) room.saved.delete(c.cid);
+function sendGo(room, c) { // start this player in the running race: on the race's first floor, or where they had got to before they left
+  const top = !c.spec && c.cid && room.saved.has(c.cid) ? room.saved.get(c.cid) : room.start - 1; if (c.cid) room.saved.delete(c.cid);
   c.done = false; c.st = null; c.top = top;
   send(c, { t: 'go', mode: room.mode, goal: room.goal, spec: c.spec ? 1 : 0, el: Date.now() - room.t0, from: top });
 }
@@ -61,7 +61,8 @@ function leave(c) {
 function onMessage(c, m) {
   if (!m || typeof m.t !== 'string') return;
   if (m.t === 'create' && !c.room) {
-    const room = { id: newRoomId(), host: c.id, players: [c], mode: [0, 1, 2].includes(m.mode) ? m.mode : 1, goal: GOALS.includes(m.goal) ? m.goal : 5, size: clampInt(m.size || 8, 2, MAXP), racing: false, over: false, place: 0, t0: 0, saved: new Map(), banned: new Set() };
+    const room = { id: newRoomId(), host: c.id, players: [c], mode: [0, 1, 2].includes(m.mode) ? m.mode : 1, start: clampInt(m.start || 1, 1, LEVELS), goal: 0, size: clampInt(m.size || 8, 2, MAXP), racing: false, over: false, place: 0, t0: 0, saved: new Map(), banned: new Set() };
+    room.goal = clampInt(m.goal || LEVELS, room.start, LEVELS);
     c.name = cleanName(m.name); c.cid = cleanCid(m.cid); c.spec = false; c.done = false; c.st = null; c.color = 0; c.room = room; rooms.set(room.id, room); roster(room, 'room', c);
     console.log('room ' + room.id + ' made by ' + c.name + ' for ' + room.size + ' players'); return;
   }
@@ -81,7 +82,7 @@ function onMessage(c, m) {
   if (m.t === 's') { // where this climber is now; it goes out to the room on the next tick
     if (!room.racing || c.spec || c.done) return;
     const h = room.players.some(p => p.id === m.h && p !== c && !p.spec && !p.done) ? m.h : 0; // whose feet they hang on, if anyone's
-    c.st = [c.id, clampInt(m.x, -100, 900), clampInt(m.a, -1000, 200000), m.f < 0 ? -1 : 1, h]; c.top = clampInt((Number(m.l) || 1) - 1, 0, Math.max(0, room.goal - 1)); return;
+    c.st = [c.id, clampInt(m.x, -100, 900), clampInt(m.a, -1000, 200000), m.f < 0 ? -1 : 1, h]; c.top = clampInt((Number(m.l) || 1) - 1, room.start - 1, Math.max(0, room.goal - 1)); return;
   }
   if (m.t === 'hit') { const to = room.players.find(p => p.id === m.to); if (room.racing && to && to !== c && !c.spec && !to.spec && !to.done) send(to, { t: 'hit', from: c.id, d: m.d < 0 ? -1 : 1 }); return; }
   if (m.t === 'fin') {
@@ -105,13 +106,14 @@ function onMessage(c, m) {
     console.log('room ' + room.id + ': ' + who.name + ' was removed by the host'); roster(room, 'roster'); checkOver(room);
   }
   else if (m.t === 'set' && !room.racing) {
-    if ([0, 1, 2].includes(m.mode)) room.mode = m.mode; if (GOALS.includes(m.goal)) room.goal = m.goal;
+    if ([0, 1, 2].includes(m.mode)) room.mode = m.mode;
+    if (m.start !== undefined) room.start = clampInt(m.start, 1, LEVELS); if (m.goal !== undefined) room.goal = clampInt(m.goal, 1, LEVELS); room.goal = Math.max(room.goal, room.start); // the finish never comes before the start
     if (m.size !== undefined) room.size = Math.max(racers(room).length, clampInt(m.size, 2, MAXP)); // never fewer seats than climbers already in them
     roster(room, 'roster');
   }
   else if (m.t === 'go' && !room.racing && racers(room).length) {
     room.racing = true; room.over = false; room.place = 0; room.t0 = Date.now(); room.saved = new Map();
-    roster(room, 'roster'); room.players.forEach(p => sendGo(room, p)); console.log('room ' + room.id + ': the race to level ' + room.goal + ' has started with ' + racers(room).length + ' climbers');
+    roster(room, 'roster'); room.players.forEach(p => sendGo(room, p)); console.log('room ' + room.id + ': the race from level ' + room.start + ' to ' + room.goal + ' has started with ' + racers(room).length + ' climbers');
   }
   else if (m.t === 'end' && room.racing) { room.racing = false; room.over = false; room.players.forEach(p => { p.done = false; p.st = null; }); all(room, { t: 'lobby' }); roster(room, 'roster'); }
 }
