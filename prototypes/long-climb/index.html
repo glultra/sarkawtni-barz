@@ -76,16 +76,16 @@ CKB.needServer = 'بۆ ژوور، یارییەکە بە start-room.bat بکەر�
 // Ten worlds of three levels. Each has its sky, the mix of special ledges it uses, what it adds,
 // the hint its banner shows, and the scale and speed of its tune.
 const WORLDS = [
-  { name: 'ناوکی زەوی', sky: ['#2a0705', '#c2410f'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
-  { name: 'سەکۆی جووڵاو', sky: ['#1c0808', '#6b1c10'], cap: '#ffffff', mix: { m: 0.35 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 102 },
-  { name: 'سەکۆی داڕماو', sky: ['#141012', '#3a2a22'], cap: '#f2c14e', mix: { c: 0.4, m: 0.1 }, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 108 },
-  { name: 'دوگمە و دەروازە', sky: ['#8fd6ff', '#dff5ff'], cap: '#58c9a0', mix: { m: 0.2 }, gate: 'btn', timed: true, hint: 'دوگمە سوورەکە دەروازە دەکاتەوە', scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 104 },
-  { name: 'سەهۆڵ', sky: ['#ff9a6a', '#ffd9a8'], cap: '#e8fbff', mix: { i: 0.55, m: 0.12 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 100 },
-  { name: 'با', sky: ['#16224f', '#43568f'], cap: '#ffb347', mix: { c: 0.15, m: 0.15, f: 0.12 }, wind: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 220, bpm: 112 },
-  { name: 'تفەنگ', sky: ['#060a22', '#1b3470'], cap: '#ff8fb8', mix: { m: 0.2, c: 0.15 }, gun: true, gate: 'tgt', bumpers: true, hint: 'F: تەقە لە ئامانجەکە بکە', scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 294, bpm: 118 },
-  { name: 'هەڵبەزێنەر و پشتێن', sky: ['#0d0912', '#2e2016'], cap: '#9a8cff', mix: { b: 0.16, v: 0.3, m: 0.12, f: 0.1 }, timed: true, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 120 },
-  { name: 'قوللەکان', sky: ['#05071a', '#1a2348'], cap: '#7f8cff', mix: { i: 0.15, c: 0.15, m: 0.15, v: 0.1 }, gun: true, gate: 'tgt', bumpers: true, turrets: true, hint: 'تەقە لە قوللەکان بکە بۆ وەستاندنیان', scale: [0, 1, 4, 5, 7, 8, 10], root: 233, bpm: 126 },
-  { name: 'کۆتایی', sky: ['#04020d', '#28093a'], cap: '#ff5a7a', mix: { c: 0.18, i: 0.15, m: 0.15, b: 0.1, v: 0.14, f: 0.08 }, gun: true, gate: 'both', timed: true, bumpers: true, turrets: true, wind: true, hint: 'هەموو شتێک پێکەوە', scale: [0, 1, 3, 5, 7, 8, 10], root: 262, bpm: 132 },
+  { name: 'ناوکی زەوی', pu: [], sky: ['#2a0705', '#c2410f'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
+  { name: 'سەکۆی جووڵاو', pu: ['speed'], sky: ['#1c0808', '#6b1c10'], cap: '#ffffff', mix: { m: 0.35 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 102 },
+  { name: 'سەکۆی داڕماو', pu: ['wing'], sky: ['#141012', '#3a2a22'], cap: '#f2c14e', mix: { c: 0.4, m: 0.1 }, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 108 },
+  { name: 'دوگمە و دەروازە', pu: ['speed'], sky: ['#8fd6ff', '#dff5ff'], cap: '#58c9a0', mix: { m: 0.2 }, gate: 'btn', timed: true, hint: 'دوگمە سوورەکە دەروازە دەکاتەوە', scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 104 },
+  { name: 'سەهۆڵ', pu: ['feather'], sky: ['#ff9a6a', '#ffd9a8'], cap: '#e8fbff', mix: { i: 0.55, m: 0.12 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 100 },
+  { name: 'با', pu: ['feather'], sky: ['#16224f', '#43568f'], cap: '#ffb347', mix: { c: 0.15, m: 0.15, f: 0.12 }, wind: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 220, bpm: 112 },
+  { name: 'تفەنگ', pu: ['shield'], sky: ['#060a22', '#1b3470'], cap: '#ff8fb8', mix: { m: 0.2, c: 0.15 }, gun: true, gate: 'tgt', bumpers: true, hint: 'F: تەقە لە ئامانجەکە بکە', scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 294, bpm: 118 },
+  { name: 'هەڵبەزێنەر و پشتێن', pu: ['wing'], sky: ['#0d0912', '#2e2016'], cap: '#9a8cff', mix: { b: 0.16, v: 0.3, m: 0.12, f: 0.1 }, timed: true, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 120 },
+  { name: 'قوللەکان', pu: ['shield'], sky: ['#05071a', '#1a2348'], cap: '#7f8cff', mix: { i: 0.15, c: 0.15, m: 0.15, v: 0.1 }, gun: true, gate: 'tgt', bumpers: true, turrets: true, hint: 'تەقە لە قوللەکان بکە بۆ وەستاندنیان', scale: [0, 1, 4, 5, 7, 8, 10], root: 233, bpm: 126 },
+  { name: 'کۆتایی', pu: ['shield','wing','feather'], sky: ['#04020d', '#28093a'], cap: '#ff5a7a', mix: { c: 0.18, i: 0.15, m: 0.15, b: 0.1, v: 0.14, f: 0.08 }, gun: true, gate: 'both', timed: true, bumpers: true, turrets: true, wind: true, hint: 'هەموو شتێک پێکەوە', scale: [0, 1, 3, 5, 7, 8, 10], root: 262, bpm: 132 },
 ];
 const LEVELS = 30, PER = 3;
 CKB.worlds = WORLDS.map(w => w.name); CKB.hints = WORLDS.map(w => w.hint || '');
@@ -124,7 +124,7 @@ Object.assign(EN, {
   spectators: 'Watching', watching: 'Watching', watch: 'Watch only', play: 'Play', kick: 'Kick', toWatch: 'Move to watching', toPlay: 'Move to players',
   startRace: 'Start the race', copy: 'tap the link to copy it', copied: 'Link copied', kicked: 'The host removed you from the room', nowWatching: 'You are watching now', noSlot: 'No free place: you are watching',
   endRace: 'End the race for everyone', joinRace: 'Join the race', youPlace: 'You finished', skip: 'Enter: results', rider: 'is on your feet: shove to shake them off', hangHint: 'Jump to leap off',
-  likes: 'likes', dropN: { heart: 'a falling heart', shoe: 'a falling shoe', pot: 'a falling flowerpot' }, oldServer: 'The server is old: close start-room.bat or start-live.bat and open it again', fx: { wind: 'Gust of wind', jump: 'Super jump', bumper: 'Red bumper', shake: 'Earthquake', rocket: 'Rocket' }, liveOn: 'TikTok LIVE connected: gifts are on', liveLost: 'TikTok LIVE lost, trying again', followed: 'followed', shared: 'shared the LIVE', bodies: { core: "Earth's inner core", mantle: 'The mantle', crust: "The Earth's crust", moon: 'The Moon', earth: 'Earth', mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn', uranus: 'Uranus', neptune: 'Neptune', galaxy: 'The Milky Way', universe: 'The universe' }, levels: 'Levels', pickTitle: 'Choose your levels', startL: 'Start', finishL: 'Finish', doneL: 'Done', allL: 'All 30', levelsN: 'levels', pickHint: 'Tap a level to set the start, then the finish', menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
+  likes: 'likes', dropN: { heart: 'a falling heart', shoe: 'a falling shoe', pot: 'a falling flowerpot' }, oldServer: 'The server is old: close start-room.bat or start-live.bat and open it again', buffs: { wing: 'Double jump', speed: 'Speed', feather: 'Feather fall', shield: 'Shield' }, fx: { wind: 'Gust of wind', jump: 'Super jump', bumper: 'Red bumper', shake: 'Earthquake', rocket: 'Rocket' }, liveOn: 'TikTok LIVE connected: gifts are on', liveLost: 'TikTok LIVE lost, trying again', followed: 'followed', shared: 'shared the LIVE', bodies: { core: "Earth's inner core", mantle: 'The mantle', crust: "The Earth's crust", moon: 'The Moon', earth: 'Earth', mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn', uranus: 'Uranus', neptune: 'Neptune', galaxy: 'The Milky Way', universe: 'The universe' }, levels: 'Levels', pickTitle: 'Choose your levels', startL: 'Start', finishL: 'Finish', doneL: 'Done', allL: 'All 30', levelsN: 'levels', pickHint: 'Tap a level to set the start, then the finish', menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
   hostKeys: 'Enter: start     Tab: pick a player     V: watch / play     K: kick', guestKeys: 'V: watch / play     Esc: leave', watchKeys: 'Arrows: next climber     Esc: menu',
 });
 Object.assign(CKB, {
@@ -132,7 +132,7 @@ Object.assign(CKB, {
   spectators: 'بینەران', watching: 'سەیرکردنی', watch: 'تەنیا سەیر بکە', play: 'یاری بکە', kick: 'دەرکردن', toWatch: 'بیکە بە بینەر', toPlay: 'بیکە بە یاریزان',
   startRace: 'پێشبڕکێ دەست پێبکە', copy: 'دەست لە بەستەرەکە بدە بۆ کۆپیکردنی', copied: 'بەستەرەکە کۆپی کرا', kicked: 'خاوەنی ژوور دەریکردیت', nowWatching: 'ئێستا تۆ بینەریت', noSlot: 'شوێنی بەتاڵ نییە: تۆ بینەریت',
   endRace: 'پێشبڕکێکە بۆ هەمووان تەواو بکە', joinRace: 'بچۆ ناو پێشبڕکێکە', youPlace: 'تەواوت کرد', skip: 'Enter: ئەنجامەکان', rider: 'خۆی بە پێیەکانتەوە هەڵواسیوە: پاڵی پێوە بنێ', hangHint: 'باز بدە بۆ خۆبەردان',
-  likes: 'لایک', dropN: { heart: 'دڵێکی کەوتوو', shoe: 'پێڵاوێکی کەوتوو', pot: 'گوڵدانێکی کەوتوو' }, oldServer: 'سێرڤەرەکە کۆنە: start-room.bat یان start-live.bat دابخە و دووبارە بیکەرەوە', fx: { wind: 'بای توند', jump: 'بازی گەورە', bumper: 'تۆپی سوور', shake: 'بوومەلەرزە', rocket: 'ڕۆکێت' }, liveOn: 'تیکتۆک لایڤ پەیوەست بوو: دیارییەکان کار دەکەن', liveLost: 'لایڤ پچڕا، هەوڵ دەدەینەوە', followed: 'فۆڵۆی کرد', shared: 'لایڤەکەی شێر کرد', bodies: { core: 'ناوکی زەوی', mantle: 'بەرگی ناوەڕاستی زەوی', crust: 'توێکڵی زەوی', moon: 'مانگ', earth: 'زەوی', mars: 'مەریخ', jupiter: 'موشتەری', saturn: 'زوحەل', uranus: 'ئۆرانۆس', neptune: 'نێپتوون', galaxy: 'کاکێشان', universe: 'گەردوون' }, levels: 'ئاستەکان', pickTitle: 'ئاستەکانت هەڵبژێرە', startL: 'دەستپێک', finishL: 'کۆتایی', doneL: 'تەواو', allL: 'هەموو 30', levelsN: 'ئاست', pickHint: 'ئاستێک دابگرە بۆ دەستپێک، پاشان بۆ کۆتایی', menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
+  likes: 'لایک', dropN: { heart: 'دڵێکی کەوتوو', shoe: 'پێڵاوێکی کەوتوو', pot: 'گوڵدانێکی کەوتوو' }, oldServer: 'سێرڤەرەکە کۆنە: start-room.bat یان start-live.bat دابخە و دووبارە بیکەرەوە', buffs: { wing: 'بازی دووجار', speed: 'خێرایی', feather: 'کەوتنی سووک', shield: 'قەڵغان' }, fx: { wind: 'بای توند', jump: 'بازی گەورە', bumper: 'تۆپی سوور', shake: 'بوومەلەرزە', rocket: 'ڕۆکێت' }, liveOn: 'تیکتۆک لایڤ پەیوەست بوو: دیارییەکان کار دەکەن', liveLost: 'لایڤ پچڕا، هەوڵ دەدەینەوە', followed: 'فۆڵۆی کرد', shared: 'لایڤەکەی شێر کرد', bodies: { core: 'ناوکی زەوی', mantle: 'بەرگی ناوەڕاستی زەوی', crust: 'توێکڵی زەوی', moon: 'مانگ', earth: 'زەوی', mars: 'مەریخ', jupiter: 'موشتەری', saturn: 'زوحەل', uranus: 'ئۆرانۆس', neptune: 'نێپتوون', galaxy: 'کاکێشان', universe: 'گەردوون' }, levels: 'ئاستەکان', pickTitle: 'ئاستەکانت هەڵبژێرە', startL: 'دەستپێک', finishL: 'کۆتایی', doneL: 'تەواو', allL: 'هەموو 30', levelsN: 'ئاست', pickHint: 'ئاستێک دابگرە بۆ دەستپێک، پاشان بۆ کۆتایی', menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
   hostKeys: 'Enter: دەستپێکردن     Tab: هەڵبژاردنی یاریزان     V: بینەر / یاریزان     K: دەرکردن', guestKeys: 'V: بینەر / یاریزان     Esc: دەرچوون', watchKeys: 'تیرەکان: یاریزانی داهاتوو     Esc: مینیو',
 });
 
@@ -501,10 +501,10 @@ function stepMusic() {
 // the level's range. Level 1 already starts part-way up that range (tune.start_hard), with no easy
 // warm-up levels, and it climbs to the limit of the jump at level 30.
 const PW = 30, PH = 38;
-let plats = [], bumpers = [], rests = [], gates = [], targets = [], turrets = [], stars = [], decor = [], route = [], SUMMIT = 0;
+let plats = [], bumpers = [], rests = [], gates = [], targets = [], turrets = [], stars = [], pickups = [], decor = [], route = [], SUMMIT = 0;
 function pickKind(mix, roll) { let a = 0; for (const k in mix) { a += mix[k]; if (roll < a) return k; } return 'n'; }
 function buildTower(mode) {
-  plats = []; bumpers = []; rests = []; gates = []; targets = []; turrets = []; stars = [];
+  plats = []; bumpers = []; rests = []; gates = []; targets = []; turrets = []; stars = []; pickups = [];
   const size = mode === 0 ? tune.easy_size : mode === 2 ? tune.hard_size : 1;
   const add = p => { p.x0 = p.x; p.dx = 0; p.gone = 0; p.shake = 0; p.squash = 0; plats.push(p); return p; };
   let alt = 0, cx = W / 2;
@@ -536,6 +536,7 @@ function buildTower(mode) {
       { const tr = fixedRng(9000 + L * 53 + i * 7); if (i > 0 && (kind === 'n' || kind === 'c' || kind === 'i') && pw <= 200 && i !== t0 - 1 && tr() < tune.tilt_share) p.tilt = (tr() < 0.5 ? -1 : 1) * Math.tan(lerp(tune.tilt_min, tune.tilt_max, tr()) * PI / 180); } // a leaning ledge: its slope, the rise per pixel to the right
       main.push(p); lastDir = dir; after = kind === 'b' || kind === 'f'; prevKind = kind;
     }
+    { const kinds = Wd.pu || []; if (kinds.length && (inW === PER - 1 || (w === WORLDS.length - 1 && inW >= 1))) { const pr = fixedRng(7000 + L * 17), j = main[Math.floor(n * (0.35 + pr() * 0.3))]; pickups.push({ x: j.x + j.w / 2, alt: j.alt + 72, kind: kinds[(L + w) % kinds.length], taken: 0, level: L + 1 }); } } // a power-up only where it helps: in a world's hardest level, the kind that world calls for
     stars.push({ x: main[Math.floor(n * 0.8)].x + main[Math.floor(n * 0.8)].w / 2, alt: main[Math.floor(n * 0.8)].alt + 128, taken: false, level: L + 1 }); // a star a full jump above a late ledge
     const gk = Wd.gate && (Wd.gate !== 'btn' || inW >= 1 || w > 3) ? Wd.gate : null;
     if (gk) { // a gate across the tower under the level's end: a button opens it, or a shot at its target, or both
@@ -629,6 +630,7 @@ function letGo(leap, quiet) { // off their feet: with a leap when you jumped, wi
 }
 function hitMe(dir, from) { // another climber shoved you: off whatever feet you hold, and away
   if (scene !== 'play' || state.count > 0 || game.fin) return;
+  if (shieldBlocks()) return;
   if (P.hang) letGo(false, true);
   P.vx = dir * tune.push_speed; P.vy = 300; P.on = null; P.coy = 0; P.cut = false; P.stun = 0.35; state.shake = 0.18; sfx.bump();
   sparks(P.x + PW / 2, P.alt + 20, 14, '#ffffff'); ring(P.x + PW / 2, P.alt + 20, '#ffffff', 56); events.push(['pushed', from]);
@@ -821,6 +823,7 @@ function reset(from) {
   for (const t of targets) t.hit = false;
   for (const t of turrets) { t.sleep = 0; t.next = 0; }
   for (const s of stars) s.taken = false;
+  for (const p of pickups) p.taken = 0; for (const k of PU_KINDS) buffs[k] = 0;
   const lp = Number(params.get('level')) || 1; let n = clamp(lp - 1, 0, LEVELS - 1);
   if (from) { n = clamp(from.top, 0, LEVELS - 1); state.time = state.lt = from.cs / 100; state.falls = from.falls; state.stars = from.stars || 0; state.started = true; }
   const start = rests[n]; for (let i = 0; i <= n; i++) rests[i].seen = true;
@@ -849,7 +852,7 @@ function land(p) {
   P.alt = topAt(p, cx); P.last = P.alt; P.whistled = false;
   if (hard) { state.falls++; state.shake = 0.3; sfx.thud(); puff(cx, P.alt, 12, '#ffffff', 220); ring(cx, P.alt, '#ffffff', 96, 0.45); popText('-' + metres(drop), cx, P.alt + 70, '#ff8a96', 30); events.push(['fall', metres(drop)]); }
   if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(cx, P.alt, 6, '#ff8fd8'); ring(cx, P.alt, '#ff8fd8', 70); return; } // a bouncer throws you straight back up
-  P.on = p; P.vy = 0; P.squash = 0.22;
+  P.on = p; P.vy = 0; P.squash = 0.22; P.airJump = true;
   if (p.kind === 'n' && thingOf(p) === 'piano') pianoAt(p, cx, true); // a chord, where you came down on the keys
   else { const snd = thingSound(p); if (snd && !(p === live.sndOn && state.t - live.sndT < 0.6)) { live.sndOn = p; live.sndT = state.t; THING_SFX[snd](1); fxSend({ k: 'snd', s: snd, a: Math.round(P.alt) }); } } // a bed springs, a car honks...
   if (!hard) { sfx.land(); puff(cx, P.alt, 4, 'rgba(255,255,255,0.8)', 70); }
@@ -882,6 +885,7 @@ function finish() {
   sfx.win(); confetti(W / 2, P.alt + 60, 90); events.push(['summit', cs, state.falls, state.code]); scene = 'results';
 }
 function knock(fromX, y) { // thrown away from what hit you, and down
+  if (shieldBlocks()) return;
   if (P.hang) letGo(false, true);
   P.vx = (P.x + PW / 2 >= fromX ? 1 : -1) * tune.bump_push; P.vy = -220; P.on = null; P.coy = 0; P.cut = false; P.stun = tune.bump_stun;
   state.shake = 0.2; sfx.bump(); puff(fromX, y, 8, '#ff3b4e', 220); sparks(fromX, y, 10, '#ff3b4e'); events.push(['bump']);
@@ -960,12 +964,13 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
   const dir = P.stun > 0 || state.count > 0 ? 0 : (right ? 1 : 0) - (left ? 1 : 0);
   if (dir) P.face = dir;
   const acc = P.on ? (P.on.kind === 'i' ? tune.ice_accel : tune.ground_accel) : tune.air_accel;
-  const want = dir * tune.move_speed * (load ? tune.carry_run : 1), dv = want - P.vx, md = acc * dt; // with someone on your feet you run slower and jump lower
+  const want = dir * tune.move_speed * (load ? tune.carry_run : 1) * (buffs.speed > 0 ? tune.buff_speed_mult : 1), dv = want - P.vx, md = acc * dt; // with someone on your feet you run slower and jump lower
   if (!(P.stun > 0)) P.vx += Math.abs(dv) <= md ? dv : Math.sign(dv) * md;
   if (P.on) { P.x += P.on.dx; if (P.on.kind === 'v') P.x += P.on.a * dt; } // carried by what you stand on
   if (P.buf > 0) P.buf -= dt;
   if (P.coy > 0) P.coy -= dt;
-  if (P.buf > 0 && (P.on || P.coy > 0)) {
+  if (P.buf > 0 && (P.on || P.coy > 0 || (buffs.wing > 0 && P.airJump))) {
+    if (!P.on && !(P.coy > 0)) { P.airJump = false; P.vx *= 0.6; sfx.swing(); ring(P.x + PW / 2, P.alt, '#e9f4ff', 60); puff(P.x + PW / 2, P.alt, 6, '#ffffff', 120); } // the wing's jump in the air
     if (P.on) P.vx = clamp(P.vx + (P.on.kind === 'v' ? P.on.a : P.on.dx / dt), -380, 380); // a jump keeps the speed of what it leaves
     P.vy = tune.jump_speed * (load ? Math.pow(tune.carry_jump, Math.min(load, 3)) : 1) * (live.jumps > 0 ? tune.gift_jump : 1); if (live.jumps > 0) { live.jumps--; sparks(P.x + PW / 2, P.alt, 10, UI.gold); } P.on = null; P.coy = 0; P.buf = 0; P.cut = true; P.squash = -0.25; sfx.jump(); puff(P.x + PW / 2, P.alt, 4, 'rgba(255,255,255,0.7)', 80); } // late and early presses both count
   if (P.cut && !jumpHeld && P.vy > 0) { P.vy *= tune.jump_cut; P.cut = false; } // let go early for a hop
@@ -1010,6 +1015,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
   } else {
     P.vy -= (P.vy > 0 ? tune.gravity : tune.gravity * tune.fall_mult) * (jumpHeld && Math.abs(P.vy) < tune.hang_speed ? tune.hang_mult : 1) * dt; // a held jump hangs a moment at its top
     for (const p of plats) if (p.kind === 'f' && P.alt > p.alt && P.alt - p.alt < tune.fan_height && P.x + PW > p.x && P.x < p.x + p.w) { if (P.vy < tune.fan_speed) P.vy = Math.min(tune.fan_speed, P.vy + 5200 * dt); P.cut = false; break; } // a fan's column carries you up
+    if (buffs.feather > 0 && P.vy < 0) { P.vy += tune.gravity * tune.fall_mult * (1 - tune.buff_feather_g) * dt; if (P.vy < -tune.max_fall * 0.45) P.vy = -tune.max_fall * 0.45; } // the feather: a slow, gentle fall
     if (P.vy < -tune.max_fall) P.vy = -tune.max_fall;
     P.alt += P.vy * dt;
     if (P.vy > 0) { // rising: a shut gate stops your head
@@ -1072,8 +1078,8 @@ function drawDecor(starsOnly) { // clouds low down, stars high up, drifting slow
 // passes them one after another, each named faintly beneath. None of it touches the game.
 const BODIES = [
   { k: 'core', w: 0, at: 0.3, x: 360, r: 250, name: 'core' }, { k: 'mantle', w: 1, at: 0.5, x: 360, r: 320, name: 'mantle' }, { k: 'crust', w: 2, at: 0.45, x: 360, r: 320, name: 'crust' },
-  { k: 'sun', w: 3, at: 0.45, x: 590, r: 56 }, { k: 'plane', w: 3, at: 0.95, x: 0, r: 30 }, { k: 'sunset', w: 4, at: 0.5, x: 170, r: 95 },
-  { k: 'moon', w: 4, at: 1.05, x: 570, r: 44, cres: true }, { k: 'moon', w: 5, at: 0.5, x: 190, r: 115, name: 'moon' },
+  { k: 'sun', w: 3, at: 0.2, x: 590, r: 56 }, { k: 'plane', w: 3, at: 0.95, x: 0, r: 30 }, { k: 'sunset', w: 4, at: 0.95, x: 170, r: 95 },
+  { k: 'moon', w: 5, at: 0.05, x: 570, r: 44, cres: true }, { k: 'moon', w: 5, at: 0.85, x: 190, r: 115, name: 'moon' },
   { k: 'earth', w: 6, at: 0.25, x: 390, r: 230, name: 'earth' }, { k: 'mars', w: 6, at: 0.9, x: 540, r: 88, name: 'mars' },
   { k: 'jupiter', w: 7, at: 0.5, x: 220, r: 150, name: 'jupiter' }, { k: 'saturn', w: 8, at: 0.28, x: 480, r: 90, name: 'saturn' },
   { k: 'uranus', w: 8, at: 0.68, x: 170, r: 46, name: 'uranus' }, { k: 'neptune', w: 8, at: 0.95, x: 560, r: 44, name: 'neptune' },
@@ -1540,6 +1546,7 @@ function drawWorld() {
   for (const tg of targets) { const y = sy(tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp); if (vis(y)) drawTarget(tg.x, y, tg.hit); }
   for (const tr of turrets) { const y = sy(tr.alt); if (vis(y)) drawTurret(tr.x, y, tr.dir, tr.sleep > 0, t); }
   for (const s of stars) { const y = sy(s.alt); if (!s.taken && vis(y)) drawStar(s.x, y, t); }
+  for (const p of pickups) { const y = sy(p.alt); if (vis(y)) drawPickup(p, y, t); }
   for (const b of bumpers) { const y = sy(b.alt + Math.sin(t * 2 + b.phase) * 30); if (vis(y)) drawBumper(b.x, y, t, 1, b.off > 0); }
   for (const o of orbs) drawOrb(o.x, sy(o.alt), t);
   for (const s of shots) { // the blaster's shot, with a short tail of light
@@ -1560,6 +1567,7 @@ function drawWorld() {
     }
     if (!P.on && !P.hang && Math.abs(P.vy) > 820) for (let k = 3; k >= 1; k--) { ctx.globalAlpha = 0.2 - k * 0.04; dot(px - P.vx * 0.012 * k, py - 22 + P.vy * 0.012 * k, 17, col); } // thrown fast: an after-image behind you
     ctx.globalAlpha = 1;
+    drawShield(px, py, t);
     drawClimber(px, py, P.face, P.squash, P.vx, P.on ? 0 : P.vy, t, 1, state.gun && scene !== 'title', col, !!P.hang);
     if (racing && !game.fin && scene !== 'board') { ctx.fillStyle = UI.gold; ctx.beginPath(); ctx.moveTo(px - 9, py - 62); ctx.lineTo(px + 9, py - 62); ctx.lineTo(px, py - 50); ctx.fill(); } // among many climbers, a gold arrow marks you
   }
@@ -1908,7 +1916,7 @@ const scenes = {
       state.t += dt;
       state.holdR = down.has('KeyR') ? state.holdR + dt : 0; // held, so a slip of the finger never ends a climb
       if (state.holdR >= 0.8 && game.kind === 'solo') { events.push(['restart']); save.run = null; store(); startSolo(); return; }
-      stepWorld(dt); stepPlayer(dt); liveStep(dt); stepOthers(dt); raceTick(dt); if (scene === 'play') { playWorld(state.world - 1); stepMusic(dt); }
+      stepWorld(dt); stepPlayer(dt); liveStep(dt); buffStep(dt); stepOthers(dt); raceTick(dt); if (scene === 'play') { playWorld(state.world - 1); stepMusic(dt); }
     },
     draw() { drawWorld(); hud(); },
   },
@@ -2099,6 +2107,58 @@ function thingSound(p) { // which sound a ledge makes, if any of its own
   return null;
 }
 
+// ---- Power-ups: bubbles above the ledges that give a buff for a while -------------------------
+// Only where it helps: each world names the kinds that help with what it brings (WORLDS[w].pu), and its
+// hardest level holds one (the last world two). Take it and for a time you have: a second jump in the air
+// (wing), quicker legs (speed), a slow gentle fall (feather) or a bubble that stops one hit (shield). A taken one comes back after tune.pickup_back
+// seconds; in a room the first to reach it takes it, for everyone.
+const PU_KINDS = ['wing', 'speed', 'feather', 'shield'], PU_COL = { wing: '#e9f4ff', speed: '#ffd44f', feather: '#9fe3ff', shield: '#5fe0d0' };
+const buffs = { wing: 0, speed: 0, feather: 0, shield: 0 };
+const buffTime = k => tune['buff_' + k];
+function drawBuffIcon(k, x, y, r) { // the mark of each buff, drawn to fit a circle of radius r
+  ctx.save(); ctx.translate(x, y); ctx.scale(r / 20, r / 20); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+  if (k === 'wing') { ctx.fillStyle = '#ffffff'; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * 2, 4); ctx.quadraticCurveTo(d * 16, 2, d * 17, -12); ctx.quadraticCurveTo(d * 11, -8, d * 9, -4); ctx.quadraticCurveTo(d * 8, 2, d * 2, 4); ctx.fill(); ctx.stroke(); } }
+  else if (k === 'speed') { ctx.fillStyle = '#ffd44f'; ctx.beginPath(); ctx.moveTo(4, -15); ctx.lineTo(-8, 2); ctx.lineTo(-1, 2); ctx.lineTo(-5, 15); ctx.lineTo(8, -3); ctx.lineTo(1, -3); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  else if (k === 'feather') { ctx.fillStyle = '#bfefff'; ctx.beginPath(); ctx.moveTo(-10, 14); ctx.quadraticCurveTo(-8, -6, 10, -14); ctx.quadraticCurveTo(8, 4, -10, 14); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-12, 16); ctx.lineTo(6, -8); ctx.stroke(); }
+  else if (k === 'shield') { ctx.fillStyle = '#5fe0d0'; ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(12, -9); ctx.quadraticCurveTo(12, 8, 0, 15); ctx.quadraticCurveTo(-12, 8, -12, -9); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(-7, -8, 4, 10); }
+  ctx.restore();
+}
+function drawPickup(p, y, t) { // a bubble bobbing above the ledge, the buff's mark inside
+  if (p.taken > 0) return; const by = y + Math.sin(t * 3 + p.x) * 6, c = PU_COL[p.kind];
+  glow(p.x, by, 46, 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(p.x, by, 22, 0, 7); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill(); ctx.strokeStyle = c; ctx.lineWidth = 3.5; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.ellipse(p.x - 8, by - 10, 6, 3.5, -0.6, 0, 7); ctx.fill();
+  drawBuffIcon(p.kind, p.x, by + 1, 14);
+}
+function takePickup(p, mine) { // a power-up taken: by you, or by someone else in the room
+  p.taken = tune.pickup_back; puff(p.x, p.alt, 10, PU_COL[p.kind], 200);
+  if (!mine) return;
+  buffs[p.kind] = buffTime(p.kind); if (p.kind === 'wing') P.airJump = true;
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.1, 0, i * 0.05)); ring(P.x + PW / 2, P.alt + 20, PU_COL[p.kind], 70);
+  popText(K.buffs[p.kind], P.x + PW / 2, P.alt + 90, PU_COL[p.kind]); events.push(['buff', p.kind]);
+  fxSend({ k: 'pu', n: pickups.indexOf(p), a: Math.round(p.alt) });
+}
+function buffStep(dt) { // the buffs run down; power-ups come back; take what you touch
+  for (const k of PU_KINDS) if (buffs[k] > 0) { buffs[k] -= dt; if (buffs[k] <= 0) { buffs[k] = 0; tone(784, 0.12, 'sine', 0.07); tone(523, 0.16, 'sine', 0.06, 0, 0.08); } }
+  for (const p of pickups) if (p.taken > 0) p.taken -= dt;
+  if (scene !== 'play' || game.spec || game.fin || state.count > 0) return;
+  const pcx = P.x + PW / 2, pcy = P.alt + PH / 2;
+  for (const p of pickups) if (!(p.taken > 0) && Math.abs(p.x - pcx) < 34 && Math.abs(p.alt - pcy) < 46) takePickup(p, true);
+}
+function shieldBlocks() { // a hit the shield takes instead of you; true when it did
+  if (!(buffs.shield > 0)) return false;
+  buffs.shield = 0; sfx.hitTarget(); ring(P.x + PW / 2, P.alt + 20, '#5fe0d0', 80); sparks(P.x + PW / 2, P.alt + 20, 14, '#5fe0d0'); events.push(['shield']); return true;
+}
+function drawBuffs(y) { // the buffs you have, each with a ring that runs out with it; returns where the next row may go
+  const on = PU_KINDS.filter(k => buffs[k] > 0); if (!on.length) return y;
+  on.forEach((k, i) => { const x = 50 + i * 54, f = clamp(buffs[k] / buffTime(k), 0, 1);
+    ctx.beginPath(); ctx.arc(x, y + 22, 22, 0, 7); ctx.fillStyle = 'rgba(10,12,20,0.7)'; ctx.fill();
+    ctx.strokeStyle = PU_COL[k]; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y + 22, 20, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke();
+    drawBuffIcon(k, x, y + 22, 12); });
+  return y + 52;
+}
+function drawShield(px, py, t) { if (!(buffs.shield > 0)) return; ctx.strokeStyle = `rgba(95,224,208,${0.55 + 0.25 * Math.sin(t * 6)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py - 22, 32, 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(95,224,208,0.12)'; ctx.fill(); }
+
 // ---- What a room shares besides where everyone is ---------------------------------------------------
 // In a room's race these go to everyone: the piano's notes (quieter the farther away), a crate starting to
 // give, a blaster's shot (only to see: it hurts nobody), a red bumper or a turret shot out, and the chaos of
@@ -2112,7 +2172,8 @@ function climbersNow(all) { // you, and with all the others climbing in the room
 function shareGift(k) { const sh = (CONFIG.gifts && CONFIG.gifts.share) || 'chaos'; return sh === 'all' || (sh === 'chaos' && ['wind', 'bumper', 'shake', 'drop'].includes(k)); }
 function onFx(m) { // something another climber did
   const far = P ? Math.abs((Number(m.a) || P.alt) - P.alt) : 0, near = clamp(1 - far / 1200, 0.12, 1);
-  if (m.k === 'snd') { if (THING_SFX[m.s] && audio && !muted) THING_SFX[m.s](near * 0.8); }
+  if (m.k === 'pu') { const p = pickups[m.n]; if (p && !(p.taken > 0)) takePickup(p, false); }
+  else if (m.k === 'snd') { if (THING_SFX[m.s] && audio && !muted) THING_SFX[m.s](near * 0.8); }
   else if (m.k === 'pn') pianoPlay(clamp(Math.round(m.i) || 0, 0, PIANO_STEPS.length - 1), !!m.c, near);
   else if (m.k === 'cr') { const p = plats[m.n]; if (p && p.kind === 'c' && !p.shake && !(p.gone > 0)) { p.shake = tune.crumble_delay; if (near > 0.5) sfx.crack(); } }
   else if (m.k === 'sh') { shots.push({ x: Number(m.x) || 0, alt: Number(m.a) || 0, vx: (m.d < 0 ? -1 : 1) * tune.shot_speed, remote: true }); if (near > 0.6) sfx.shot(); }
@@ -2162,7 +2223,7 @@ function applyGift(m) { // one gift, now: what it does, a line in the feed, and 
   else if (k === 'bumper') { // red bumpers by every climber, at the same places on every screen
     const spots = m.spots || climbersNow(share).flatMap(c => Array.from({ length: Math.min(n, 3) }, (_, i) => ({ x: Math.round(clamp(c.x + c.face * (80 + i * 70), 40, W - 40)), alt: Math.round(c.alt + 150 + i * 60) })));
     spots.forEach((p, i) => bumpers.push({ x: p.x, alt: p.alt, phase: i, cool: 0.6, off: 0, gift: tune.gift_bumper_time })); out.spots = spots; sfx.bump(); }
-  else if (k === 'shake') { state.shake = 0.8; sfx.thud(); if (P.hang) letGo(false, true); if (P.on) { P.on = null; P.vy = 380; P.vx = (P.face || 1) * -220; P.coy = 0; P.cut = false; P.stun = 0.3; } }
+  else if (k === 'shake') { state.shake = 0.8; sfx.thud(); if (!shieldBlocks()) { if (P.hang) letGo(false, true); if (P.on) { P.on = null; P.vy = 380; P.vx = (P.face || 1) * -220; P.coy = 0; P.cut = false; P.stun = 0.3; } } }
   else { if (P.hang) letGo(false, true); P.on = null; P.coy = 0; P.cut = false; P.stun = 0; P.vy = tune.gift_rocket; live.rocket = 1.2; sfx.go(); ring(cx, P.alt, '#ffb347', 90); }
   if (k !== 'wind' && k !== 'jump') { live.big = { s1: K.fx[k], s2: m.user, t: 1.8 }; }
   events.push(['gift', m.user, m.gift, n, m.d, k]);
@@ -2224,7 +2285,7 @@ function drawDrops() {
 }
 function drawLive() { // the falling things, the likes counter and the gift feed down the left, and a banner for a big gift
   drawDrops();
-  let y = dev.on ? 132 : 92; ctx.textBaseline = 'middle';
+  let y = drawBuffs(dev.on ? 132 : 92); ctx.textBaseline = 'middle';
   if (live.likesSeen) { pill(30, y, 150, 32, 'rgba(120,20,50,0.78)'); ctx.save(); ctx.translate(48, y + 16); ctx.scale(0.5, 0.5); ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.moveTo(0, 16); ctx.bezierCurveTo(-26, -2, -16, -24, 0, -10); ctx.bezierCurveTo(16, -24, 26, -2, 0, 16); ctx.fill(); ctx.restore(); ctx.font = `bold 16px ${FONT}`; ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffe0ea'; ctx.fillText(`${live.likes} / ${tune.like_drop}`, 64, y + 17); y += 38; } // the likes, and how many until the next drop
   for (const f of live.feed) { ctx.globalAlpha = clamp(f.t, 0, 1); ctx.font = `bold 16px ${FONT}`; const s = fitText(f.s, W - 140, 16), w = ctx.measureText(s).width + 24; pill(30, y, w, 32, 'rgba(10,12,20,0.7)'); ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = f.c; ctx.fillText(s, 42, y + 17); y += 38; }
   ctx.globalAlpha = 1;

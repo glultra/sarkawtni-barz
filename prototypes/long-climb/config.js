@@ -75,6 +75,15 @@ window.CONFIG = {
   bot_slip: { value: 0.05, min: 0, max: 0.4, step: 0.01 },       // chance a bot slips after a jump on level 1; it grows with the levels
   room_size: { value: 8, min: 2, max: 25, step: 1 },
 
+  // Power-ups: a bubble in each world's hardest level, of a kind that helps there (WORLDS[w].pu in index.html)
+  pickup_back: { value: 30, min: 3, max: 120, step: 1 },          // seconds before a taken one comes back
+  buff_wing: { value: 8, min: 2, max: 60, step: 1 },             // seconds of double jump
+  buff_speed: { value: 6, min: 2, max: 60, step: 1 },             // seconds of speed
+  buff_speed_mult: { value: 1.5, min: 1.1, max: 2.5, step: 0.05 }, // how much faster you run
+  buff_feather: { value: 6, min: 2, max: 60, step: 1 },           // seconds of feather fall
+  buff_feather_g: { value: 0.45, min: 0.15, max: 0.9, step: 0.05 }, // gravity on the way down, as a share of the usual
+  buff_shield: { value: 12, min: 2, max: 60, step: 1 },           // seconds the shield lasts, if nothing hits it first
+
   // TikTok LIVE gifts (start-live.bat): each gift does one thing. By its worth in diamonds: a gift worth
   // at least the number does that, the highest that fits. Or by its name, which wins over its worth.
   // The things: 'wind' a gust that pushes you, 'jump' super jumps, 'bumper' red bumpers by you,
