@@ -186,6 +186,11 @@ function onGift(d) {
   console.log('gift: ' + who + ' sent ' + name + (n > 1 ? ' x' + n : '') + ' (' + dia + ' diamonds each)');
   liveAll({ t: 'gift', user: who, gift: name, n, d: dia });
 }
+// Your Euler Stream API key, if you have one, raises the limits on reading a LIVE. Put it in a .env file beside
+// this one, as the line  SIGN_API_KEY=your-key  (.env is kept out of git and the server never sends it to a browser),
+// or set SIGN_API_KEY yourself. Without one the free limits apply.
+try { if (fs.existsSync(path.join(ROOT, '.env'))) process.loadEnvFile(path.join(ROOT, '.env')); } catch (e) { console.log('.env could not be read: ' + e.message); }
+const SIGN_KEY = String(process.env.SIGN_API_KEY || '').trim();
 async function startTikTok() {
   let lib;
   try { lib = await import('tiktok-live-connector'); } catch (e) { console.log('TikTok LIVE: the tiktok-live-connector package is not installed. Run start-live.bat, or in this folder: npm install'); setLive('missing'); return; }
@@ -193,9 +198,10 @@ async function startTikTok() {
   if (!Conn) { console.log('TikTok LIVE: this version of tiktok-live-connector is not one this server knows.'); setLive('missing'); return; }
   let wait = 5000, timer = null;
   const again = why => { if (timer) return; setLive('lost'); console.log('TikTok LIVE: ' + why + ' Trying again in ' + Math.round(wait / 1000) + ' s.'); timer = setTimeout(() => { timer = null; go(); }, wait); wait = Math.min(wait * 2, 60000); };
+  console.log(SIGN_KEY ? 'TikTok LIVE: using your API key (SIGN_API_KEY).' : 'TikTok LIVE: no API key (no SIGN_API_KEY in .env): the free limits apply.');
   const go = () => {
     let conn;
-    try { conn = new Conn(TIKTOK, { enableExtendedGiftInfo: true }); } catch (e) { again('could not start (' + e.message + ').'); return; }
+    try { conn = new Conn(TIKTOK, Object.assign({ enableExtendedGiftInfo: false }, SIGN_KEY ? { signApiKey: SIGN_KEY } : {}) /* the full gift list needs a signed request Euler keeps for its Business plan; each gift message carries its own name and worth */); } catch (e) { again('could not start (' + e.message + ').'); return; }
     conn.on(EV.GIFT || 'gift', d => { try { onGift(d); } catch (e) { console.error('gift error:', e.message); } });
     conn.on(EV.FOLLOW || 'follow', d => liveAll({ t: 'cheer', user: viewer(d), what: 'follow' }));
     conn.on(EV.SHARE || 'share', d => liveAll({ t: 'cheer', user: viewer(d), what: 'share' }));

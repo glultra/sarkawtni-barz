@@ -63,6 +63,10 @@ After play: remove the star magnet; reduce the others and bring them only where 
 
 After play: sometimes i want to go up on a moving car but i go through it and fall
 
+After play: my friend said this game has no anxiety or enjoyment; a fear-and-drama update was made (fewer floors, heartbeat, slow motion, big-fall cost, a voice) and rolled back: "it is not nice, only show the highest point"
+
+After play: remove the highest point as well; the TikTok API key goes in an .env file (SIGN_API_KEY)
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -110,6 +114,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A level picker (the Levels button on the menu, or the room's Levels box for its host): the ten worlds in rows of three, tap the first level and then the last; it sets where a climb alone, a race with the bots and a room's race start and end. Only a climb of the whole tower gives a finish code and a best time
 - [x] From the bottom of the Earth to the universe: the first three worlds are underground (the inner core, the mantle, the crust and its caves) with mine carts, barrels and wooden scaffolds to stand on (a moving ledge there is a rolling mine cart), each with its sound; the surface comes at level 10, then furniture, vehicles and aircraft as before
 - [x] Power-ups, only where they help: one in each world's hardest level (two in the last, none in the first), of the kind that world calls for: speed for moving ledges and timed ones, double jump for crumbling crates and bouncers, feather fall for ice and wind, a shield for bumpers and turrets. Each a buff for a while with a ring on screen that runs down: double jump 8 s, speed 6 s, feather fall 6 s, a shield that stops one hit 12 s; a taken one comes back after 30 s; in a room the first to reach it takes it for everyone
+
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
 - [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
 - [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right
@@ -181,6 +186,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - 2D with this idea will be perfect for me *(you said)*
 
 ## Avoid
+- More fear and drama: fewer floors, a heartbeat, darkening edges, slow motion, big-fall banners, a taunting voice (tried, "not nice")
 - duel maybe not makes sense
 - fully 3D: i hate this one
 - the game or the idea shouldn't be short
