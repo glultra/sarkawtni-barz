@@ -33,6 +33,10 @@ After play: i don't like zurna try smth  simple and relaxful
 
 After play: allow me to start level from anywhere i want till end please ! while creating the room for example i just wanna play the hard levels or allow me to select which level i play ! please nice ui  menu i need
 
+After play: about the backgrounds can u show moon, earth, jupiter, other planets step by step ? then galaxies and universes idk i just like to see them ! and i prefer adding real world items for the parkour like cars, plance and some other furnitures ...
+
+After play: add a dev mode where i can see the entire map maybe by opening command promp with tilda` key then enable dev mode
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -51,7 +55,7 @@ After play: allow me to start level from anywhere i want till end please ! while
   - Camera and scale: side view, tall 9:16 screen for TikTok, following the climber with more view above than below.
   - Shapes: chunky and rounded; a small round climber with a red scarf; platforms with thick outlines.
   - Values: the climber and what you can stand on are the brightest things; the sky behind stays soft.
-  - Palette: the sky changes every zone (green garden, white clouds, orange sunset, deep blue night, starry top), so height reads at a glance. Hazards are red; safe rest floors are gold.
+  - Palette: the sky changes every world (blue garden, sunset, dusk, night, then space), so height reads at a glance. Far off, the climb passes the sun, a plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus and Neptune, the Milky Way and the universe, each named faintly. Hazards are red; safe rest floors are gold.
   - Detail: on the climber, the platforms and the height bar; the background stays quiet.
   - Signature: a slim height bar down the side with every level marked, where you are and your best.
   - Every figure drawn, no emoji, no plain circles.
@@ -78,6 +82,9 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 ## Features
 - [x] A tall tower of thirty levels in ten worlds of three, each world adding its own idea, the last one ultimate; no easy levels
 - [x] A level picker (the Levels button on the menu, or the room's Levels box for its host): the ten worlds in rows of three, tap the first level and then the last; it sets where a climb alone, a race with the bots and a room's race start and end. Only a climb of the whole tower gives a finish code and a best time
+- [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
+- [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
+- [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
 - [x] Each level's end cheers louder the higher you are, shows how long the level took, and the end of a world gets a bigger cheer
 - [x] Three difficulties, picked on the title: easy, normal, hard
 - [x] Machines in some worlds: a button that opens the level's gate, a plate that makes timed ledges solid
