@@ -23,7 +23,8 @@ window.CONFIG = {
 
   hang_speed: { value: 110, min: 0, max: 300, step: 10 },         // near the top of a held jump (slower than this) you hang a moment
   hang_mult: { value: 0.55, min: 0.2, max: 1, step: 0.05 },       // gravity is this much weaker while you hang
-  edge: { value: 1, min: -8, max: 8, step: 1 },                   // pixels of a ledge's edge that do not hold you; below 0 is forgiving
+  edge: { value: 1, min: -8, max: 8, step: 1 },
+  car_snap: { value: 18, min: 0, max: 40, step: 1 },             // feet this far under a car's top, falling, are lifted onto it: no slipping through a moving car                   // pixels of a ledge's edge that do not hold you; below 0 is forgiving
 
   // Running
   move_speed: { value: 260, min: 150, max: 420, step: 10 },      // pixels per second

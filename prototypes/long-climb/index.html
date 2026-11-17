@@ -1022,7 +1022,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
       for (const g of gates) if (!g.open && prev + PH <= g.alt && P.alt + PH > g.alt) { P.alt = g.alt - PH; P.vy = -140; P.cut = false; sfx.bonk(); hint(g.needBtn && !g.btn ? K.needBtn : K.needTgt); break; }
     } else { // falling: the highest ledge your feet pass through catches you
       let hitP = null;
-      for (const p of plats) if (solid(p) && prev >= topAt(p, P.x + PW / 2) - 0.01 && P.alt <= topAt(p, P.x + PW / 2) && P.x + PW > p.x - extOf(p) + tune.edge && P.x < p.x + p.w + extOf(p) - tune.edge && (!hitP || topAt(p, P.x + PW / 2) > topAt(hitP, P.x + PW / 2))) hitP = p;
+      for (const p of plats) if (solid(p) && prev >= topAt(p, P.x + PW / 2) - (p.kind === 'm' ? tune.car_snap : 0) - 0.01 && P.alt <= topAt(p, P.x + PW / 2) && P.x + PW > p.x - extOf(p) + tune.edge && P.x < p.x + p.w + extOf(p) - tune.edge && (!hitP || topAt(p, P.x + PW / 2) > topAt(hitP, P.x + PW / 2))) hitP = p;
       if (hitP) land(hitP);
       else if (!P.whistled && P.last - P.alt > tune.fall_min * 40) { P.whistled = true; sfx.whistle(); }
     }

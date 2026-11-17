@@ -61,6 +61,8 @@ After play: add buff timers, modifiers, like a double jump or a boost
 
 After play: remove the star magnet; reduce the others and bring them only where needed (no shields in the first levels), make each reasonable to use
 
+After play: sometimes i want to go up on a moving car but i go through it and fall
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -111,7 +113,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
 - [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
 - [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right
-- [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers; the whole car is solid as drawn: you stand on the roof or step down onto the hood or the boot
+- [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers; the whole car is solid as drawn: you stand on the roof or step down onto the hood or the boot; feet a little under a car's top while falling are lifted onto it (car_snap, 18 px), so a jump that falls just short or a car that drives into you no longer lets you slip through
 - [x] Each thing sounds like itself when you land on it, and the room hears it: a bed springs, a sofa puffs, wood knocks, a counter clinks, a car honks, a bus horns and sighs its brakes, a truck and a van honk, a plane whooshes, a rocket clangs, a satellite beeps, ice tinkles; crates come back after 1.2 seconds
 - [x] The climber has arms in blue sleeves with white cartoon mittens and short legs with big brown shoes: hands at the sides standing, swinging and striding running, both arms up jumping, flailing falling; the arms come from behind the body, so the shoulders are clean
 - [x] A room shares more than where everyone is: the piano's notes (quieter the farther away), crates giving way, blaster shots (to see; they hurt nobody), red bumpers and turrets shot out, and every gift and like of the streamer's for everyone (gifts.share in config.js: all, chaos or none); gift bumpers and falling things are placed once, by every climber, and stand at the same places on every screen; positions go out 30 times a second with speeds, so friends are shown where they are now; a game newer than its server says so
