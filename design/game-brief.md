@@ -55,6 +55,8 @@ After play: a bit slow and not correct; make the gifts for all (friends lag, eff
 
 After play: the breakable boxes come back too late; the moving cars are not collided nicely, i can't even go on the edges, make a nice rigidbody 2d for the furnitures; for some furnitures add custom sounds, a bed sound, a car horn
 
+After play: start the map from the bottom of the earth then to the universe, this makes more sense
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -73,7 +75,7 @@ After play: the breakable boxes come back too late; the moving cars are not coll
   - Camera and scale: side view, tall 9:16 screen for TikTok, following the climber with more view above than below.
   - Shapes: chunky and rounded; a small round climber with a red scarf; platforms with thick outlines.
   - Values: the climber and what you can stand on are the brightest things; the sky behind stays soft.
-  - Palette: the sky changes every world (blue garden, sunset, dusk, night, then space), so height reads at a glance. Far off, the climb passes the sun, a plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus and Neptune, the Milky Way and the universe, each named faintly. Hazards are red; safe rest floors are gold.
+  - Palette: the climb goes from the centre of the Earth to the edge of the universe, so height reads at a glance: the molten core over a sea of lava, the mantle's glowing cracks, the crust's rock and crystals, out through green hills into day, sunset, night and space. Far off, the climb passes the core, the mantle, the crust, the sun, a plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus and Neptune, the Milky Way and the universe, each named faintly. Hazards are red; safe rest floors are gold.
   - Detail: on the climber, the platforms and the height bar; the background stays quiet.
   - Signature: a slim height bar down the side with every level marked, where you are and your best.
   - Every figure drawn, no emoji, no plain circles.
@@ -100,6 +102,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 ## Features
 - [x] A tall tower of thirty levels in ten worlds of three, each world adding its own idea, the last one ultimate; no easy levels
 - [x] A level picker (the Levels button on the menu, or the room's Levels box for its host): the ten worlds in rows of three, tap the first level and then the last; it sets where a climb alone, a race with the bots and a room's race start and end. Only a climb of the whole tower gives a finish code and a best time
+- [x] From the bottom of the Earth to the universe: the first three worlds are underground (the inner core, the mantle, the crust and its caves) with mine carts, barrels and wooden scaffolds to stand on (a moving ledge there is a rolling mine cart), each with its sound; the surface comes at level 10, then furniture, vehicles and aircraft as before
 - [x] Real things to stand on: furniture low down (tables, sofas, beds, counters, desks, pianos), buses, vans and trucks in the middle, planes, rockets and satellites high up; moving ledges are blue cars (hover cars in space), crumbling ones cardboard boxes, bouncers trampolines
 - [x] Leaning ledges: about 4 in 10 furniture, box and ice ledges tilt 4 to 9 degrees; you stand on the slope and slide slowly down it, ice the most (tilt_share, tilt_min, tilt_max, tilt_slide; tilt_share 0 makes every ledge flat again)
 - [x] Detailed things: crumbling ledges are old wooden crates whose cracks open and splinter; buses are big with windshield, door, windows and route sign, a short ledge a detailed van; wheels with turning spokes; a glossy grand piano that plays a note for each step along its keys and a chord when you land, low on the left, high on the right

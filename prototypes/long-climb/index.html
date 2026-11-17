@@ -76,13 +76,13 @@ CKB.needServer = 'بۆ ژوور، یارییەکە بە start-room.bat بکەر�
 // Ten worlds of three levels. Each has its sky, the mix of special ledges it uses, what it adds,
 // the hint its banner shows, and the scale and speed of its tune.
 const WORLDS = [
-  { name: 'باخچە', sky: ['#8fd6ff', '#dff5ff'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
-  { name: 'سەکۆی جووڵاو', sky: ['#9ad0ff', '#f2f8ff'], cap: '#ffffff', mix: { m: 0.35 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 102 },
-  { name: 'سەکۆی داڕماو', sky: ['#ffd39a', '#fff0d8'], cap: '#f2c14e', mix: { c: 0.4, m: 0.1 }, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 108 },
-  { name: 'دوگمە و دەروازە', sky: ['#5a6fc0', '#f0a88a'], cap: '#58c9a0', mix: { m: 0.2 }, gate: 'btn', timed: true, hint: 'دوگمە سوورەکە دەروازە دەکاتەوە', scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 104 },
-  { name: 'سەهۆڵ', sky: ['#16224f', '#43568f'], cap: '#e8fbff', mix: { i: 0.55, m: 0.12 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 100 },
-  { name: 'با', sky: ['#060a22', '#1b3470'], cap: '#ffb347', mix: { c: 0.15, m: 0.15, f: 0.12 }, wind: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 220, bpm: 112 },
-  { name: 'تفەنگ', sky: ['#10060f', '#3a1418'], cap: '#ff8fb8', mix: { m: 0.2, c: 0.15 }, gun: true, gate: 'tgt', bumpers: true, hint: 'F: تەقە لە ئامانجەکە بکە', scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 294, bpm: 118 },
+  { name: 'ناوکی زەوی', sky: ['#2a0705', '#c2410f'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
+  { name: 'سەکۆی جووڵاو', sky: ['#1c0808', '#6b1c10'], cap: '#ffffff', mix: { m: 0.35 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 102 },
+  { name: 'سەکۆی داڕماو', sky: ['#141012', '#3a2a22'], cap: '#f2c14e', mix: { c: 0.4, m: 0.1 }, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 108 },
+  { name: 'دوگمە و دەروازە', sky: ['#8fd6ff', '#dff5ff'], cap: '#58c9a0', mix: { m: 0.2 }, gate: 'btn', timed: true, hint: 'دوگمە سوورەکە دەروازە دەکاتەوە', scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 104 },
+  { name: 'سەهۆڵ', sky: ['#ff9a6a', '#ffd9a8'], cap: '#e8fbff', mix: { i: 0.55, m: 0.12 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 100 },
+  { name: 'با', sky: ['#16224f', '#43568f'], cap: '#ffb347', mix: { c: 0.15, m: 0.15, f: 0.12 }, wind: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 220, bpm: 112 },
+  { name: 'تفەنگ', sky: ['#060a22', '#1b3470'], cap: '#ff8fb8', mix: { m: 0.2, c: 0.15 }, gun: true, gate: 'tgt', bumpers: true, hint: 'F: تەقە لە ئامانجەکە بکە', scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 294, bpm: 118 },
   { name: 'هەڵبەزێنەر و پشتێن', sky: ['#0d0912', '#2e2016'], cap: '#9a8cff', mix: { b: 0.16, v: 0.3, m: 0.12, f: 0.1 }, timed: true, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 120 },
   { name: 'قوللەکان', sky: ['#05071a', '#1a2348'], cap: '#7f8cff', mix: { i: 0.15, c: 0.15, m: 0.15, v: 0.1 }, gun: true, gate: 'tgt', bumpers: true, turrets: true, hint: 'تەقە لە قوللەکان بکە بۆ وەستاندنیان', scale: [0, 1, 4, 5, 7, 8, 10], root: 233, bpm: 126 },
   { name: 'کۆتایی', sky: ['#04020d', '#28093a'], cap: '#ff5a7a', mix: { c: 0.18, i: 0.15, m: 0.15, b: 0.1, v: 0.14, f: 0.08 }, gun: true, gate: 'both', timed: true, bumpers: true, turrets: true, wind: true, hint: 'هەموو شتێک پێکەوە', scale: [0, 1, 3, 5, 7, 8, 10], root: 262, bpm: 132 },
@@ -110,7 +110,7 @@ const EN = {
   nameTitle: "What's your name?", nameHint: 'N: change', codeLine: "C: check a viewer's code", simple: ['Play alone', 'Race the bots', 'Make a room', 'Join a room'],
   pauseMenu: ['Go on', 'Start again from the bottom', 'Sound', 'Main menu'], leaveRoom: 'Leave the room', on: 'on', off: 'off', arrows2: 'Arrows and Enter     Esc: go on',
   figures: ['Climber', 'Ledge', 'Moving ledge', 'Crumbling ledge', 'Ice', 'Bouncer', 'Conveyor belt', 'Timed ledge', 'Button', 'Gate', 'Target', 'Turret', 'Red bumper', 'Star', 'Fan'],
-  worlds: ['Garden', 'Moving ledges', 'Crumbling ledges', 'Buttons and gates', 'Ice', 'Wind', 'Blaster', 'Bouncers and belts', 'Turrets', 'Ultimate'],
+  worlds: ["Earth's core", 'Moving ledges', 'Crumbling ledges', 'Buttons and gates', 'Ice', 'Wind', 'Blaster', 'Bouncers and belts', 'Turrets', 'Ultimate'],
   hints: ['', '', '', 'The red button opens the gate', '', '', 'F: shoot the target', '', 'Shoot the turrets to stop them', 'Everything at once'],
 };
 CKB.share = 'ئەم بەستەرە بنێرە بۆ هاوڕێکانت';
@@ -124,7 +124,7 @@ Object.assign(EN, {
   spectators: 'Watching', watching: 'Watching', watch: 'Watch only', play: 'Play', kick: 'Kick', toWatch: 'Move to watching', toPlay: 'Move to players',
   startRace: 'Start the race', copy: 'tap the link to copy it', copied: 'Link copied', kicked: 'The host removed you from the room', nowWatching: 'You are watching now', noSlot: 'No free place: you are watching',
   endRace: 'End the race for everyone', joinRace: 'Join the race', youPlace: 'You finished', skip: 'Enter: results', rider: 'is on your feet: shove to shake them off', hangHint: 'Jump to leap off',
-  likes: 'likes', dropN: { heart: 'a falling heart', shoe: 'a falling shoe', pot: 'a falling flowerpot' }, oldServer: 'The server is old: close start-room.bat or start-live.bat and open it again', fx: { wind: 'Gust of wind', jump: 'Super jump', bumper: 'Red bumper', shake: 'Earthquake', rocket: 'Rocket' }, liveOn: 'TikTok LIVE connected: gifts are on', liveLost: 'TikTok LIVE lost, trying again', followed: 'followed', shared: 'shared the LIVE', bodies: { moon: 'The Moon', earth: 'Earth', mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn', uranus: 'Uranus', neptune: 'Neptune', galaxy: 'The Milky Way', universe: 'The universe' }, levels: 'Levels', pickTitle: 'Choose your levels', startL: 'Start', finishL: 'Finish', doneL: 'Done', allL: 'All 30', levelsN: 'levels', pickHint: 'Tap a level to set the start, then the finish', menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
+  likes: 'likes', dropN: { heart: 'a falling heart', shoe: 'a falling shoe', pot: 'a falling flowerpot' }, oldServer: 'The server is old: close start-room.bat or start-live.bat and open it again', fx: { wind: 'Gust of wind', jump: 'Super jump', bumper: 'Red bumper', shake: 'Earthquake', rocket: 'Rocket' }, liveOn: 'TikTok LIVE connected: gifts are on', liveLost: 'TikTok LIVE lost, trying again', followed: 'followed', shared: 'shared the LIVE', bodies: { core: "Earth's inner core", mantle: 'The mantle', crust: "The Earth's crust", moon: 'The Moon', earth: 'Earth', mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn', uranus: 'Uranus', neptune: 'Neptune', galaxy: 'The Milky Way', universe: 'The universe' }, levels: 'Levels', pickTitle: 'Choose your levels', startL: 'Start', finishL: 'Finish', doneL: 'Done', allL: 'All 30', levelsN: 'levels', pickHint: 'Tap a level to set the start, then the finish', menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
   hostKeys: 'Enter: start     Tab: pick a player     V: watch / play     K: kick', guestKeys: 'V: watch / play     Esc: leave', watchKeys: 'Arrows: next climber     Esc: menu',
 });
 Object.assign(CKB, {
@@ -132,7 +132,7 @@ Object.assign(CKB, {
   spectators: 'بینەران', watching: 'سەیرکردنی', watch: 'تەنیا سەیر بکە', play: 'یاری بکە', kick: 'دەرکردن', toWatch: 'بیکە بە بینەر', toPlay: 'بیکە بە یاریزان',
   startRace: 'پێشبڕکێ دەست پێبکە', copy: 'دەست لە بەستەرەکە بدە بۆ کۆپیکردنی', copied: 'بەستەرەکە کۆپی کرا', kicked: 'خاوەنی ژوور دەریکردیت', nowWatching: 'ئێستا تۆ بینەریت', noSlot: 'شوێنی بەتاڵ نییە: تۆ بینەریت',
   endRace: 'پێشبڕکێکە بۆ هەمووان تەواو بکە', joinRace: 'بچۆ ناو پێشبڕکێکە', youPlace: 'تەواوت کرد', skip: 'Enter: ئەنجامەکان', rider: 'خۆی بە پێیەکانتەوە هەڵواسیوە: پاڵی پێوە بنێ', hangHint: 'باز بدە بۆ خۆبەردان',
-  likes: 'لایک', dropN: { heart: 'دڵێکی کەوتوو', shoe: 'پێڵاوێکی کەوتوو', pot: 'گوڵدانێکی کەوتوو' }, oldServer: 'سێرڤەرەکە کۆنە: start-room.bat یان start-live.bat دابخە و دووبارە بیکەرەوە', fx: { wind: 'بای توند', jump: 'بازی گەورە', bumper: 'تۆپی سوور', shake: 'بوومەلەرزە', rocket: 'ڕۆکێت' }, liveOn: 'تیکتۆک لایڤ پەیوەست بوو: دیارییەکان کار دەکەن', liveLost: 'لایڤ پچڕا، هەوڵ دەدەینەوە', followed: 'فۆڵۆی کرد', shared: 'لایڤەکەی شێر کرد', bodies: { moon: 'مانگ', earth: 'زەوی', mars: 'مەریخ', jupiter: 'موشتەری', saturn: 'زوحەل', uranus: 'ئۆرانۆس', neptune: 'نێپتوون', galaxy: 'کاکێشان', universe: 'گەردوون' }, levels: 'ئاستەکان', pickTitle: 'ئاستەکانت هەڵبژێرە', startL: 'دەستپێک', finishL: 'کۆتایی', doneL: 'تەواو', allL: 'هەموو 30', levelsN: 'ئاست', pickHint: 'ئاستێک دابگرە بۆ دەستپێک، پاشان بۆ کۆتایی', menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
+  likes: 'لایک', dropN: { heart: 'دڵێکی کەوتوو', shoe: 'پێڵاوێکی کەوتوو', pot: 'گوڵدانێکی کەوتوو' }, oldServer: 'سێرڤەرەکە کۆنە: start-room.bat یان start-live.bat دابخە و دووبارە بیکەرەوە', fx: { wind: 'بای توند', jump: 'بازی گەورە', bumper: 'تۆپی سوور', shake: 'بوومەلەرزە', rocket: 'ڕۆکێت' }, liveOn: 'تیکتۆک لایڤ پەیوەست بوو: دیارییەکان کار دەکەن', liveLost: 'لایڤ پچڕا، هەوڵ دەدەینەوە', followed: 'فۆڵۆی کرد', shared: 'لایڤەکەی شێر کرد', bodies: { core: 'ناوکی زەوی', mantle: 'بەرگی ناوەڕاستی زەوی', crust: 'توێکڵی زەوی', moon: 'مانگ', earth: 'زەوی', mars: 'مەریخ', jupiter: 'موشتەری', saturn: 'زوحەل', uranus: 'ئۆرانۆس', neptune: 'نێپتوون', galaxy: 'کاکێشان', universe: 'گەردوون' }, levels: 'ئاستەکان', pickTitle: 'ئاستەکانت هەڵبژێرە', startL: 'دەستپێک', finishL: 'کۆتایی', doneL: 'تەواو', allL: 'هەموو 30', levelsN: 'ئاست', pickHint: 'ئاستێک دابگرە بۆ دەستپێک، پاشان بۆ کۆتایی', menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
   hostKeys: 'Enter: دەستپێکردن     Tab: هەڵبژاردنی یاریزان     V: بینەر / یاریزان     K: دەرکردن', guestKeys: 'V: بینەر / یاریزان     Esc: دەرچوون', watchKeys: 'تیرەکان: یاریزانی داهاتوو     Esc: مینیو',
 });
 
@@ -923,9 +923,9 @@ function stepWorld(dt) {
   if (state.cool > 0) state.cool -= dt;
 }
 const solid = p => !(p.gone > 0) && (p.kind !== 'g' || state.ghost > 0);
-const extOf = p => p.kind === 'm' ? Math.min(30, p.w * 0.24) : 0; // how far a thing's solid shape reaches past its ledge: a car's hood and boot
+const extOf = p => p.kind === 'm' && (p.world || 0) > 2 ? Math.min(30, p.w * 0.24) : 0; // how far a thing's solid shape reaches past its ledge: a car's hood and boot
 const topAt = (p, x) => { // a ledge's top under x: tilted for a leaning one; for a car the roof, down the glass, then the hood or the boot
-  if (p.kind === 'm') { const n = extOf(p), out = x > p.x + p.w ? x - p.x - p.w : x < p.x ? p.x - x : 0; return p.alt - Math.min(14, out / Math.max(1, n * 0.55) * 14); }
+  if (p.kind === 'm' && (p.world || 0) > 2) { const n = extOf(p), out = x > p.x + p.w ? x - p.x - p.w : x < p.x ? p.x - x : 0; return p.alt - Math.min(14, out / Math.max(1, n * 0.55) * 14); }
   return p.tilt ? p.alt + p.tilt * (clamp(x, p.x, p.x + p.w) - (p.x + p.w / 2)) : p.alt;
 };
 function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so no key counts and the climber is left to gravity
@@ -1004,7 +1004,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
     const p = P.on;
     if (!solid(p) || P.x + PW < p.x - extOf(p) + tune.edge || P.x > p.x + p.w + extOf(p) - tune.edge) { P.on = null; P.coy = tune.coyote; P.cut = false; }
     else if (Math.abs(P.vx) > 120) { P.stepT -= dt; if (P.stepT <= 0) { P.stepT = 0.21; if (p.kind === 'n' && thingOf(p) === 'piano') pianoAt(p, P.x + PW / 2, false); else sfx.step(); parts.push({ x: P.x + PW / 2 - P.face * 10, alt: P.alt + 2, vx: -P.face * 40, vy: 50, g: 200, life: 0.3, max: 0.3, color: 'rgba(255,255,255,0.7)', s: 4 }); } } // footsteps, and the dust they kick up
-    if (P.on && P.on.kind === 'm') { P.alt = topAt(P.on, P.x + PW / 2); P.last = P.alt; } // on a car: up on the roof, down on the hood
+    if (P.on && P.on.kind === 'm' && (P.on.world || 0) > 2) { P.alt = topAt(P.on, P.x + PW / 2); P.last = P.alt; } // on a car: up on the roof, down on the hood
     if (P.on && P.on.tilt) { const p2 = P.on; P.x = clamp(P.x - Math.sign(p2.tilt) * tune.tilt_slide * (Math.abs(p2.tilt) / Math.tan(tune.tilt_max * PI / 180)) * (p2.kind === 'i' ? 2.2 : 1) * dt, 0, W - PW); P.alt = topAt(p2, P.x + PW / 2); P.last = P.alt; } // on a lean the feet follow it, and it slides you
     if (load && Math.floor(state.t * 3) !== Math.floor((state.t - dt) * 3)) { parts.push({ x: P.x + PW / 2 + P.face * 16, alt: P.alt + 44, vx: P.face * 60, vy: 120, g: 600, life: 0.4, max: 0.4, color: '#8fd6ff', s: 4 }); } // sweat, under the weight
   } else {
@@ -1044,17 +1044,25 @@ function drawSky() {
   const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, mix(Z.sky[0], N.sky[0], k)); g.addColorStop(1, mix(Z.sky[1], N.sky[1], k));
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   drawDecor(true); drawBodies(state.t || 0); drawDecor(false);
-  if (cam < 900) { // the garden's hills at the foot of the tower
-    const y = sy(0); ctx.fillStyle = '#5fbf5a'; ctx.beginPath(); ctx.ellipse(120, y, 260, 150, 0, PI, 0); ctx.ellipse(560, y, 300, 110, 0, PI, 0); ctx.fill();
-    ctx.fillStyle = '#4aa650'; ctx.fillRect(0, y, W, H - y + 40);
+  if (cam < 900) { // a sea of lava under the tower's foot, bubbling
+    const y = sy(0) + 14, t = state.t || 0; glow(W / 2, y, 420, 'rgba(255,120,30,0.45)', 'rgba(255,90,20,0)');
+    const g = ctx.createLinearGradient(0, y, 0, H + 40); g.addColorStop(0, '#ffb347'); g.addColorStop(0.15, '#ff6a1a'); g.addColorStop(1, '#8a1406'); ctx.fillStyle = g; ctx.fillRect(0, y, W, H - y + 40);
+    for (let i = 0; i < 9; i++) { const bx = (i * 83 + 40) % W, ph = (t * 0.6 + i * 0.37) % 1, br = 4 + (i % 3) * 3; ctx.fillStyle = `rgba(255,230,150,${0.7 * (1 - ph)})`; ctx.beginPath(); ctx.arc(bx, y + 20 + (1 - ph) * 40, br * (0.5 + ph), 0, 7); ctx.fill(); }
   }
+  { const sb = WORLDS[3].base, y = sy(sb); if (sb !== undefined && y > -200 && y < H + 260) { // the surface: green hills where the sky begins, soil and roots under them
+    ctx.fillStyle = '#5fbf5a'; ctx.beginPath(); ctx.ellipse(120, y, 260, 150, 0, PI, 0); ctx.ellipse(560, y, 300, 110, 0, PI, 0); ctx.fill();
+    const g = ctx.createLinearGradient(0, y, 0, y + 420); g.addColorStop(0, '#4aa650'); g.addColorStop(0.035, '#6b4a2e'); g.addColorStop(0.3, '#3d2c22'); g.addColorStop(1, '#1d1614'); ctx.fillStyle = g; ctx.fillRect(0, y, W, Math.max(0, H - y + 40)); // earth all the way down: soil, then dark rock
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? 'rgba(90,64,48,0.25)' : 'rgba(20,14,12,0.25)'; ctx.fillRect(0, y + 70 + i * 70, W, 26); }
+    ctx.strokeStyle = 'rgba(60,40,24,0.5)'; ctx.lineWidth = 3; for (const rx of [90, 260, 470, 640]) { ctx.beginPath(); ctx.moveTo(rx, y + 14); ctx.quadraticCurveTo(rx + 20, y + 60, rx - 10, y + 110); ctx.stroke(); }
+  } }
 }
 function drawDecor(starsOnly) { // clouds low down, stars high up, drifting slower than the tower
   for (const d of decor) {
     const y = H * 0.6 - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
-    const high = d.alt / SUMMIT;
-    if ((high > 0.36) !== starsOnly) continue;
-    if (high > 0.36) { ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.5 * d.k})`; const s = 2 + d.s * 2.2; ctx.beginPath(); ctx.moveTo(d.x, y - s); ctx.lineTo(d.x + s * 0.35, y - s * 0.35); ctx.lineTo(d.x + s, y); ctx.lineTo(d.x + s * 0.35, y + s * 0.35); ctx.lineTo(d.x, y + s); ctx.lineTo(d.x - s * 0.35, y + s * 0.35); ctx.lineTo(d.x - s, y); ctx.lineTo(d.x - s * 0.35, y - s * 0.35); ctx.fill(); }
+    const high = d.alt / SUMMIT, wz = worldAt(d.alt);
+    if (wz <= 2) { if (!starsOnly) continue; const t = state.t || 0; if (wz < 2) { const ry = y - ((t * 40 * (0.5 + d.k)) % 160) + 80; ctx.fillStyle = `rgba(255,${140 + Math.round(d.k * 80)},60,${0.35 + 0.4 * d.k})`; ctx.beginPath(); ctx.arc(d.x, ry, 1.5 + d.s * 1.5, 0, 7); ctx.fill(); } else { const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + d.x)); ctx.fillStyle = `rgba(200,220,255,${0.45 * tw})`; const sz = 2 + d.s * 2; ctx.fillRect(d.x - sz / 2, y - 0.5, sz, 1.5); ctx.fillRect(d.x - 0.75, y - sz / 2, 1.5, sz); } continue; } // embers rising in the deep, glints in the rock
+    if ((wz >= 5) !== starsOnly) continue;
+    if (wz >= 5) { ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.5 * d.k})`; const s = 2 + d.s * 2.2; ctx.beginPath(); ctx.moveTo(d.x, y - s); ctx.lineTo(d.x + s * 0.35, y - s * 0.35); ctx.lineTo(d.x + s, y); ctx.lineTo(d.x + s * 0.35, y + s * 0.35); ctx.lineTo(d.x, y + s); ctx.lineTo(d.x - s * 0.35, y + s * 0.35); ctx.lineTo(d.x - s, y); ctx.lineTo(d.x - s * 0.35, y - s * 0.35); ctx.fill(); }
     else { ctx.fillStyle = `rgba(255,255,255,${0.42 - high * 0.2})`; const s = 34 * d.s; ctx.beginPath(); ctx.ellipse(d.x, y, s * 1.5, s * 0.5, 0, 0, 7); ctx.ellipse(d.x - s * 0.6, y - s * 0.3, s * 0.7, s * 0.5, 0, 0, 7); ctx.ellipse(d.x + s * 0.5, y - s * 0.36, s * 0.8, s * 0.56, 0, 0, 7); ctx.fill(); }
   }
 }
@@ -1063,9 +1071,10 @@ function drawDecor(starsOnly) { // clouds low down, stars high up, drifting slow
 // Each hangs at a height in its world and drifts far slower than the tower (0.22 of it), so a climb
 // passes them one after another, each named faintly beneath. None of it touches the game.
 const BODIES = [
-  { k: 'sun', w: 0, at: 0.55, x: 590, r: 56 }, { k: 'plane', w: 1, at: 0.5, x: 0, r: 30 }, { k: 'sunset', w: 2, at: 0.55, x: 170, r: 95 },
-  { k: 'moon', w: 3, at: 0.6, x: 570, r: 44, cres: true }, { k: 'moon', w: 4, at: 0.5, x: 190, r: 115, name: 'moon' },
-  { k: 'earth', w: 5, at: 0.45, x: 390, r: 230, name: 'earth' }, { k: 'mars', w: 6, at: 0.5, x: 540, r: 88, name: 'mars' },
+  { k: 'core', w: 0, at: 0.3, x: 360, r: 250, name: 'core' }, { k: 'mantle', w: 1, at: 0.5, x: 360, r: 320, name: 'mantle' }, { k: 'crust', w: 2, at: 0.45, x: 360, r: 320, name: 'crust' },
+  { k: 'sun', w: 3, at: 0.45, x: 590, r: 56 }, { k: 'plane', w: 3, at: 0.95, x: 0, r: 30 }, { k: 'sunset', w: 4, at: 0.5, x: 170, r: 95 },
+  { k: 'moon', w: 4, at: 1.05, x: 570, r: 44, cres: true }, { k: 'moon', w: 5, at: 0.5, x: 190, r: 115, name: 'moon' },
+  { k: 'earth', w: 6, at: 0.25, x: 390, r: 230, name: 'earth' }, { k: 'mars', w: 6, at: 0.9, x: 540, r: 88, name: 'mars' },
   { k: 'jupiter', w: 7, at: 0.5, x: 220, r: 150, name: 'jupiter' }, { k: 'saturn', w: 8, at: 0.28, x: 480, r: 90, name: 'saturn' },
   { k: 'uranus', w: 8, at: 0.68, x: 170, r: 46, name: 'uranus' }, { k: 'neptune', w: 8, at: 0.95, x: 560, r: 44, name: 'neptune' },
   { k: 'galaxy', w: 9, at: 0.12, x: 430, r: 200, name: 'galaxy' }, { k: 'universe', w: 9, at: 1.15, x: 360, r: 330, name: 'universe' },
@@ -1076,6 +1085,32 @@ function nightSide(x, y, r) { const g = ctx.createLinearGradient(x - r, y - r * 
 function clipBall(x, y, r, f) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip(); f(); ctx.restore(); }
 let GAL = null, UNI = null, MOONC = null; // the galaxy, the universe and the moon, each painted once into its own picture
 const FAR = {
+  core(x, y, r, t) { // the inner core: white-hot at the heart, churning orange, a red rim, a wide glow
+    glow(x, y, r * 1.9, 'rgba(255,120,40,0.35)', 'rgba(255,90,20,0)');
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, '#fffbe0'); g.addColorStop(0.3, '#ffd45a'); g.addColorStop(0.65, '#ff7a1c'); g.addColorStop(1, '#a8180a');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    clipBall(x, y, r, () => { ctx.lineCap = 'round'; for (let i = 0; i < 9; i++) { const a = t * 0.12 * (i % 2 ? 1 : -1) + i * 0.7, rr2 = r * (0.3 + (i % 5) * 0.14); ctx.strokeStyle = `rgba(255,${200 + (i % 3) * 18},${120 + (i % 4) * 25},0.28)`; ctx.lineWidth = r * 0.05; ctx.beginPath(); ctx.arc(x, y, rr2, a, a + 1.6 + (i % 3) * 0.4); ctx.stroke(); } }); // the churning
+  },
+  mantle(x, y, r, t) { // the mantle: dark rock split by glowing cracks of magma that pulse slowly
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let i = 0; i < 6; i++) {
+      const y0 = y + (i - 2.5) * r * 0.36, pulse = 0.55 + 0.45 * Math.sin(t * 1.4 + i * 1.7), pts = [];
+      for (let k = 0; k <= 12; k++) pts.push([k / 12 * W, y0 + Math.sin(k * 1.3 + i * 2.1) * 26 + Math.sin(k * 3.1 + i) * 9]);
+      for (const [lw, c] of [[22, `rgba(255,80,20,${0.16 * pulse})`], [8, `rgba(255,120,40,${0.5 * pulse})`], [2.5, `rgba(255,220,140,${0.85 * pulse})`]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); pts.forEach(([px, py], k) => k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke(); }
+    }
+  },
+  crust(x, y, r, t) { // the crust: layers of rock, and clusters of crystals that catch the light
+    for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 2 ? 'rgba(90,64,48,0.22)' : 'rgba(40,28,22,0.22)'; ctx.beginPath(); const y0 = y + (i - 3.5) * r * 0.28; ctx.moveTo(0, y0); for (let k = 0; k <= 10; k++) ctx.lineTo(k / 10 * W, y0 + Math.sin(k * 0.9 + i) * 14); ctx.lineTo(W, y0 + r * 0.14); ctx.lineTo(0, y0 + r * 0.14); ctx.fill(); }
+    for (const [cx, cy, s, hue] of [[120, -0.5, 1, '160,110,255'], [600, -0.15, 1.3, '90,220,230'], [210, 0.35, 0.9, '255,120,200'], [520, 0.6, 1.1, '160,110,255'], [360, 0.05, 0.7, '90,220,230']]) {
+      const by = y + cy * r; glow(cx, by - 30 * s, 70 * s, `rgba(${hue},0.25)`, `rgba(${hue},0)`);
+      for (const [dx, h, lean] of [[-14, 46, -0.35], [0, 70, 0], [15, 52, 0.3], [28, 30, 0.55]]) {
+        ctx.save(); ctx.translate(cx + dx * s, by); ctx.rotate(lean); const w2 = 9 * s, h2 = h * s;
+        ctx.beginPath(); ctx.moveTo(-w2, 0); ctx.lineTo(-w2, -h2 * 0.8); ctx.lineTo(0, -h2); ctx.lineTo(w2, -h2 * 0.8); ctx.lineTo(w2, 0); ctx.closePath();
+        ctx.fillStyle = `rgba(${hue},0.75)`; ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.moveTo(-w2 * 0.2, -2); ctx.lineTo(-w2 * 0.2, -h2 * 0.8); ctx.lineTo(0, -h2 * 0.97); ctx.lineTo(w2 * 0.1, -h2 * 0.8); ctx.lineTo(w2 * 0.1, -2); ctx.fill(); ctx.restore();
+      }
+      const tw = 0.5 + 0.5 * Math.sin(t * 3 + cx); ctx.fillStyle = `rgba(255,255,255,${tw})`; ctx.fillRect(cx - 1, by - 72 * s, 2, 10); ctx.fillRect(cx - 5, by - 68 * s, 10, 2); // a glint
+    }
+  },
   sun(x, y, r, t) { // a soft wide glow, faint turning rays, then a disc that is white at the heart and warmer at its edge
     glow(x, y, r * 5, 'rgba(255,250,225,0.32)', 'rgba(255,250,225,0)'); glow(x, y, r * 2.3, 'rgba(255,246,205,0.65)', 'rgba(255,240,190,0)');
     ctx.save(); ctx.translate(x, y); ctx.rotate(t * 0.03); ctx.fillStyle = 'rgba(255,250,225,0.10)';
@@ -1214,7 +1249,7 @@ const OUT = '#2a1c14';
 // rest hangs below. A moving ledge is a blue car (a hover car in space), a crumbling one a stack of
 // cardboard boxes, a bouncer a trampoline. Which thing a ledge is comes from where it is, so the
 // tower looks the same every climb.
-const THINGS = [['table', 'sofa', 'bed', 'counter', 'desk', 'piano'], ['bus', 'van', 'truck'], ['plane', 'rocket', 'satellite']];
+const THINGS = [['minecart', 'barrels', 'scaffold'], ['table', 'sofa', 'bed', 'counter', 'desk', 'piano'], ['bus', 'van', 'truck'], ['plane', 'rocket', 'satellite']];
 const WOOD = ['#b9814e', '#8d5a34', '#d49a62'], PAINT = ['#e8574a', '#f2b33d', '#4fae6a', '#8a6bd6', '#f07ab0', '#42b8c8'];
 const lookOf = p => { if (p.look === undefined) p.look = Math.abs(Math.round((p.x0 === undefined ? p.x : p.x0) * 13 + p.alt * 7)); return p.look; };
 function wheel(cx, cy, r, spin) { // a tyre, a silver rim with five spokes turning, a hub
@@ -1223,7 +1258,7 @@ function wheel(cx, cy, r, spin) { // a tyre, a silver rim with five spokes turni
   dot(cx, cy, r * 0.16, '#5a626e');
 }
 function thingOf(p) { // which real thing a plain ledge is: by its height up the tower and where it is; a bus needs room, so a short one is a van
-  const v = lookOf(p), wd = p.world || 0, set = THINGS[wd <= 3 ? 0 : wd <= 6 ? 1 : 2], k = set[v % set.length];
+  const v = lookOf(p), wd = p.world || 0, set = THINGS[wd <= 2 ? 0 : wd <= 4 ? 1 : wd <= 6 ? 2 : 3], k = set[v % set.length];
   return k === 'bus' && p.w < 120 ? 'van' : k;
 }
 // The piano plays: a note for each step along its keys, low on the left, high on the right; a chord when you land on it.
@@ -1243,10 +1278,30 @@ function pianoAt(p, x, chord) { // you, on the keys: the note, and the room hear
   const i = Math.floor(clamp((x - p.x) / p.w, 0, 0.999) * PIANO_STEPS.length);
   pianoPlay(i, chord); fxSend({ k: 'pn', i, c: chord ? 1 : 0, a: Math.round(P.alt) }); events.push(['piano', i]);
 }
+function drawMinecart(x, y, w, spin) { // an iron mine cart: its rim is the ledge, ore inside, riveted bands, small iron wheels
+  ctx.fillStyle = '#2a2d33'; for (const wx of [x + 16, x + w - 16]) { ctx.beginPath(); ctx.arc(wx, y + 32, 7, 0, 7); ctx.fill(); ctx.strokeStyle = '#8a929e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + Math.cos(spin) * 5, y + 32 + Math.sin(spin) * 5); ctx.lineTo(wx - Math.cos(spin) * 5, y + 32 - Math.sin(spin) * 5); ctx.stroke(); }
+  for (const [ox, c] of [[0.25, '#d9b44a'], [0.45, '#8a8f99'], [0.62, '#e6c85a'], [0.8, '#7d838c']]) dot(x + w * ox, y + 6, 6, c); // the ore, heaped just under the rim
+  ctx.beginPath(); ctx.moveTo(x, y + 2); ctx.lineTo(x + w, y + 2); ctx.lineTo(x + w - 9, y + 30); ctx.lineTo(x + 9, y + 30); ctx.closePath();
+  const g = ctx.createLinearGradient(0, y, 0, y + 30); g.addColorStop(0, '#7a8592'); g.addColorStop(1, '#4a525d'); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + 4, y + 12, w - 8, 3); ctx.fillRect(x + 6, y + 22, w - 12, 3);
+  ctx.fillStyle = 'rgba(160,80,40,0.35)'; ctx.fillRect(x + w * 0.3, y + 16, 9, 5); ctx.fillRect(x + w * 0.66, y + 24, 7, 4); // rust
+  for (const [rx, ry] of [[x + 6, y + 6], [x + w - 6, y + 6], [x + 12, y + 26], [x + w - 12, y + 26]]) dot(rx, ry, 1.8, '#2a2d33');
+  rr(x - 2, y, w + 4, 6, 2, '#9aa4b0', OUT, 2.5);
+}
 function drawThing(p, x, y, w) {
   const v = lookOf(p), k = thingOf(p), c = PAINT[(v >> 3) % PAINT.length], wood = WOOD[(v >> 2) % 3], dark = mix(c, '#000000', 0.3);
   const legs = (h, col = OUT) => { ctx.fillStyle = col; ctx.fillRect(x + 8, y + h, 8, 16); ctx.fillRect(x + w - 16, y + h, 8, 16); };
-  if (k === 'table') { legs(12); ctx.fillStyle = OUT; ctx.fillRect(x + 8, y + 22, w - 16, 4); ctx.fillRect(x + 8, y + 12, 8, 30); ctx.fillRect(x + w - 16, y + 12, 8, 30); rr(x, y, w, 13, 5, wood, OUT); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(x + 6, y + 3, w - 12, 3); }
+  if (k === 'minecart') drawMinecart(x, y, w, 0);
+  else if (k === 'barrels') { // a row of wooden barrels, lids up, iron hoops round them
+    const n = Math.max(1, Math.round(w / 42)), bw = w / n;
+    for (let i = 0; i < n; i++) { const bx = x + i * bw; rr(bx + 1, y, bw - 2, 38, 9, '#9a5b2e', OUT, 3); ctx.strokeStyle = 'rgba(60,30,12,0.35)'; ctx.lineWidth = 1.5; for (let sx = bx + 8; sx < bx + bw - 6; sx += 7) { ctx.beginPath(); ctx.moveTo(sx, y + 4); ctx.lineTo(sx, y + 34); ctx.stroke(); }
+      ctx.fillStyle = '#3b2a1e'; ctx.fillRect(bx + 2, y + 8, bw - 4, 3.5); ctx.fillRect(bx + 2, y + 27, bw - 4, 3.5); rr(bx + 3, y, bw - 6, 6, 3, '#b87442', OUT, 2); }
+  } else if (k === 'scaffold') { // a plank on two posts, braced, nailed
+    for (const px of [x + 8, x + w - 16]) { ctx.fillStyle = '#7a5130'; ctx.fillRect(px, y + 8, 8, 34); }
+    ctx.strokeStyle = '#7a5130'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + 14, y + 12); ctx.lineTo(x + w - 12, y + 40); ctx.moveTo(x + w - 12, y + 12); ctx.lineTo(x + 14, y + 40); ctx.stroke();
+    rr(x, y, w, 11, 2, '#b5834f', OUT, 3); ctx.strokeStyle = 'rgba(90,55,25,0.35)'; ctx.lineWidth = 1; for (let gx = x + 14; gx < x + w - 8; gx += 19) { ctx.beginPath(); ctx.moveTo(gx, y + 3); ctx.lineTo(gx + 9, y + 8); ctx.stroke(); }
+    for (const nx of [x + 12, x + w - 12]) dot(nx, y + 5, 1.8, '#2a1a0c');
+  } else if (k === 'table') { legs(12); ctx.fillStyle = OUT; ctx.fillRect(x + 8, y + 22, w - 16, 4); ctx.fillRect(x + 8, y + 12, 8, 30); ctx.fillRect(x + w - 16, y + 12, 8, 30); rr(x, y, w, 13, 5, wood, OUT); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(x + 6, y + 3, w - 12, 3); }
   else if (k === 'sofa') {
     legs(30); rr(x, y + 10, w, 22, 8, dark, OUT); const n = Math.max(1, Math.round((w - 28) / 48)), cw = (w - 28) / n;
     for (let i = 0; i < n; i++) rr(x + 14 + i * cw, y, cw - 2, 15, 6, c, OUT, 3);
@@ -1312,7 +1367,8 @@ function drawThing(p, x, y, w) {
     rr(cx - bw / 2, y, bw, 26, 4, '#e6b84a', OUT, 3); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx - bw / 2 + 4, y + 4, bw - 8, 4);
   }
 }
-function drawCar(p, x, y, w, t) { // a moving ledge: a blue car (high up, a hover car on two flames). Its roof is the ledge you stand on;
+function drawCar(p, x, y, w, t) {
+  if ((p.world || 0) <= 2) { drawMinecart(x, y, w, x / 7); return; } // in the deep, a mine cart rolling // a moving ledge: a blue car (high up, a hover car on two flames). Its roof is the ledge you stand on;
   // the windshield and rear window slope down past the roof's ends to a lower hood and boot, which are only to look at
   const space = (p.world || 0) >= 7, dir = (p.dx || 0) < 0 ? -1 : 1, nose = Math.min(30, w * 0.24), L = x - nose, R = x + w + nose, low = y + 14, bot = y + 32;
   const BLUE = '#4f9cf0', DARK = '#16407e', GLASS = '#cfe8ff';
@@ -2018,6 +2074,9 @@ function drawDevBadge() { pill(14, 80, 120, 34, 'rgba(20,90,40,0.85)'); ctx.dire
 // A bed springs, a sofa puffs, wood knocks, a counter clinks, a car honks, a bus sighs its brakes, a
 // plane whooshes, a rocket clangs, a satellite beeps, ice tinkles. The room hears it too, softer farther off.
 const THING_SFX = {
+  minecart: v => { tone(220, 0.12, 'square', 0.07 * v, 170); tone(660, 0.18, 'triangle', 0.05 * v); noise(0.09, 0.08 * v, 3200, 1500); },
+  barrels: v => { tone(118, 0.2, 'sine', 0.16 * v, 78); noise(0.12, 0.07 * v, 420, 160); },
+  scaffold: v => { tone(300, 0.28, 'sawtooth', 0.025 * v, 210); tone(420, 0.05, 'triangle', 0.12 * v, 300, 0.02); },
   bed: v => { tone(150, 0.32, 'triangle', 0.13 * v, 290); tone(290, 0.22, 'sine', 0.06 * v, 150, 0.08); noise(0.12, 0.05 * v, 500, 200); },
   sofa: v => { noise(0.22, 0.12 * v, 600, 180); tone(110, 0.14, 'sine', 0.08 * v, 70); },
   table: v => { tone(430, 0.06, 'triangle', 0.16 * v, 300); tone(700, 0.04, 'square', 0.035 * v); noise(0.05, 0.08 * v, 1900, 900); },
@@ -2034,7 +2093,7 @@ const THING_SFX = {
   ice: v => { tone(2000, 0.18, 'sine', 0.05 * v); tone(2700, 0.15, 'sine', 0.04 * v, 0, 0.05); tone(3300, 0.12, 'sine', 0.03 * v, 0, 0.1); },
 };
 function thingSound(p) { // which sound a ledge makes, if any of its own
-  if (p.kind === 'm') return (p.world || 0) >= 7 ? 'hover' : 'car';
+  if (p.kind === 'm') return (p.world || 0) >= 7 ? 'hover' : (p.world || 0) <= 2 ? 'minecart' : 'car';
   if (p.kind === 'i') return 'ice';
   if (p.kind === 'n') { const k = thingOf(p); return THING_SFX[k] ? k : null; }
   return null;
