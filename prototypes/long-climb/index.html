@@ -2518,12 +2518,16 @@ function drawDrops() {
 function drawLive() { // the falling things, the likes counter and the gift feed down the left, and a banner for a big gift
   drawPianos(); drawDrops();
   let y = drawBuffs(dev.on ? 132 : 92); ctx.textBaseline = 'middle';
-  if (live.likesSeen || live.state === 'on') { // the like goal: a bar that fills with the LIVE's likes, and what everyone gets when it is full
-    const f = clamp(live.goal / tune.like_goal, 0, 1), pr = likePrize(); rr(30, y, 250, 60, 16, 'rgba(120,20,50,0.82)');
+  if (live.likesSeen || live.state === 'on') { // one card for the likes: the like goal's bar and its prize, and under it the dots that fill toward the next falling thing
+    const f = clamp(live.goal / tune.like_goal, 0, 1), pr = likePrize(); rr(30, y, 250, 84, 16, 'rgba(120,20,50,0.82)');
     ctx.save(); ctx.translate(48, y + 19); ctx.scale(0.55, 0.55); ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.moveTo(0, 16); ctx.bezierCurveTo(-26, -2, -16, -24, 0, -10); ctx.bezierCurveTo(16, -24, 26, -2, 0, 16); ctx.fill(); ctx.restore();
     ltr(`${live.goal} / ${tune.like_goal}`, 64, y + 20, 17, '#ffe0ea', 'left'); text(fitText(`${K.fx[pr]} ${K.forAll}`, 110, 14), 268, y + 20, 14, UI.gold, 'right', true);
-    rr(42, y + 38, 226, 12, 6, 'rgba(10,12,20,0.55)'); if (f > 0) rr(42, y + 38, Math.max(12, 226 * f), 12, 6, f > 0.9 ? UI.gold : '#ff5a7a'); y += 66; }
-  if (live.likesSeen) { pill(30, y, 150, 32, 'rgba(120,20,50,0.78)'); ctx.save(); ctx.translate(48, y + 16); ctx.scale(0.5, 0.5); ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.moveTo(0, 16); ctx.bezierCurveTo(-26, -2, -16, -24, 0, -10); ctx.bezierCurveTo(16, -24, 26, -2, 0, 16); ctx.fill(); ctx.restore(); ctx.font = `bold 16px ${FONT}`; ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffe0ea'; ctx.fillText(`${live.likes} / ${tune.like_drop}`, 64, y + 17); y += 38; } // the likes, and how many until the next drop
+    rr(42, y + 38, 226, 12, 6, 'rgba(10,12,20,0.55)'); if (f > 0) rr(42, y + 38, Math.max(12, 226 * f), 12, 6, f > 0.9 ? UI.gold : '#ff5a7a');
+    const ry = y + 68; ctx.strokeStyle = '#ffb0c8'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(48, ry - 8); ctx.lineTo(48, ry + 6); ctx.moveTo(42, ry + 1); ctx.lineTo(48, ry + 7); ctx.lineTo(54, ry + 1); ctx.stroke(); // an arrow down: something falls
+    const nd = tune.like_drop, have = clamp(live.likes, 0, nd);
+    if (nd <= 12) for (let i = 0; i < nd; i++) { const dx = 68 + i * 17; ctx.beginPath(); ctx.arc(dx, ry, 6, 0, 7); if (i < have) { ctx.fillStyle = '#ff4d6d'; ctx.fill(); } else { ctx.strokeStyle = 'rgba(255,176,200,0.55)'; ctx.lineWidth = 2; ctx.stroke(); } } // a dot a like
+    else { rr(64, ry - 4, 204, 8, 4, 'rgba(10,12,20,0.55)'); if (have > 0) rr(64, ry - 4, Math.max(8, 204 * have / nd), 8, 4, '#ff4d6d'); } // many likes a drop: a thin bar instead
+    y += 90; }
   for (const f of live.feed) { ctx.globalAlpha = clamp(f.t, 0, 1); ctx.font = `bold 16px ${FONT}`; const s = fitText(f.s, W - 140, 16), w = ctx.measureText(s).width + 24; pill(30, y, w, 32, 'rgba(10,12,20,0.7)'); ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = f.c; ctx.fillText(s, 42, y + 17); y += 38; }
   ctx.globalAlpha = 1;
   if (live.jumps > 0) { pill(30, y, 132, 32, 'rgba(120,90,0,0.8)'); ctx.font = `bold 16px ${FONT}`; ctx.textAlign = 'left'; ctx.fillStyle = '#fff3b0'; ctx.direction = 'ltr'; ctx.fillText(`${K.fx.jump} ×${live.jumps}`, 42, y + 17); }
