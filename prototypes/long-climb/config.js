@@ -88,14 +88,19 @@ window.CONFIG = {
   // TikTok LIVE gifts (start-live.bat): each gift does one thing. By its worth in diamonds: a gift worth
   // at least the number does that, the highest that fits. Or by its name, which wins over its worth.
   // The things: 'wind' a gust that pushes you, 'jump' super jumps, 'bumper' red bumpers by you,
-  // 'shake' an earthquake that throws you off your ledge, 'rocket' a blast about a level up.
+  // 'shake' an earthquake that throws you off your ledge, 'rocket' a blast about a level up,
+  // 'piano' a grand piano that falls on you. A bigger gift does a bigger thing; the game lists them all
+  // on screen under the likes card.
   gifts: {
-    rules: [[1, 'piano'], [5, 'jump'], [30, 'bumper'], [99, 'shake'], [500, 'rocket']], // [diamonds at least, what it does]: 'piano' (a grand piano falls on you), 'wind', 'jump', 'bumper', 'shake', 'rocket'
-    names: { /* 'Rose': 'wind', 'Lion': 'rocket' */ },
+    // [diamonds at least, what it does, how much (super jumps, bumpers or pianos; a rocket of 2 goes two levels), a gift's name to show]
+    rules: [[1, 'piano', 1, 'Rose'], [10, 'jump', 2, 'Perfume'], [30, 'bumper', 2, 'Doughnut'], [99, 'jump', 3, 'Hat and Mustache'], [199, 'shake', 1, 'Corgi'], [500, 'rocket', 1, 'Money Gun'], [1000, 'rocket', 2, 'Galaxy']], // the names are one gift of each worth, to show on screen (TikTok's prices can change: any gift worth that much does the same)
+    names: { /* 'Rose': 'wind', 'Lion': ['rocket', 2] */ }, // by name: what it does, or [what, how much]
     like_prize: 'rocket', // what reaching the like goal (like_goal) gives everyone: 'rocket' or 'jump'
     share: 'all', // in a room: 'chaos' sends wind, bumpers, earthquakes and falling things to everyone and keeps super jumps and rockets yours; 'all' sends everything; 'none' keeps it all yours
   },
-  gift_gap: { value: 0.6, min: 0.3, max: 6, step: 0.1 },          // seconds between two gifts' effects (the rest wait their turn)
+  gift_gap: { value: 0, min: 0, max: 6, step: 0.1 },              // seconds between two gifts' effects (0: every gift at once, as it comes; above 0 the rest wait their turn)
+  feed_lines: { value: 3, min: 0, max: 6, step: 1 },              // lines in the recent-gifts feed on screen (0 hides it)
+  feed_time: { value: 4, min: 1, max: 10, step: 0.5 },            // seconds a line stays in the feed
   gift_wind_time: { value: 3, min: 1, max: 8, step: 0.5 },        // seconds a gust blows, for each gift in a streak (up to 4)
   gift_wind_speed: { value: 170, min: 50, max: 400, step: 10 },   // how hard a gust pushes, pixels per second
   gift_jump: { value: 1.4, min: 1.1, max: 2, step: 0.05 },         // a super jump is this many times a jump

@@ -184,7 +184,10 @@ function onGift(d) {
   const dia = Math.max(1, Number(x.diamond_count !== undefined ? x.diamond_count : x.diamondCount !== undefined ? x.diamondCount : d.diamondCount !== undefined ? d.diamondCount : g.diamondCount !== undefined ? g.diamondCount : g.diamond_count !== undefined ? g.diamond_count : gd.diamondCount) || 1);
   const n = Math.max(1, Math.min(99, Number(d.repeatCount) || 1)), who = viewer(d);
   console.log('gift: ' + who + ' sent ' + name + (n > 1 ? ' x' + n : '') + ' (' + dia + ' diamonds each)');
-  liveAll({ t: 'gift', user: who, gift: name, n, d: dia });
+  // the gift's own picture, as TikTok sends it with the gift: the game shows it beside the gift while the LIVE runs (it is never saved)
+  const im = gd.giftImage || g.image || x.image || {}, pics = [d.giftPictureUrl, im.url && im.url[0], im.urlList && im.urlList[0], im.url_list && im.url_list[0]];
+  const pic = pics.find(u => typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u) && u.length < 600) || '';
+  liveAll({ t: 'gift', user: who, gift: name, n, d: dia, pic });
 }
 // Your Euler Stream API key, if you have one, raises the limits on reading a LIVE. Put it in a .env file beside
 // this one, as the line  SIGN_API_KEY=your-key  (.env is kept out of git and the server never sends it to a browser),

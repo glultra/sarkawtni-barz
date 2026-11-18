@@ -77,6 +77,14 @@ After play: on a TikTok LIVE (from LIVE Studio on the PC) the game looks small a
 
 After play: the ghost does not start where I spawned (it did on a fresh climb; on a climb gone on with it was wherever the best climb was at that time)
 
+After play: likes do more for me than a Rose; make each gift better, a bigger gift a bigger thing, and show all the gifts under the likes card (no ghost on a saved climb)
+
+After play: a Rose should be a disadvantage; the real TikTok gift pictures; after I finished, my gifts did nothing to the others in my room
+
+After play: at least write each gift's name in the list
+
+After play: no rate limit for gifters; the recent activities take my entire screen
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -137,6 +145,10 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
 - [x] TikTok LIVE gifts change the climb (start-live.bat asks your TikTok name): by worth, a gust of wind, super jumps, red bumpers, an earthquake, a rocket about a level up; set by worth or by gift name in config.js; one at a time, a feed down the left says who sent what, a banner for the big ones; follows and shares get confetti. Only the game on the server's own PC hears them. "gift 30" in the dev console, or node server.js 8080 --test-gifts, tries them without going live
 - [x] A gift's grand piano instead of the wind (the cheapest gifts, Roses, 1 diamond up): it falls slowly with the sender's name, a red mark at the top and a shadow where it will land, at your height (it falls past the ledges above); if it hits you you are flattened and thrown (with a line: پیانۆ؟! بەڕاستی؟), it lands with a crash of low keys and stays 7 s as a ledge that plays notes, then blinks and goes (piano_speed, piano_stay, piano_w); in a room it falls at the same places for everyone
+- [x] Gifts by worth, a bigger gift a bigger thing (gifts.rules: diamonds, what, how much, a name to show): 1 a falling piano (a Rose), 10 two super jumps, 30 two red bumpers, 99 three super jumps, 199 an earthquake, 500 a rocket a level up, 1000 a double rocket two levels up; the list of them sits under the likes card on screen, green for help and red for trouble, each row with one gift of that worth by name (Rose, Perfume, Doughnut, Hat and Mustache, Corgi, Money Gun, Galaxy)
+- [x] The gifts' own pictures: TikTok sends a picture with each gift, and the feed and the gift list show it (for that gift's worth) while LIVE; only the address is kept, in the browser; a drawn diamond until one comes
+- [x] No waiting for gifts: every gift acts the moment it comes (gift_gap 0), none dropped, and a streak counts in full (up to 99 super jumps, 6 pianos or bumpers each); the recent-gifts feed is small, 3 short lines that go after 4 s (feed_lines, feed_time; 0 lines hides it)
+- [x] Done with a race (watching the rest), the streamer's gifts and the likes' falling things still go to the climbers on the tower, as 'share' allows
 - [x] A like goal on screen: a bar that fills with the LIVE's likes (like_goal, 1000); full, everyone in the room gets a rocket (gifts.like_prize), with a banner and confetti, and it starts again
 - [x] The ghost of your best climb, alone: a see-through climber where you were at this moment of your best climb from this start level and difficulty (the one that got highest, then fastest), a ring for it on the height bar, and at each level done how far ahead (green) or behind (red) your best you are; going on with a saved climb shows no ghost (only a fresh climb has one)
 - [x] World 6's wind is gentler (wind_speed 75, was 115), eases in and out around each turn, and its sign blinks just before it turns

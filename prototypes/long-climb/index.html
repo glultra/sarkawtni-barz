@@ -68,7 +68,7 @@ const CKB = {
   toLobby: 'Enter: گەڕانەوە', hostEnds: 'خاوەنی ژوور پێشبڕکێکە کۆتایی پێ دەهێنێت', held: 'گیرایت!', go: 'بڕۆ!', errFull: 'ژوورەکە پڕە', errNone: 'ژوور نەدۆزرایەوە', errGone: 'پەیوەندی پچڕا',
   arrows: 'تیرەکان: هەڵبژاردن     Enter: دەستپێکردن', diff: 'ئاستی سەختی',
   nameTitle: 'ناوەکەت چییە؟', nameHint: 'N: گۆڕینی ناو', codeLine: 'C: پشکنینی کۆدی بینەر', simple: ['بە تەنیا یاری بکە', 'پێشبڕکێ لەگەڵ بۆتەکان', 'ژوورێک دروست بکە', 'بچۆ ناو ژوورێک'],
-  pauseMenu: ['بەردەوامبوون', 'دەستپێکردنەوە لە سەرەتاوە', 'دەنگ', 'مینیوی سەرەکی'], tiktokView: 'دیمەنی تیکتۆک', leaveRoom: 'دەرچوون لە ژوور', on: 'کراوە', off: 'کوژاوە', arrows2: 'تیرەکان و Enter     Esc: بەردەوامبوون',
+  pauseMenu: ['بەردەوامبوون', 'دەستپێکردنەوە لە سەرەتاوە', 'دەنگ', 'مینیوی سەرەکی'], tiktokView: 'دیمەنی تیکتۆک', giftsT: 'دیارییەکان: ئەڵماس', leaveRoom: 'دەرچوون لە ژوور', on: 'کراوە', off: 'کوژاوە', arrows2: 'تیرەکان و Enter     Esc: بەردەوامبوون',
   figures: ['سەرکەوتوو', 'سەکۆ', 'سەکۆی جووڵاو', 'سەکۆی داڕماو', 'سەهۆڵ', 'هەڵبەزێنەر', 'پشتێنی گوازەرەوە', 'سەکۆی کاتی', 'دوگمە', 'دەروازە', 'ئامانج', 'قوللە', 'تۆپی سوور', 'ئەستێرە', 'پانکە'],
 };
 CKB.controls = ['A / D یان جۆیستیک: جووڵە     Space: باز     F: تەقە', 'کلیکی چەپ یان E: پاڵنان     کلیکی ڕاست یان Q: گرتن', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ'];
@@ -108,7 +108,7 @@ const EN = {
   toLobby: 'Enter: go back', hostEnds: 'The host ends the race', held: 'Grabbed!', go: 'GO!', errFull: 'The room is full', errNone: 'Room not found', errGone: 'Connection lost',
   arrows: 'Arrows: choose     Enter: go', diff: 'Difficulty',
   nameTitle: "What's your name?", nameHint: 'N: change', codeLine: "C: check a viewer's code", simple: ['Play alone', 'Race the bots', 'Make a room', 'Join a room'],
-  pauseMenu: ['Go on', 'Start again from the bottom', 'Sound', 'Main menu'], tiktokView: 'TikTok view', leaveRoom: 'Leave the room', on: 'on', off: 'off', arrows2: 'Arrows and Enter     Esc: go on',
+  pauseMenu: ['Go on', 'Start again from the bottom', 'Sound', 'Main menu'], tiktokView: 'TikTok view', giftsT: 'Gifts: diamonds', leaveRoom: 'Leave the room', on: 'on', off: 'off', arrows2: 'Arrows and Enter     Esc: go on',
   figures: ['Climber', 'Ledge', 'Moving ledge', 'Crumbling ledge', 'Ice', 'Bouncer', 'Conveyor belt', 'Timed ledge', 'Button', 'Gate', 'Target', 'Turret', 'Red bumper', 'Star', 'Fan'],
   worlds: ["Earth's core", 'Moving ledges', 'Crumbling ledges', 'Buttons and gates', 'Ice', 'Wind', 'Blaster', 'Bouncers and belts', 'Turrets', 'Ultimate'],
   hints: ['', '', '', 'The red button opens the gate', '', '', 'F: shoot the target', '', 'Shoot the turrets to stop them', 'Everything at once'],
@@ -2370,9 +2370,9 @@ function onFx(m) { // something another climber did
   else if (m.k === 'bo') { const b = bumpers[m.n]; if (b && b.gift === undefined && !(b.off > 0)) { b.off = tune.off_time; puff(b.x, b.alt, 8, '#ff3b4e', 180); } }
   else if (m.k === 'to') { const tr = turrets[m.n]; if (tr && !(tr.sleep > 0)) { tr.sleep = tune.off_time; tr.next = tune.turret_period; puff(tr.x, tr.alt, 8, '#9aa0a8', 180); } }
   else if (m.k === 'gift' && m.g) {
-    const g = { user: String(m.g.user || 'viewer').slice(0, 24), gift: String(m.g.gift || 'Gift').slice(0, 24), n: clamp(Math.round(m.g.n) || 1, 1, 99), d: Math.max(1, Number(m.g.d) || 1), k: FX.includes(m.g.k) ? m.g.k : 'wind', remote: true, all: !!m.g.all };
+    const g = { user: String(m.g.user || 'viewer').slice(0, 24), gift: String(m.g.gift || 'Gift').slice(0, 24), n: clamp(Math.round(m.g.n) || 1, 1, 99), d: Math.max(1, Number(m.g.d) || 1), k: FX.includes(m.g.k) ? m.g.k : 'wind', a: giftAmt(m.g.a), remote: true, all: !!m.g.all };
     if (m.g.dir === 1 || m.g.dir === -1) g.dir = m.g.dir; if (Array.isArray(m.g.spots)) g.spots = m.g.spots.slice(0, 80).map(p => ({ x: clamp(Number(p.x) || 0, 0, W), alt: Number(p.alt) || 0 }));
-    if (game.spec || scene !== 'play' || !P) { liveFeed(`${g.user}: ${g.gift}  →  ${K.fx[g.k]}`, UI.dim); if (g.k === 'shake') { state.shake = 0.8; sfx.thud(); } if (g.k !== 'wind' && g.k !== 'jump') live.big = { s1: K.fx[g.k], s2: g.user, t: 1.8 }; if (g.spots) g.spots.forEach((p, i) => { if (g.k === 'piano') dropPiano(p.x, p.alt, g.user); else bumpers.push({ x: p.x, alt: p.alt, phase: i, cool: 0.6, off: 0, gift: tune.gift_bumper_time }); }); } else applyGift(g); // at once: the streamer already spaced them
+    if (game.spec || scene !== 'play' || !P) { liveFeed(`${g.user}: ${g.gift}  →  ${giftLabel(g.k, g.a)}`, UI.dim); if (g.k === 'shake') { state.shake = 0.8; sfx.thud(); } if (g.k !== 'wind' && !(g.k === 'jump' && g.a < 2)) live.big = { s1: giftLabel(g.k, g.a), s2: g.user, t: 1.8 }; if (g.spots) g.spots.forEach((p, i) => { if (g.k === 'piano') dropPiano(p.x, p.alt, g.user); else bumpers.push({ x: p.x, alt: p.alt, phase: i, cool: 0.6, off: 0, gift: tune.gift_bumper_time }); }); } else applyGift(g); // at once: the streamer already spaced them
   } else if (m.k === 'drop' && Array.isArray(m.list)) { const user = String(m.user || 'viewer').slice(0, 24); for (const o of m.list.slice(0, 40)) live.falling.push({ x: clamp(Number(o.x) || 0, 30, W - 30), alt: Number(o.alt) || 0, kind: DROPS.includes(o.kind) ? o.kind : 'heart', user, spin: 0 }); liveFeed(`${user}: ${tune.like_drop} ${K.likes}  →  ${K.dropN[DROPS.includes(m.list[0] && m.list[0].kind) ? m.list[0].kind : 'heart']}`, '#ffb0c8'); sfx.whistle(); }
 }
 
@@ -2384,43 +2384,82 @@ function onFx(m) { // something another climber did
 // A follow or a share is thanked with confetti. In dev mode, "gift 30" in the console sends a test one.
 const live = { ws: null, state: 'off', queue: [], wait: 0, feed: [], big: null, gust: 0, gustDir: 1, jumps: 0, rocket: 0, likes: 0, likesSeen: false, drops: [], dropWait: 0, dropN: 0, falling: [], pianos: [], goal: 0 };
 const FX = ['wind', 'jump', 'bumper', 'shake', 'rocket', 'piano'];
-function giftKind(name, d) { // what a gift does: by its name when config.js names it, otherwise by its worth
-  const G = CONFIG.gifts || {}, by = G.names || {};
-  if (FX.includes(by[name])) return by[name];
-  let k = 'wind'; for (const [min, e] of G.rules || []) if (d >= min && FX.includes(e)) k = e; return k;
+const GIFT_GOOD = ['jump', 'rocket'], giftColor = k => GIFT_GOOD.includes(k) ? '#7be08a' : k === 'wind' ? '#cfe3ff' : '#ff8a96'; // the gifts that help you; the rest make the climb harder
+const giftAmt = a => clamp(Math.round(Number(a)) || 1, 1, 9);
+function giftRule(name, d) { // what a gift does and how much: by its name when config.js names it, otherwise by its worth
+  const G = CONFIG.gifts || {}, by = G.names || {}, nm = Array.isArray(by[name]) ? by[name] : [by[name]];
+  if (FX.includes(nm[0])) return { k: nm[0], a: giftAmt(nm[1]) };
+  let r = { k: 'wind', a: 1 }; for (const [min, e, a] of G.rules || []) if (d >= min && FX.includes(e)) r = { k: e, a: giftAmt(a) }; return r;
 }
-function liveFeed(s, c = '#ffffff') { live.feed.push({ s, c, t: 6 }); if (live.feed.length > 5) live.feed.shift(); }
-function liveGift(m) { if (live.queue.length < 40) live.queue.push(m); else liveFeed(`${m.user}: ${m.gift}`, UI.dim); }
+const giftLabel = (k, a) => K.fx[k] + (a > 1 ? ' ×' + a : ''); // "Super jump ×3", "Rocket ×2"
+// The gifts' own pictures: TikTok sends one with each gift, and the game shows it in the feed and in the list
+// of gifts (for that gift's worth). Only the address is kept, in this browser, so the list has them next time;
+// a picture that does not load leaves the drawn diamond in its place. Nothing is fetched until a gift comes.
+const giftPics = { byName: {}, byTier: {} }, giftImgs = {};
+try { const v = JSON.parse(localStorage.getItem('long-climb-gift-pics') || 'null'); if (v && v.byName && v.byTier) Object.assign(giftPics, v); } catch (e) {}
+const giftTier = d => { let t = -1; ((CONFIG.gifts || {}).rules || []).forEach((r, i) => { if (d >= r[0]) t = i; }); return t; };
+function giftPicSeen(name, d, url) {
+  if (typeof url !== 'string' || !/^https:\/\//.test(url) || url.length > 600) return;
+  giftPics.byName[name] = url; const t = giftTier(d); if (t >= 0) giftPics.byTier[t] = name;
+  try { localStorage.setItem('long-climb-gift-pics', JSON.stringify(giftPics)); } catch (e) {}
+}
+function giftImg(name) { // the picture of a gift by its name, once it has loaded; null until then or when it cannot
+  const url = giftPics.byName[name]; if (!url) return null;
+  let im = giftImgs[url]; if (!im) { im = giftImgs[url] = new Image(); im.referrerPolicy = 'no-referrer'; im.src = url; }
+  return im.complete && im.naturalWidth > 0 ? im : null;
+}
+function liveFeed(s, c = '#ffffff', pic = null) { live.feed.push({ s, c, t: tune.feed_time, pic }); while (live.feed.length > Math.max(0, tune.feed_lines)) live.feed.shift(); }
+function liveGift(m) { if (live.queue.length < 500) live.queue.push(m); else liveFeed(`${m.user}: ${m.gift}`, UI.dim); }
 function liveConnect() { // only the game on the server's own PC hears the gifts: that is the streamer's
   if (!net.can || !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || live.ws) return;
   try {
     const ws = new WebSocket('ws://' + location.host); live.ws = ws;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'live' }));
     ws.onmessage = e => { let m = null; try { m = JSON.parse(e.data); } catch (x) {} if (!m) return;
-      if (m.t === 'gift') liveGift({ user: String(m.user || 'viewer').slice(0, 24), gift: String(m.gift || 'Gift').slice(0, 24), n: clamp(Math.round(m.n) || 1, 1, 99), d: Math.max(1, Number(m.d) || 1) });
+      if (m.t === 'gift') { const g = { user: String(m.user || 'viewer').slice(0, 24), gift: String(m.gift || 'Gift').slice(0, 24), n: clamp(Math.round(m.n) || 1, 1, 99), d: Math.max(1, Number(m.d) || 1) }; giftPicSeen(g.gift, g.d, m.pic); liveGift(g); }
       else if (m.t === 'cheer') { const share = m.what === 'share'; liveFeed(`${String(m.user || '').slice(0, 24)} ${share ? K.shared : K.followed}${share ? '  →  ' + K.fx.jump : ''}`, '#7be08a'); if (share) live.jumps = Math.min(live.jumps + 1, 5); if (scene === 'play' && P) confetti(P.x + PW / 2, P.alt + 60, 20); } // a share gives a super jump
       else if (m.t === 'like') liveLikes(String(m.user || 'viewer').slice(0, 24), clamp(Math.round(m.n) || 1, 1, 500));
       else if (m.t === 'livestate') { if (m.s !== live.state && (m.s === 'on' || (m.s === 'lost' && live.state === 'on'))) toast(m.s === 'on' ? K.liveOn : K.liveLost); live.state = m.s; } };
     ws.onclose = () => { live.ws = null; setTimeout(liveConnect, 5000); };
   } catch (e) { live.ws = null; }
 }
+const bumperSpots = (list, na) => list.flatMap(c => Array.from({ length: Math.min(na, 6) }, (_, i) => ({ x: Math.round(clamp(c.x + c.face * (80 + i * 70) * (i % 2 ? -1 : 1), 40, W - 40)), alt: Math.round(c.alt + 150 + i * 60) })));
+const pianoSpots = (list, na) => list.flatMap(c => Array.from({ length: Math.min(na, 6) }, (_, i) => ({ x: Math.round(clamp(c.x + (fxr() - 0.5) * 160 + i * 120 * (c.face || 1), tune.piano_w / 2 + 6, W - tune.piano_w / 2 - 6)), alt: Math.round(c.alt + 1000 + i * 380) })));
+// Done with the race (or watching it), the streamer's gifts still reach the room: each one goes out to the
+// climbers still on the tower, at the same places on every screen, and only the feed shows it here.
+const relaying = () => game.kind === 'net' && !!net.ws && (scene === 'watch' || (scene === 'pause' && pauseFrom === 'watch')) && !(state.count > 0);
+const othersNow = () => climbersNow(true).slice(1); // the climbers still racing, without you
+function relayGift(m) {
+  const r = m.k ? { k: m.k, a: giftAmt(m.a) } : giftRule(m.gift, m.d), k = r.k, a = r.a, n = m.n, na = a * n, list = othersNow();
+  const go = (m.all || shareGift(k)) && list.length > 0;
+  liveFeed(`${m.user}: ${m.gift}${n > 1 ? ' ×' + n : ''}  →  ${giftLabel(k, a)}${go && !m.all ? '  →  ' + K.forAll : ''}`, go ? giftColor(k) : UI.dim, m.gift);
+  if (!go) return;
+  const out = { user: m.user, gift: m.gift, n, d: m.d, k, a, all: m.all ? 1 : 0 };
+  if (k === 'wind') out.dir = fxr() < 0.5 ? -1 : 1;
+  else if (k === 'bumper') out.spots = bumperSpots(list, na);
+  else if (k === 'piano') { out.spots = pianoSpots(list, na); for (const q of out.spots) dropPiano(q.x, q.alt, m.user); } // seen falling here too, on the one you watch
+  if (k !== 'wind' && !(k === 'jump' && a < 2)) live.big = { s1: giftLabel(k, a), s2: m.user, t: 1.8 };
+  events.push(['gift-relay', m.user, m.gift, n, m.d, k]);
+  net.send({ t: 'fx', k: 'gift', g: out });
+}
 function applyGift(m) { // one gift, now: what it does, a line in the feed, and for the big ones a banner
-  const k = m.k || giftKind(m.gift, m.d), n = m.n, cx = P.x + PW / 2;
-  liveFeed(`${m.user}: ${m.gift}${n > 1 ? ' ×' + n : ''}  →  ${K.fx[k]}`, k === 'jump' || k === 'rocket' ? '#7be08a' : k === 'wind' ? '#cfe3ff' : '#ff8a96');
-  const share = !m.remote && (m.all || shareGift(k)) && game.kind === 'net', out = { user: m.user, gift: m.gift, n, d: m.d, k, all: m.all ? 1 : 0 };
-  if (k === 'wind') { live.gust += tune.gift_wind_time * Math.min(n, 4); live.gustDir = m.dir || (P.face >= 0 ? -1 : 1); out.dir = live.gustDir; sfx.swing(); }
-  else if (k === 'jump') { live.jumps = Math.min(live.jumps + n, 5); sfx.star(); ring(cx, P.alt + 20, UI.gold, 70); }
+  const r = m.k ? { k: m.k, a: giftAmt(m.a) } : giftRule(m.gift, m.d), k = r.k, a = r.a, n = m.n, na = a * n, cx = P.x + PW / 2; // na: how much in all, for a streak of n
+  liveFeed(`${m.user}: ${m.gift}${n > 1 ? ' ×' + n : ''}  →  ${giftLabel(k, a)}`, giftColor(k), m.gift);
+  const share = !m.remote && (m.all || shareGift(k)) && game.kind === 'net', out = { user: m.user, gift: m.gift, n, d: m.d, k, a, all: m.all ? 1 : 0 };
+  if (k === 'wind') { live.gust = Math.min(live.gust + tune.gift_wind_time * Math.min(na, 4), 20); live.gustDir = m.dir || (P.face >= 0 ? -1 : 1); out.dir = live.gustDir; sfx.swing(); }
+  else if (k === 'jump') { live.jumps = Math.min(live.jumps + na, 99); sfx.star(); ring(cx, P.alt + 20, UI.gold, 70 + a * 20); }
   else if (k === 'bumper') { // red bumpers by every climber, at the same places on every screen
-    const spots = m.spots || climbersNow(share).flatMap(c => Array.from({ length: Math.min(n, 3) }, (_, i) => ({ x: Math.round(clamp(c.x + c.face * (80 + i * 70), 40, W - 40)), alt: Math.round(c.alt + 150 + i * 60) })));
+    const spots = m.spots || bumperSpots(climbersNow(share), na);
     spots.forEach((p, i) => bumpers.push({ x: p.x, alt: p.alt, phase: i, cool: 0.6, off: 0, gift: tune.gift_bumper_time })); out.spots = spots; sfx.bump(); }
   else if (k === 'shake') { state.shake = 0.8; sfx.thud(); if (!shieldBlocks()) { if (P.hang) letGo(false, true); if (P.on) { P.on = null; P.vy = 380; P.vx = (P.face || 1) * -220; P.coy = 0; P.cut = false; P.stun = 0.3; } } }
   else if (k === 'piano') { // a grand piano above every climber, at the same places on every screen
-    const spots = m.spots || climbersNow(share).flatMap(c => Array.from({ length: Math.min(n, 3) }, (_, i) => ({ x: Math.round(clamp(c.x + (fxr() - 0.5) * 160 + i * 120 * (c.face || 1), tune.piano_w / 2 + 6, W - tune.piano_w / 2 - 6)), alt: Math.round(c.alt + 1000 + i * 380) })));
+    const spots = m.spots || pianoSpots(climbersNow(share), na);
     for (const q of spots) dropPiano(q.x, q.alt, m.user); out.spots = spots; sfx.whistle(); }
-  else { if (P.hang) letGo(false, true); P.on = null; P.coy = 0; P.cut = false; P.stun = 0; P.vy = tune.gift_rocket; live.rocket = 1.2; sfx.go(); ring(cx, P.alt, '#ffb347', 90); }
-  if (k !== 'wind' && k !== 'jump') { live.big = { s1: K.fx[k], s2: m.user, t: 1.8 }; }
+  else { // a rocket: the height goes with the square of the speed, so a rocket of 2 goes twice as high
+    if (P.hang) letGo(false, true); P.on = null; P.coy = 0; P.cut = false; P.stun = 0; P.vy = tune.gift_rocket * Math.sqrt(Math.min(na, 3)); live.rocket = 1.2 * Math.min(na, 3); sfx.go(); ring(cx, P.alt, '#ffb347', 90 * Math.min(na, 3)); if (na > 1) confetti(cx, P.alt + 40, 40); }
+  if (k !== 'wind' && !(k === 'jump' && a < 2)) { live.big = { s1: giftLabel(k, a), s2: m.user, t: 1.8 }; }
   if (k === 'jump' || k === 'rocket') quip('gift', k === 'rocket'); else if (k === 'shake') quip('bump', true);
-  if (m.all) { live.big = { s1: `${K.fx[k]} ${K.forAll}`, s2: m.user, t: 2.6 }; confetti(cx, P.alt + 60, 60); sfx.win(); } // the like goal reached
+  if (m.all) { live.big = { s1: `${giftLabel(k, a)} ${K.forAll}`, s2: m.user, t: 2.6 }; confetti(cx, P.alt + 60, 60); sfx.win(); } // the like goal reached
   events.push(['gift', m.user, m.gift, n, m.d, k]);
   if (share) fxSend({ k: 'gift', g: out }); // the room gets it too, with the very same places
 }
@@ -2431,7 +2470,7 @@ function liveStep(dt) { // after the climber's own step, each step of the climb
   if (bumpers.some(b => b.gift !== undefined && b.gift <= 0)) bumpers = bumpers.filter(b => b.gift === undefined || b.gift > 0); // a gift's bumpers go after a while
   const can = scene === 'play' && !(state.count > 0) && !game.fin && !state.done && !game.spec;
   live.wait -= dt;
-  if (can && live.wait <= 0 && live.queue.length) { applyGift(live.queue.shift()); live.wait = tune.gift_gap; }
+  while (live.wait <= 0 && live.queue.length && (can || relaying())) { const m = live.queue.shift(); if (can) applyGift(m); else relayGift(m); live.wait = tune.gift_gap; if (tune.gift_gap > 0) break; } // gift_gap 0: no waiting, every gift at once
   if (live.gust > 0) { live.gust -= dt; if (can) { P.x = clamp(P.x + live.gustDir * tune.gift_wind_speed * dt * (P.on ? 0.55 : 1), 0, W - PW); state.wind = live.gustDir; } } // a gust pushes on a ledge too, a little less than in the air
   if (live.rocket > 0) { live.rocket -= dt; if (Math.floor(live.rocket * 30) % 2) puff(P.x + PW / 2, P.alt - 4, 2, '#ffb347', 120); }
   stepDrops(dt, can); stepPianos(dt, can);
@@ -2450,10 +2489,11 @@ function liveLikes(user, n) {
 const likePrize = () => ['rocket', 'jump'].includes((CONFIG.gifts || {}).like_prize) ? CONFIG.gifts.like_prize : 'rocket';
 function stepDrops(dt, can) {
   live.dropWait -= dt;
-  if (can && live.dropWait <= 0 && live.drops.length) { // the next one starts to fall, just above the top of the screen
+  const rel = !can && relaying() && shareGift('drop') && othersNow().length > 0; // done with the race: the likes' things fall on the others
+  if ((can || rel) && live.dropWait <= 0 && live.drops.length) { // the next one starts to fall, just above the top of the screen
     const it = live.drops.shift(), user = it.user, kind = DROPS[live.dropN % DROPS.length], off = DROP_AT[live.dropN % DROP_AT.length], share = shareGift('drop') && game.kind === 'net';
-    const list = climbersNow(share).map(c => ({ x: Math.round(clamp(c.x + off, 30, W - 30)), alt: Math.round(c.alt + 1040), kind })); // one above every climber, just above the top of their screen
-    for (const o of list) live.falling.push({ x: o.x, alt: o.alt, kind, user, spin: 0 }); live.dropN++; live.dropWait = tune.drop_gap; if (share) fxSend({ k: 'drop', user, list });
+    const list = (rel ? othersNow() : climbersNow(share)).map(c => ({ x: Math.round(clamp(c.x + off, 30, W - 30)), alt: Math.round(c.alt + 1040), kind })); // one above every climber, just above the top of their screen
+    for (const o of list) live.falling.push({ x: o.x, alt: o.alt, kind, user, spin: 0 }); live.dropN++; live.dropWait = tune.drop_gap; if (rel) net.send({ t: 'fx', k: 'drop', user, list }); else if (share) fxSend({ k: 'drop', user, list });
     liveFeed(`${user}: ${tune.like_drop} ${K.likes}  →  ${K.dropN[kind]}`, '#ffb0c8'); sfx.whistle(); events.push(['drop', user, kind]);
   }
   for (const o of live.falling) {
@@ -2529,6 +2569,21 @@ function drawDrops() {
     else if (y < H + 40) drawDrop(o, y);
   }
 }
+function drawGiftList(y) { // under the likes card: every gift by its worth in diamonds and what it does, green when it helps, red when it gets in the way
+  const rules = ((CONFIG.gifts || {}).rules || []).filter(r => FX.includes(r[1])); if (!rules.length) return y;
+  const rh = 25, h = 34 + rules.length * rh, gw = 356; rr(30, y, gw, h, 16, 'rgba(10,12,20,0.78)'); // wider than the likes card, for the gifts' names
+  text(K.giftsT, 30 + gw / 2, y + 17, 15, UI.gold, 'center', true);
+  rules.forEach(([d, k, a, name], i) => {
+    const ry = y + 34 + i * rh + rh / 2 - 2;
+    const shown = name || giftPics.byTier[i], im = shown ? giftImg(shown) : null; // the gift's own picture once one has come, else a diamond
+    if (im) ctx.drawImage(im, 32, ry - 12, 24, 24);
+    else { ctx.fillStyle = '#5fd0ff'; ctx.beginPath(); ctx.moveTo(44, ry - 7); ctx.lineTo(51, ry); ctx.lineTo(44, ry + 7); ctx.lineTo(37, ry); ctx.closePath(); ctx.fill(); }
+    ltr(`${d}+`, 60, ry, 16, '#ffffff', 'left');
+    if (shown) { ctx.font = `bold 16px ${FONT}`; const nx = 60 + ctx.measureText(`${d}+`).width + 8; ltr(fitText(String(shown), 172 - (nx - 60), 14), nx, ry, 14, '#d8deea', 'left'); }
+    text(fitText(giftLabel(k, giftAmt(a)), 140, 15), 30 + gw - 12, ry, 15, giftColor(k), 'right', true);
+  });
+  return y + h + 6;
+}
 function drawLive() { // the falling things, the likes counter and the gift feed down the left, and a banner for a big gift
   drawPianos(); drawDrops();
   let y = drawBuffs(dev.on ? 132 : 92); ctx.textBaseline = 'middle';
@@ -2541,8 +2596,9 @@ function drawLive() { // the falling things, the likes counter and the gift feed
     const nd = tune.like_drop, have = clamp(live.likes, 0, nd);
     if (nd <= 12) for (let i = 0; i < nd; i++) { const dx = 68 + i * 17; ctx.beginPath(); ctx.arc(dx, ry, 6, 0, 7); if (i < have) { ctx.fillStyle = '#ff4d6d'; ctx.fill(); } else { ctx.strokeStyle = 'rgba(255,176,200,0.55)'; ctx.lineWidth = 2; ctx.stroke(); } } // a dot a like
     else { rr(64, ry - 4, 204, 8, 4, 'rgba(10,12,20,0.55)'); if (have > 0) rr(64, ry - 4, Math.max(8, 204 * have / nd), 8, 4, '#ff4d6d'); } // many likes a drop: a thin bar instead
-    y += 90; }
-  for (const f of live.feed) { ctx.globalAlpha = clamp(f.t, 0, 1); ctx.font = `bold 16px ${FONT}`; const s = fitText(f.s, W - 140, 16), w = ctx.measureText(s).width + 24; pill(30, y, w, 32, 'rgba(10,12,20,0.7)'); ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = f.c; ctx.fillText(s, 42, y + 17); y += 38; }
+    y += 90;
+    y = drawGiftList(y); }
+  for (const f of live.feed) { ctx.globalAlpha = clamp(f.t, 0, 1) * 0.9; ctx.font = `bold 13px ${FONT}`; const im = f.pic ? giftImg(f.pic) : null, ix = im ? 22 : 0, s = fitText(f.s, 300 - ix, 13), w = ctx.measureText(s).width + 18 + ix; pill(30, y, w, 24, 'rgba(10,12,20,0.6)'); if (im) ctx.drawImage(im, 36, y + 3, 18, 18); ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.fillStyle = f.c; ctx.fillText(s, 39 + ix, y + 13); y += 28; } // the recent gifts, small: tune.feed_lines of them
   ctx.globalAlpha = 1;
   if (live.jumps > 0) { pill(30, y, 132, 32, 'rgba(120,90,0,0.8)'); ctx.font = `bold 16px ${FONT}`; ctx.textAlign = 'left'; ctx.fillStyle = '#fff3b0'; ctx.direction = 'ltr'; ctx.fillText(`${K.fx.jump} ×${live.jumps}`, 42, y + 17); }
   if (live.big) { const a = clamp(Math.min(live.big.t, 1.8 - live.big.t) * 5, 0, 1); ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(0, 470, W, 130); text(live.big.s1, W / 2, 520, 50, UI.gold, 'center', true); text(live.big.s2, W / 2, 570, 22, '#ffffff', 'center', true); ctx.globalAlpha = 1; }
