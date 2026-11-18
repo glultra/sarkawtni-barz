@@ -73,6 +73,10 @@ After play: add funny Kurdish lines when he falls from high or other things: "ay
 
 After play: the wind is so annoying; drop something bigger, like a piano, slowly; yes to a ghost of the best run with splits, and a like goal on screen
 
+After play: on a TikTok LIVE (from LIVE Studio on the PC) the game looks small and not right on phones (you decide what to fix)
+
+After play: the ghost does not start where I spawned (it did on a fresh climb; on a climb gone on with it was wherever the best climb was at that time)
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -134,7 +138,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] TikTok LIVE gifts change the climb (start-live.bat asks your TikTok name): by worth, a gust of wind, super jumps, red bumpers, an earthquake, a rocket about a level up; set by worth or by gift name in config.js; one at a time, a feed down the left says who sent what, a banner for the big ones; follows and shares get confetti. Only the game on the server's own PC hears them. "gift 30" in the dev console, or node server.js 8080 --test-gifts, tries them without going live
 - [x] A gift's grand piano instead of the wind (the cheapest gifts, Roses, 1 diamond up): it falls slowly with the sender's name, a red mark at the top and a shadow where it will land, at your height (it falls past the ledges above); if it hits you you are flattened and thrown (with a line: پیانۆ؟! بەڕاستی؟), it lands with a crash of low keys and stays 7 s as a ledge that plays notes, then blinks and goes (piano_speed, piano_stay, piano_w); in a room it falls at the same places for everyone
 - [x] A like goal on screen: a bar that fills with the LIVE's likes (like_goal, 1000); full, everyone in the room gets a rocket (gifts.like_prize), with a banner and confetti, and it starts again
-- [x] The ghost of your best climb, alone: a see-through climber where you were at this moment of your best climb from this start level and difficulty (the one that got highest, then fastest), a ring for it on the height bar, and at each level done how far ahead (green) or behind (red) your best you are
+- [x] The ghost of your best climb, alone: a see-through climber where you were at this moment of your best climb from this start level and difficulty (the one that got highest, then fastest), a ring for it on the height bar, and at each level done how far ahead (green) or behind (red) your best you are; going on with a saved climb shows no ghost (only a fresh climb has one)
 - [x] World 6's wind is gentler (wind_speed 75, was 115), eases in and out around each turn, and its sign blinks just before it turns
 - [x] Likes fill one card on screen: the like goal's bar on top, and under it a dot for each like toward the next falling thing (a thin bar when like_drop is over 12); every 10 (like_drop; it was 50, lowered for a small LIVE) a heart, a shoe or a flowerpot falls near you with the liker's name, a red mark at the top showing where; dodge it or it knocks you (drop_push, 0 for harmless). A share gives a super jump. "likes 50" in the dev console tries it
 - [x] Funny Kurdish lines in a speech bubble over the climber, with a little cartoon voice: a big fall (quote_fall, 12 m) always (ئەی لە قەبری بام!, ئاخ برا گیان...), standing still 8 s teases (چیە بۆ ناجوڵێیتەوە، ئەترسی شێرەکەم؟), and now and then a small fall, a bump, a shove, someone on your feet, a level done, a good gift, the finish; bots say some too; the room and spectators see yours. The lines are in config.js (quotes), to change or add to, in Kurdish in either language
@@ -150,6 +154,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A controller plays it: PS5, Xbox or any standard pad
 - [x] The mouse plays it: left click shoves and fires, right click grabs
 - [x] Phone buttons that show only what applies (fire, shove, grab), with a ring while a shove or grab is not ready; a room link that carries the code
+- [x] A TikTok view (a button at the top left of the main menu, or T, or the Esc menu; kept on): for a LIVE watched on phones, the clock, the likes card, the gift feed and the standings come down 150 px out from under TikTok's name bar, the camera keeps the climber higher (47% down the screen, not 60%) above TikTok's chat, and the game draws at 1080 x 1920 however small the captured window is
 - [x] A menu on Esc (and a menu button on screen): go on, start again, sound, or leave for the main menu and out of the room
 - [x] A race of up to twenty-five to a level the host picks, with a countdown and live standings
 - [x] A room's size, 2 to 25 seats, chosen by its host; the room screen shows every seat, taken or empty

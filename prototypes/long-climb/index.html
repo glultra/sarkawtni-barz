@@ -68,7 +68,7 @@ const CKB = {
   toLobby: 'Enter: گەڕانەوە', hostEnds: 'خاوەنی ژوور پێشبڕکێکە کۆتایی پێ دەهێنێت', held: 'گیرایت!', go: 'بڕۆ!', errFull: 'ژوورەکە پڕە', errNone: 'ژوور نەدۆزرایەوە', errGone: 'پەیوەندی پچڕا',
   arrows: 'تیرەکان: هەڵبژاردن     Enter: دەستپێکردن', diff: 'ئاستی سەختی',
   nameTitle: 'ناوەکەت چییە؟', nameHint: 'N: گۆڕینی ناو', codeLine: 'C: پشکنینی کۆدی بینەر', simple: ['بە تەنیا یاری بکە', 'پێشبڕکێ لەگەڵ بۆتەکان', 'ژوورێک دروست بکە', 'بچۆ ناو ژوورێک'],
-  pauseMenu: ['بەردەوامبوون', 'دەستپێکردنەوە لە سەرەتاوە', 'دەنگ', 'مینیوی سەرەکی'], leaveRoom: 'دەرچوون لە ژوور', on: 'کراوە', off: 'کوژاوە', arrows2: 'تیرەکان و Enter     Esc: بەردەوامبوون',
+  pauseMenu: ['بەردەوامبوون', 'دەستپێکردنەوە لە سەرەتاوە', 'دەنگ', 'مینیوی سەرەکی'], tiktokView: 'دیمەنی تیکتۆک', leaveRoom: 'دەرچوون لە ژوور', on: 'کراوە', off: 'کوژاوە', arrows2: 'تیرەکان و Enter     Esc: بەردەوامبوون',
   figures: ['سەرکەوتوو', 'سەکۆ', 'سەکۆی جووڵاو', 'سەکۆی داڕماو', 'سەهۆڵ', 'هەڵبەزێنەر', 'پشتێنی گوازەرەوە', 'سەکۆی کاتی', 'دوگمە', 'دەروازە', 'ئامانج', 'قوللە', 'تۆپی سوور', 'ئەستێرە', 'پانکە'],
 };
 CKB.controls = ['A / D یان جۆیستیک: جووڵە     Space: باز     F: تەقە', 'کلیکی چەپ یان E: پاڵنان     کلیکی ڕاست یان Q: گرتن', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ'];
@@ -108,7 +108,7 @@ const EN = {
   toLobby: 'Enter: go back', hostEnds: 'The host ends the race', held: 'Grabbed!', go: 'GO!', errFull: 'The room is full', errNone: 'Room not found', errGone: 'Connection lost',
   arrows: 'Arrows: choose     Enter: go', diff: 'Difficulty',
   nameTitle: "What's your name?", nameHint: 'N: change', codeLine: "C: check a viewer's code", simple: ['Play alone', 'Race the bots', 'Make a room', 'Join a room'],
-  pauseMenu: ['Go on', 'Start again from the bottom', 'Sound', 'Main menu'], leaveRoom: 'Leave the room', on: 'on', off: 'off', arrows2: 'Arrows and Enter     Esc: go on',
+  pauseMenu: ['Go on', 'Start again from the bottom', 'Sound', 'Main menu'], tiktokView: 'TikTok view', leaveRoom: 'Leave the room', on: 'on', off: 'off', arrows2: 'Arrows and Enter     Esc: go on',
   figures: ['Climber', 'Ledge', 'Moving ledge', 'Crumbling ledge', 'Ice', 'Bouncer', 'Conveyor belt', 'Timed ledge', 'Button', 'Gate', 'Target', 'Turret', 'Red bumper', 'Star', 'Fan'],
   worlds: ["Earth's core", 'Moving ledges', 'Crumbling ledges', 'Buttons and gates', 'Ice', 'Wind', 'Blaster', 'Bouncers and belts', 'Turrets', 'Ultimate'],
   hints: ['', '', '', 'The red button opens the gate', '', '', 'F: shoot the target', '', 'Shoot the turrets to stop them', 'Everything at once'],
@@ -143,10 +143,18 @@ const ctx = canvas.getContext('2d');
 // buttons on the dark panels beside it, and as much of the tower's height as fits. A PC's window never does.
 const phone = params.get('land') === '1' || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
 let CW = W, OX = 0, LAND = false; // the canvas's logical width, how far the tower's left edge sits inside it, and whether the sideways view is on
+// The TikTok view (the Esc menu, kept): for a LIVE watched on phones, where TikTok's own name bar covers the top and its chat and gift
+// buttons the bottom. The clock, the cards and the standings come down out from under the top bar, the camera keeps the climber
+// higher, above the chat, and the game draws at 1080 x 1920 however small the captured window is.
+let STREAM = params.get('stream') === '1'; try { if (localStorage.getItem('long-climb-stream') === '1') STREAM = true; } catch (e) {}
+const SAFE_TOP = 150; let HUDY = 0; // how far the HUD comes down in the TikTok view, and the shift of the HUD being drawn now
+const camY = () => STREAM && !LAND ? 0.47 : 0.6; // where the climber sits on the screen, as a share of its height
+function setStream(on) { STREAM = on; try { localStorage.setItem('long-climb-stream', on ? '1' : '0'); } catch (e) {} fit(); }
+function hudShift(fn) { if (!STREAM || LAND || touchSeen) { fn(); return; } ctx.save(); ctx.translate(0, SAFE_TOP); HUDY = SAFE_TOP; try { fn(); } finally { HUDY = 0; ctx.restore(); } }
 function fit() { // fills the window at any size and pixel ratio
   const iw = innerWidth, ih = innerHeight; LAND = phone && iw > ih * 1.15;
   H = LAND ? clamp(Math.round(2 * W * ih / iw), 600, 1280) : 1280; CW = LAND ? Math.max(W, H * iw / ih) : W; OX = (CW - W) / 2;
-  const k = LAND ? ih / H : Math.min(iw / W, ih / H), r = k * (devicePixelRatio || 1);
+  const k = LAND ? ih / H : Math.min(iw / W, ih / H), r = Math.max(k * (devicePixelRatio || 1), STREAM ? 1.5 : 0); // the TikTok view: never under 1080 x 1920
   canvas.width = Math.round(CW * r); canvas.height = Math.round(H * r);
   canvas.style.width = Math.round(CW * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
   canvas.style.marginTop = Math.max(0, Math.floor((ih - H * k) / 2)) + 'px';
@@ -182,6 +190,7 @@ let zones = [], taps = []; // what can be tapped or clicked: every screen names 
 let PASS = 0, VT = null, corner = null, wantToast = false; // set while a tall screen is drawn in slices for a sideways phone (splitDraw)
 function zone(x, y, w, h, fn) {
   if (VT) { const cy = y + h / 2; if (cy < VT.a || cy > VT.b) return; x = VT.ox + x * VT.s; y = VT.oy + y * VT.s; w *= VT.s; h *= VT.s; } // a button in a slice is where the slice put it
+  else y += HUDY; // a button of the HUD, brought down in the TikTok view
   zones.push({ x, y, w, h, fn });
 }
 function dim(a) { if (PASS) return; ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, 0, W, H); }
@@ -876,7 +885,8 @@ function reset(from) {
   cam = P.alt + tune.cam_lead; parts = []; shots = []; orbs = [];
   state.level = Math.min(LEVELS, n + 1); state.world = Math.floor((state.level - 1) / PER) + 1;
   state.splitD = null; state.rec = null; state.ghostRun = null; // alone: the ghost of the best climb from this start, and this climb recorded when it starts fresh
-  if (game.kind === 'solo' && !(lp > LEVELS && !from)) { const st = (from && from.from) || n + 1; state.ghostRun = ghostLoad(mode, st); if (!from || !from.cs) state.rec = { from: st, s: [], split: [] }; }
+  state.ghostOff = 0; // going on with a saved climb: no ghost and nothing recorded, only a fresh climb has one
+  if (game.kind === 'solo' && !(lp > LEVELS && !from) && !(from && from.cs)) { const st = n + 1; state.ghostRun = ghostLoad(mode, st); state.rec = { from: st, s: [], split: [] }; }
 }
 // What you see when something happens: dust, rings, sparks, paper and small numbers. None of it changes the game.
 function puff(x, alt, n, color, speed = 120) { // dust thrown out and up
@@ -949,8 +959,9 @@ function ghostAt(g, time) { // the best climb at this moment: where, which way, 
   const k = f - i, x0 = g.s[2 * i], x1 = g.s[2 * i + 2];
   return { x: lerp(Math.abs(x0), Math.abs(x1), k), alt: lerp(g.s[2 * i + 1], g.s[2 * i + 3], k), face: x1 < 0 ? -1 : 1, vx: (Math.abs(x1) - Math.abs(x0)) * GHOST_HZ, vy: (g.s[2 * i + 3] - g.s[2 * i + 1]) * GHOST_HZ };
 }
+const ghostTime = () => state.time + (state.ghostOff || 0); // the best climb's clock: yours, or on a climb you went on with, from when the best one reached your floor
 function drawGhost(t) {
-  const g = ghostAt(state.ghostRun, state.time); if (!g) return; const y = sy(g.alt); if (y < -70 || y > H + 70) return;
+  const g = ghostAt(state.ghostRun, ghostTime()); if (!g) return; const y = sy(g.alt); if (y < -70 || y > H + 70) return;
   ctx.globalAlpha = 0.36; drawClimber(g.x, y, g.face, 0, g.vx, Math.abs(g.vy) < 60 ? 0 : g.vy, t, 1, false, '#d8ecff', false);
   ctx.globalAlpha = 0.6; text(K.best, g.x, y - 64, 15, '#e6f2ff', 'center', true); ctx.globalAlpha = 1;
 }
@@ -1125,7 +1136,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
 }
 
 // ---- Drawing ----------------------------------------------------------------------------------
-const sy = alt => H * 0.6 - (alt - cam); // where an altitude lands on the screen
+const sy = alt => H * camY() - (alt - cam); // where an altitude lands on the screen
 const worldAt = alt => clamp(Math.floor(levelAt(alt) / PER), 0, WORLDS.length - 1);
 function mix(a, b, t) {
   const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), ch = s => Math.round(lerp((pa >> s) & 255, (pb >> s) & 255, t));
@@ -1150,7 +1161,7 @@ function drawSky() {
 }
 function drawDecor(starsOnly) { // clouds low down, stars high up, drifting slower than the tower
   for (const d of decor) {
-    const y = H * 0.6 - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
+    const y = H * camY() - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
     const high = d.alt / SUMMIT, wz = worldAt(d.alt);
     if (wz <= 2) { if (!starsOnly) continue; const t = state.t || 0; if (wz < 2) { const ry = y - ((t * 40 * (0.5 + d.k)) % 160) + 80; ctx.fillStyle = `rgba(255,${140 + Math.round(d.k * 80)},60,${0.35 + 0.4 * d.k})`; ctx.beginPath(); ctx.arc(d.x, ry, 1.5 + d.s * 1.5, 0, 7); ctx.fill(); } else { const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + d.x)); ctx.fillStyle = `rgba(200,220,255,${0.45 * tw})`; const sz = 2 + d.s * 2; ctx.fillRect(d.x - sz / 2, y - 0.5, sz, 1.5); ctx.fillRect(d.x - 0.75, y - sz / 2, 1.5, sz); } continue; } // embers rising in the deep, glints in the rock
     if ((wz >= 5) !== starsOnly) continue;
@@ -1683,7 +1694,7 @@ function drawWorld() {
 function menuBtn(x = 0) { if (PASS) { corner = 'menu'; return; } pill(x + 14, 14, 52, 52); ctx.fillStyle = '#ffffff'; for (const yy of [31, 39, 47]) ctx.fillRect(x + 29, yy, 22, 3); zone(x, 0, 84, 84, () => hit.add('Escape')); } // the menu button: Esc, or a tap
 function clockPill(sub) { pill(W / 2 - 116, 14, 232, 76); ltr(clockText(Math.floor(state.time * 100)), W / 2, 42, 32, '#ffffff'); text(sub, W / 2, 72, 17, UI.dim); }
 function heightBar(alt, color, ghostAlt = null) { // the whole tower by world, with every level marked, where you are and your best
-  const bx = 6, by = 100, bh = H - by - 70, yOf = a => by + bh - clamp(a / SUMMIT, 0, 1) * bh, race = game.kind !== 'solo';
+  const bx = 6, by = 100, bh = H - by - 70 - HUDY, yOf = a => by + bh - clamp(a / SUMMIT, 0, 1) * bh, race = game.kind !== 'solo';
   rr(bx - 3, by - 4, 16, bh + 8, 8, 'rgba(10,12,20,0.6)');
   WORLDS.forEach(Z => { ctx.fillStyle = Z.sky[0]; ctx.fillRect(bx, yOf(Z.end), 10, yOf(Z.base) - yOf(Z.end)); });
   ctx.fillStyle = 'rgba(255,212,79,0.9)'; for (let i = 1; i <= LEVELS; i++) ctx.fillRect(bx, yOf(rests[i].alt) - 1, i % PER ? 4 : 10, 2);
@@ -1704,7 +1715,7 @@ function standings() { // the first three of the race, and you
 function farArrows(ref) { // the nearest climbers out of sight, above and below, each with its distance
   const up = [], dn = []; for (const o of others.values()) { if (o.fin) continue; const y = sy(o.alt); if (y < 96) up.push(o); else if (y > H - 60) dn.push(o); }
   up.sort((a, b) => a.alt - b.alt); dn.sort((a, b) => b.alt - a.alt);
-  const chip = (o, k, d) => { const ax = clamp(o.x, 90, W - 310), ay = d > 0 ? 122 + k * 38 : H - (LAND ? 110 : touchSeen ? 420 : 150) - k * 38;
+  const chip = (o, k, d) => { const ax = clamp(o.x, 90, W - 310), ay = d > 0 ? 122 + k * 38 : H - HUDY - (LAND ? 110 : touchSeen ? 420 : 150) - k * 38;
     pill(ax - 52, ay - 16, 104, 32, 'rgba(10,12,20,0.78)'); ctx.fillStyle = o.color; ctx.beginPath(); ctx.moveTo(ax - 34, ay - d * 8); ctx.lineTo(ax - 43, ay + d * 6); ctx.lineTo(ax - 25, ay + d * 6); ctx.fill();
     text(`${Math.abs(metres(o.alt) - metres(ref))} ${K.metre}`, ax + 12, ay + 1, 17, '#ffffff', 'center', true); };
   up.slice(0, 2).forEach((o, k) => chip(o, k, 1)); dn.slice(0, 2).forEach((o, k) => chip(o, k, -1));
@@ -1724,7 +1735,7 @@ function hud() {
     pill(W - 190, 14, 176, 52); drawStar(W - 162, 40, 0, 0.6); ltr(String(state.stars), W - 128, 41, 22, '#ffffff');
     ctx.strokeStyle = '#ff8a96'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(W - 84, 30); ctx.lineTo(W - 84, 50); ctx.moveTo(W - 92, 43); ctx.lineTo(W - 84, 51); ctx.lineTo(W - 76, 43); ctx.stroke(); ltr(String(state.falls), W - 46, 41, 22, '#ffffff');
   }
-  const gh = race ? null : ghostAt(state.ghostRun, state.time); heightBar(P.alt, race ? game.color : '#e8334a', gh ? gh.alt : null);
+  const gh = race ? null : ghostAt(state.ghostRun, ghostTime()); heightBar(P.alt, race ? game.color : '#e8334a', gh ? gh.alt : null);
   if (P.hang) { ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(W / 2 - 100, 96, 200, 6); ctx.fillStyle = UI.gold; ctx.fillRect(W / 2 - 100, 96, 200 * clamp(P.hangT / tune.grab_time, 0, 1), 6); } // how long your grip still holds
   let row = race ? 190 : 112;
   if (!race && state.splitD !== null && state.splitD !== undefined) { // ahead of your best (green) or behind it (red), at the last level done
@@ -1759,11 +1770,11 @@ function levelBanner() {
   }
 }
 function hudRest(race) { // the first keys of a climb, the race's arrows and countdown, the shove and grab keys, and the phone's buttons
-  if (state.t < 5 && !race && !touchSeen) { pill(W / 2 - 290, H - 140, 580, 42); text(K.controls[0], W / 2, H - 118, 19, '#ffffff'); } // the keys, for the first seconds of a climb
+  if (state.t < 5 && !race && !touchSeen) { pill(W / 2 - 290, H - HUDY - 140, 580, 42); text(K.controls[0], W / 2, H - HUDY - 118, 19, '#ffffff'); } // the keys, for the first seconds of a climb
   if (race) {
     farArrows(P.alt); countdown();
     if (!touchSeen && !(state.count > 0)) for (const [k, x] of [['E', W / 2 - 34], ['Q', W / 2 + 34]]) { // shove and grab, and how soon each is ready again
-      const cool = k === 'E' ? pushCool / tune.push_cool : grabCool / tune.grab_cool, y = H - 52;
+      const cool = k === 'E' ? pushCool / tune.push_cool : grabCool / tune.grab_cool, y = H - HUDY - 52;
       dot(x, y, 24, 'rgba(10,12,20,0.6)'); ltr(k, x, y + 1, 20, cool > 0 ? '#666e80' : '#ffffff');
       if (cool > 0) { ctx.strokeStyle = UI.gold; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, 22, -PI / 2, -PI / 2 + (1 - clamp(cool, 0, 1)) * PI * 2); ctx.stroke(); }
     }
@@ -1794,13 +1805,13 @@ function watchHud() { // watching a race: whose climb you see, the standings, an
     if (bots) button(K.board, W + OX / 2 - 110, H - 72, 220, 50, false, () => hit.add('Enter'), { size: 19 });
     return;
   }
-  const y = H - 170; pill(W / 2 - 230, y, 460, 92, 'rgba(10,12,20,0.8)');
+  const y = H - HUDY - 170; pill(W / 2 - 230, y, 460, 92, 'rgba(10,12,20,0.8)');
   eye(W / 2 - 4 - 60, y + 26, 11, UI.dim); text(K.watching, W / 2 + 14, y + 27, 17, UI.dim);
   if (o) { dot(W / 2 - 120, y + 62, 9, o.color); text(fitText(o.name, 200, 26), W / 2, y + 63, 26, '#ffffff', 'center', true); }
   chevron(W / 2 - 196, y + 46, -1, '#ffffff', 13); chevron(W / 2 + 196, y + 46, 1, '#ffffff', 13);
   zone(W / 2 - 230, y - 10, 230, 112, () => watchNext(-1)); zone(W / 2, y - 10, 230, 112, () => watchNext(1));
-  if (bots) button(K.board, W / 2 - 110, H - 64, 220, 46, false, () => hit.add('Enter'), { size: 19 });
-  else if (!touchSeen) text(K.watchKeys, W / 2, H - 46, 17, '#ffffff');
+  if (bots) button(K.board, W / 2 - 110, H - HUDY - 64, 220, 46, false, () => hit.add('Enter'), { size: 19 });
+  else if (!touchSeen) text(K.watchKeys, W / 2, H - HUDY - 46, 17, '#ffffff');
 }
 
 // ---- Scenes ---------------------------------------------------------------------------------
@@ -1831,6 +1842,7 @@ const scenes = {
       if (mode !== m0) { const t = state.t; sfx.type(); game.kind = 'solo'; reset(); state.t = t; }
       if (pressed('KeyG')) { hit.clear(); sfx.pick(); openLevels(); return; }
       if (pressed('KeyL')) { setLang(lang === 'en' ? 'ckb' : 'en'); sfx.type(); }
+      if (pressed('KeyT') && !touchSeen) { setStream(!STREAM); sfx.type(); toast(`${K.tiktokView}: ${STREAM ? K.on : K.off}`); }
       if (pressed('KeyN')) { hit.clear(); menuGo(0); return; }
       if (pressed('KeyC')) { hit.clear(); menuGo(5); return; }
       if (pressed('KeyB') && save.run && save.run.mode === mode) { game.from = save.run.from || 1; game.goal = save.run.goal || LEVELS; game.kind = 'solo'; others = new Map(); reset(save.run); hit.clear(); scene = 'play'; return; }
@@ -1839,6 +1851,7 @@ const scenes = {
     draw() {
       drawWorld(); dim(0.8);
       seg([EN.langName, CKB.langName], lang === 'en' ? 0 : 1, W - 246, 26, 220, 46, i => { if ((i === 0) !== (lang === 'en')) hit.add('KeyL'); }); // the language: tap one, or press L
+      if (!touchSeen) button(`${K.tiktokView}: ${STREAM ? K.on : K.off}`, 26, 26, 250, 46, STREAM, () => hit.add('KeyT'), { size: 18 }); // the TikTok view: tap it, or press T
       text(K.title, W / 2, 232, 70, '#ffffff', 'center', true); ctx.fillStyle = UI.gold; ctx.fillRect(W / 2 - 36, 288, 72, 5);
       text(K.menu[4], W / 2, 340, 18, UI.dim); rr(110, 358, W - 220, 70, 22, UI.soft, menuSel === 0 ? '#ffffff' : null, 3); text(game.name, W / 2, 394, 32, '#ffffff', 'center', true); // your name, in its own box at the top
       zone(110, 358, W - 220, 70, () => { menuSel = 0; hit.add('Enter'); });
@@ -2030,7 +2043,7 @@ const scenes = {
       if (state.holdR >= 0.8 && game.kind === 'solo') { events.push(['restart']); save.run = null; store(); startSolo(); return; }
       stepWorld(dt); stepPlayer(dt); if (game.kind === 'solo') ghostRec(); liveStep(dt); buffStep(dt); stepOthers(dt); raceTick(dt); if (scene === 'play') { playWorld(state.world - 1); stepMusic(dt); }
     },
-    draw() { drawWorld(); hud(); },
+    draw() { drawWorld(); hudShift(hud); },
   },
   watch: { // watching the race: as a spectator, or once you have finished while the others still climb
     update(dt) {
@@ -2040,7 +2053,7 @@ const scenes = {
       if (game.kind === 'bots' && (pressed('Enter') || !stillRacing())) { state.t0 = state.t; scene = 'board'; return; } // with bots the results are yours to call up; a room's come when everyone is in
       playWorld(state.world - 1); stepMusic(dt);
     },
-    draw() { drawWorld(); watchHud(); },
+    draw() { drawWorld(); hudShift(watchHud); },
   },
   pause: { // the menu on Esc: go on, sound, the room's code and link, and the ways out
     cols() { const y = pauseTop(), n = this.items().length; return net.room ? [[[96, y - 12]], [[y - 12, y + n * 76]]] : [[[280, y + n * 76]]]; },
@@ -2049,6 +2062,7 @@ const scenes = {
       const list = [[K.pauseMenu[0], resume]], inRoom = game.kind === 'net';
       if (game.kind === 'solo') list.push([K.pauseMenu[1], () => { save.run = null; store(); startSolo(); }]);
       list.push([`${K.pauseMenu[2]}: ${muted ? K.off : K.on}`, () => setMuted(!muted)]);
+      if (!touchSeen) list.push([`${K.tiktokView}: ${STREAM ? K.on : K.off}`, () => setStream(!STREAM)]); // for a LIVE watched on phones
       if (inRoom && !game.fin && !game.over) list.push([game.spec ? K.joinRace : K.watch, () => { net.send({ t: 'spec', on: !game.spec }); resume(); }]);
       if (inRoom && net.host) list.push([game.over ? K.backRoom : K.endRace, () => net.send({ t: 'end' })]);
       list.push([inRoom ? K.leaveRoom : K.pauseMenu[3], toMenu]);
@@ -2578,7 +2592,7 @@ function drawFrame() {
   ctx.save(); if (LAND) { ctx.fillStyle = '#0b0d14'; ctx.fillRect(0, 0, CW, H); ctx.translate(OX, 0); }
   if (LAND && sc.cols) splitDraw(sc); else sc.draw();
   if (dev.on && !con.open && scene === 'play') drawDevBadge();
-  if (!con.open && (scene === 'play' || scene === 'watch')) drawLive(); // the falling likes, the gift feed and the buffs: yours, or those of the climber you watch
+  if (!con.open && (scene === 'play' || scene === 'watch')) hudShift(drawLive); // the falling likes, the gift feed and the buffs: yours, or those of the climber you watch
   if (con.open) drawConsole();
   ctx.restore();
 }
