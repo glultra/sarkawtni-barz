@@ -67,6 +67,8 @@ After play: my friend said this game has no anxiety or enjoyment; a fear-and-dra
 
 After play: remove the highest point as well; the TikTok API key goes in an .env file (SIGN_API_KEY)
 
+After play: show all details in spectate mode (the wind, the gun shots, almost everything), match details on both sides, and reduce the lag between players
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -121,7 +123,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] The moving ledge is a real car shape: its roof is the ledge, sloping glass down to a lower hood and boot, wheels in arches, lights and bumpers; the whole car is solid as drawn: you stand on the roof or step down onto the hood or the boot; feet a little under a car's top while falling are lifted onto it (car_snap, 18 px), so a jump that falls just short or a car that drives into you no longer lets you slip through
 - [x] Each thing sounds like itself when you land on it, and the room hears it: a bed springs, a sofa puffs, wood knocks, a counter clinks, a car honks, a bus horns and sighs its brakes, a truck and a van honk, a plane whooshes, a rocket clangs, a satellite beeps, ice tinkles; crates come back after 1.2 seconds
 - [x] The climber has arms in blue sleeves with white cartoon mittens and short legs with big brown shoes: hands at the sides standing, swinging and striding running, both arms up jumping, flailing falling; the arms come from behind the body, so the shoulders are clean
-- [x] A room shares more than where everyone is: the piano's notes (quieter the farther away), crates giving way, blaster shots (to see; they hurt nobody), red bumpers and turrets shot out, and every gift and like of the streamer's for everyone (gifts.share in config.js: all, chaos or none); gift bumpers and falling things are placed once, by every climber, and stand at the same places on every screen; positions go out 30 times a second with speeds, so friends are shown where they are now; a game newer than its server says so
+- [x] A room shares more than where everyone is: the piano's notes (quieter the farther away), crates giving way, blaster shots (to see; they hurt nobody), red bumpers and turrets shot out, and every gift and like of the streamer's for everyone (gifts.share in config.js: all, chaos or none); gift bumpers and falling things are placed once, by every climber, and stand at the same places on every screen; positions go out as soon as they come (every 16 ms), 60 times a second from each climber in a room of up to 6, 30 up to 14, 20 beyond, with speeds and the ledge each stands on, so a friend on a car rides that car on your screen and in the air flies on under gravity until their next word; one race clock for every screen, so cars, wind and turret orbs are in the same places for all; a game newer than its server says so
 - [x] A real-looking sky: the sun with corona and rays, the Moon painted with seas, lit craters and a rayed crater, the galaxy with thousands of stars, glowing arms and dust, the universe as a great cloud of coloured gas with dust lanes and stars of every colour
 - [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
@@ -142,7 +144,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A menu on Esc (and a menu button on screen): go on, start again, sound, or leave for the main menu and out of the room
 - [x] A race of up to twenty-five to a level the host picks, with a countdown and live standings
 - [x] A room's size, 2 to 25 seats, chosen by its host; the room screen shows every seat, taken or empty
-- [x] Spectating: anyone may choose to watch, a full room lets newcomers in to watch, and the camera follows the climber you pick
+- [x] Spectating: anyone may choose to watch, a full room lets newcomers in to watch, and the camera follows the climber you pick; you see what they see: their wind and which way it blows, their blaster and its shots, their gates, buttons, targets and stars, their timed ledges' clock, their buffs and shield, their level banners, hard falls, bumps, shoves and power-ups, and the streamer's gift feed and falling likes
 - [x] The host alone kicks a player (who cannot come back) or moves anyone between playing and watching
 - [x] A race goes on after the first finish: the finished watch the rest, and the results come when everyone is in
 - [x] Leaving and coming back in the middle of a race: the Esc menu shows the room's code and link, and a returning player goes on from the level they had reached

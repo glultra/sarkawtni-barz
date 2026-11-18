@@ -601,7 +601,7 @@ const meId = () => game.kind === 'net' ? net.id : 'me', hangAlt = a => Math.max(
 function resume() { if (song.el) song.el.play().catch(() => {}); scene = pauseFrom; }
 function toMenu() { // leave the climb, and the room if you are in one, for the main menu
   if (song.el) { song.el.pause(); song.el = null; } song.world = -1; if (audio) musicHush();
-  if (net.ws) net.leave(); others = new Map(); game.kind = 'solo'; game.spec = false; game.fin = null; reset(); menuSel = 1; scene = 'title';
+  if (net.ws) net.leave(); net.t0 = null; others = new Map(); game.kind = 'solo'; game.spec = false; game.fin = null; reset(); menuSel = 1; scene = 'title';
 }
 function toast(s) { game.msg = s; game.msgT = 3; }
 try { const g = JSON.parse(localStorage.getItem('long-climb-range') || 'null'); if (Array.isArray(g)) { game.from = clamp(Math.round(g[0]) || 1, 1, LEVELS); game.goal = clamp(Math.round(g[1]) || LEVELS, game.from, LEVELS); } } catch (e) {}
@@ -633,7 +633,7 @@ function hitMe(dir, from) { // another climber shoved you: off whatever feet you
   if (shieldBlocks()) return;
   if (P.hang) letGo(false, true);
   P.vx = dir * tune.push_speed; P.vy = 300; P.on = null; P.coy = 0; P.cut = false; P.stun = 0.35; state.shake = 0.18; sfx.bump();
-  sparks(P.x + PW / 2, P.alt + 20, 14, '#ffffff'); ring(P.x + PW / 2, P.alt + 20, '#ffffff', 56); events.push(['pushed', from]);
+  sparks(P.x + PW / 2, P.alt + 20, 14, '#ffffff'); ring(P.x + PW / 2, P.alt + 20, '#ffffff', 56); events.push(['pushed', from]); evSend('push');
 }
 function botDrop(o) { // a bot lets go of your feet: it lands on the ledge under it, and climbs on from there
   o.h = null; let k = 0; for (let i = 0; i < route.length && route[i].alt <= o.alt + 1; i++) k = i;
@@ -677,7 +677,17 @@ function stepOthers(dt) { // the bots think; real players glide to where they la
     if (o.bot) stepBot(o, dt, goalI);
     else {
       const c = o.h ? (o.h === me && !game.spec ? { x: P.x + PW / 2, alt: P.alt } : others.get(o.h)) : null;
-      if (c) { o.x = c.x; o.alt = hangAlt(c.alt); } else { const age = Math.min(0.12, clock.now() - (o.rt || 0)), ex = o.tx + (o.tvx || 0) * age, ea = o.talt + (o.tvy || 0) * age; o.x += (ex - o.x) * Math.min(1, 24 * dt); o.alt += (ea - o.alt) * Math.min(1, 24 * dt); /* their last word, carried on by their speed */ }
+      if (c) { o.x = c.x; o.alt = hangAlt(c.alt); }
+      else { // their last word, carried on to now: on a ledge they ride it where this screen has it; in the air they fly on under gravity
+        const age = clamp(clock.now() - (o.rt || 0), 0, 0.2), p = o.on >= 0 ? plats[o.on] : null; let ex, ea;
+        if (p && solid(p)) { ex = clamp(p.x + o.ox + (o.tvx || 0) * Math.min(age, 0.1), 0, W); ea = topAt(p, ex); }
+        else { const ag = Math.min(age, 0.15), vy = o.tvy || 0, g = (vy > 0 ? tune.gravity : tune.gravity * tune.fall_mult); ex = clamp(o.tx + (o.tvx || 0) * ag, 0, W); ea = o.talt + Math.max(-tune.max_fall * ag, vy * ag - 0.5 * g * ag * ag); }
+        if (Math.abs(ex - o.x) + Math.abs(ea - o.alt) > 500) { o.x = ex; o.alt = ea; } // a jump far away (a rocket, a return): no long glide
+        else { const k = Math.min(1, 30 * dt); o.x += (ex - o.x) * k; o.alt += (ea - o.alt) * k; }
+      }
+      if (o.squash > 0) o.squash = Math.max(0, o.squash - dt * 1.6); else if (o.squash < 0) o.squash = Math.min(0, o.squash + dt * 1.6);
+      if (o.gh > 0) o.gh = Math.max(0, o.gh - dt); if (o.bf) for (let i = 0; i < o.bf.length; i++) if (o.bf[i] > 0) o.bf[i] = Math.max(0, o.bf[i] - dt); // their timers run down here as on their screen
+      if (o.fl & 1 && Math.floor(state.t * 30) % 2) puff(o.x, o.alt - 4, 2, '#ffb347', 120); // a gift's rocket under them
     }
     o.vx = lerp(o.vx || 0, (o.x - px) / dt, 0.3); o.vy = lerp(o.vy || 0, (o.alt - pa) / dt, 0.3);
   }
@@ -701,7 +711,7 @@ const net = { ws: null, can: location.protocol.startsWith('http'), room: null, i
     } catch (e) { toast(K.errGone); }
   },
   leave() { const w = this.ws; this.ws = null; this.room = null; if (w) w.close(); } };
-const SERVER_V = 4; // the server this game needs: 4 shares the piano, crates, shots and gifts, and sends positions with speeds 30 times a second
+const SERVER_V = 5; // the server this game needs: 4 shares the piano, crates, shots and gifts; 5 sends fresh positions every 16 ms with the ledge stood on and the race's clock
 function onNet(m) {
   if ((m.t === 'room' || m.t === 'roster') && (m.sv || 0) < SERVER_V && !net.oldWarned) { net.oldWarned = true; setTimeout(() => { toast(K.oldServer); game.msgT = 8; }, 400); } // the server was started before the game was updated
   if (m.t === 'fx') { onFx(m); return; } // something another climber did, for the whole room
@@ -723,9 +733,17 @@ function onNet(m) {
   } else if (m.t === 'err') { toast(m.msg === 'full' ? K.errFull : m.msg === 'kicked' ? K.kicked : K.errNone); net.leave(); scene = 'title'; }
   else if (m.t === 'kicked') { net.leave(); others = new Map(); game.kind = 'solo'; game.spec = false; game.fin = null; reset(); scene = 'title'; toast(K.kicked); sfx.bonk(); }
   else if (m.t === 'note') { toast(K.noSlot); }
-  else if (m.t === 'go') { mode = m.mode; startRace('net', m.goal, { spec: m.spec, el: m.el, from: m.from }); }
-  else if (m.t === 'lobby') { game.kind = 'solo'; game.fin = null; game.over = false; reset(); scene = 'lobby'; }
-  else if (m.t === 'ss') { for (const s of m.p) { const o = others.get(s[0]); if (o) { o.tx = s[1]; o.talt = s[2]; o.face = s[3]; o.h = s[4] || 0; o.tvx = s[5] || 0; o.tvy = s[6] || 0; o.rt = clock.now(); o.vx = o.tvx; o.vy = o.tvy; } } }
+  else if (m.t === 'go') { mode = m.mode; startRace('net', m.goal, { spec: m.spec, el: m.el, from: m.from }); net.t0 = clock.now() - (m.el || 0) / 1000; net.zSig = ''; }
+  else if (m.t === 'lobby') { net.t0 = null; game.kind = 'solo'; game.fin = null; game.over = false; reset(); scene = 'lobby'; }
+  else if (m.t === 'ss') {
+    if (typeof m.T === 'number' && game.kind === 'net') { const off = clock.now() - m.T / 1000; net.t0 = net.t0 === null || net.t0 === undefined ? off : Math.min(off, net.t0 + 0.0003); } // the least-delayed word sets the clock; it may creep later slowly
+    for (const s of m.p) { const o = others.get(s[0]); if (!o) continue;
+      const wasOn = o.on === undefined ? -1 : o.on, on = s[7] === undefined ? -1 : s[7];
+      o.tx = s[1]; o.talt = s[2]; o.face = s[3]; o.h = s[4] || 0; o.tvx = s[5] || 0; o.tvy = s[6] || 0; o.on = plats[on] ? on : -1; o.ox = s[8] || 0; o.fl = s[9] || 0; o.rt = clock.now(); o.vx = o.tvx; o.vy = o.tvy;
+      if (wasOn >= 0 && o.on < 0 && o.tvy > 200 && !o.h) { o.squash = -0.25; puff(o.x, o.alt, 4, 'rgba(255,255,255,0.7)', 80); } // they jumped
+      else if (wasOn < 0 && o.on >= 0) { o.squash = 0.22; puff(o.tx, o.talt, 4, 'rgba(255,255,255,0.8)', 70); } // they landed
+    }
+  }
   else if (m.t === 'hit') { const o = others.get(m.from); hitMe(m.d < 0 ? -1 : 1, o ? o.name : ''); }
   else if (m.t === 'fin') {
     if (m.id === net.id) game.fin = { cs: m.cs, place: m.place };
@@ -734,8 +752,21 @@ function onNet(m) {
 }
 function raceTick(dt) { // what a race does every step: tell the room where you are
   if (game.msgT > 0) game.msgT -= dt;
-  if (game.kind !== 'net' || game.spec || game.fin) return;
-  if ((net.tick = (net.tick + 1) % 2) === 0) net.send({ t: 's', x: Math.round(P.x + PW / 2), a: Math.round(P.alt), f: P.face, l: state.level, h: P.hang || 0, vx: Math.round(P.vx), vy: Math.round(P.on ? 0 : P.vy) });
+  if (game.kind !== 'net') return;
+  syncClock();
+  if (game.spec || game.fin) return;
+  const n = net.room ? net.room.players.filter(p => !p.spec).length : 2, every = n <= 6 ? 1 : n <= 14 ? 2 : 3; // a small room hears you 60 times a second, a big one 30 or 20, so the host's line keeps up
+  if ((net.tick = (net.tick + 1) % every) === 0) {
+    const p = P.on && !P.hang ? P.on : null, on = p ? (p.ix !== undefined ? p.ix : (p.ix = plats.indexOf(p))) : -1; // the ledge you stand on: on every screen you ride it, where that screen's car is
+    const fl = (live.rocket > 0 ? 1 : 0) | (P.stun > 0 ? 2 : 0) | (state.wind > 0 ? 4 : state.wind < 0 ? 8 : 0) | (buffs.shield > 0 ? 16 : 0) | (buffs.feather > 0 ? 32 : 0) | (buffs.speed > 0 ? 64 : 0) | (buffs.wing > 0 ? 128 : 0);
+    net.send({ t: 's', x: Math.round(P.x + PW / 2), a: Math.round(P.alt), f: P.face, l: state.level, h: P.hang || 0, vx: Math.round(P.vx), vy: Math.round(P.on ? 0 : P.vy), on, ox: on >= 0 ? Math.round(P.x + PW / 2 - p.x) : 0, fl });
+  }
+  zTick(STEP);
+}
+function syncClock() { // the race's clock, the same on every screen: it moves the cars, turns the wind and fires the turrets
+  if (net.t0 === null || net.t0 === undefined) return;
+  const d = clock.now() - net.t0 - state.t;
+  if (Math.abs(d) > 0.75) state.t += d; else state.t += d * 0.08;
 }
 function entries() { // everyone in the race, the finished first by time, then the rest by height
   const list = [];
@@ -755,6 +786,16 @@ function watchStep(dt) { // watching: the race's clock runs, and the camera foll
   const o = watched(); state.wind = 0; if (!o) return;
   cam += (o.alt + tune.cam_lead - cam) * Math.min(1, tune.cam_speed * dt);
   if (game.spec) { state.level = Math.min(LEVELS, levelAt(o.alt) + 1); state.world = Math.floor((state.level - 1) / PER) + 1; state.height = metres(o.alt); }
+  // what the one you watch has on their screen: the wind on them, their gates, buttons, targets and stars, their timed ledges and buffs
+  const fl = o.fl || 0; state.wind = fl & 4 ? 1 : fl & 8 ? -1 : 0;
+  if (o.bot) { const Wd = WORLDS[worldAt(o.alt)]; if (Wd.wind) state.wind = (state.t / tune.wind_period) % 2 < 1 ? 1 : -1; } // a bot climbs in the same wind
+  if (o.z) {
+    gates.forEach((g, i) => { if (i < 31) { g.open = !!((o.z.gm >> i) & 1); g.btn = !!((o.z.bm >> i) & 1); g.tgt = !!((o.z.tm >> i) & 1); } });
+    for (const tg of targets) tg.hit = tg.gate.tgt;
+    stars.forEach((s, i) => { if (i < 31) s.taken = !!((o.z.sm >> i) & 1); });
+  }
+  if (!o.bot) { state.ghost = o.gh || 0; PU_KINDS.forEach((k, i) => { buffs[k] = (o.bf && o.bf[i]) || 0; }); if (fl & 16 && !(buffs.shield > 0)) buffs.shield = 0.1; else if (!(fl & 16)) buffs.shield = 0; }
+  else { state.ghost = 0; for (const k of PU_KINDS) buffs[k] = 0; }
 }
 function roomLink() { // the address to send: on the host's own PC, the one the others on the Wi-Fi must use
   const r = net.room; if (!r) return '';
@@ -850,15 +891,15 @@ function hint(s) { state.hint = s; state.hintT = 2.2; }
 function land(p) {
   const drop = P.last - p.alt, cx = P.x + PW / 2, hard = drop > tune.fall_min * 40;
   P.alt = topAt(p, cx); P.last = P.alt; P.whistled = false;
-  if (hard) { state.falls++; state.shake = 0.3; sfx.thud(); puff(cx, P.alt, 12, '#ffffff', 220); ring(cx, P.alt, '#ffffff', 96, 0.45); popText('-' + metres(drop), cx, P.alt + 70, '#ff8a96', 30); events.push(['fall', metres(drop)]); }
+  if (hard) { state.falls++; state.shake = 0.3; sfx.thud(); puff(cx, P.alt, 12, '#ffffff', 220); ring(cx, P.alt, '#ffffff', 96, 0.45); popText('-' + metres(drop), cx, P.alt + 70, '#ff8a96', 30); events.push(['fall', metres(drop)]); evSend('fall', metres(drop)); }
   if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(cx, P.alt, 6, '#ff8fd8'); ring(cx, P.alt, '#ff8fd8', 70); return; } // a bouncer throws you straight back up
   P.on = p; P.vy = 0; P.squash = 0.22; P.airJump = true;
   if (p.kind === 'n' && thingOf(p) === 'piano') pianoAt(p, cx, true); // a chord, where you came down on the keys
   else { const snd = thingSound(p); if (snd && !(p === live.sndOn && state.t - live.sndT < 0.6)) { live.sndOn = p; live.sndT = state.t; THING_SFX[snd](1); fxSend({ k: 'snd', s: snd, a: Math.round(P.alt) }); } } // a bed springs, a car honks...
   if (!hard) { sfx.land(); puff(cx, P.alt, 4, 'rgba(255,255,255,0.8)', 70); }
   if (p.kind === 'c' && !p.shake) { p.shake = tune.crumble_delay; sfx.crack(); fxSend({ k: 'cr', n: plats.indexOf(p), a: Math.round(p.alt) }); }
-  if (p.timer) { state.ghost = tune.ghost_time; sfx.click(); ring(cx, P.alt, '#3fdcff', 80); events.push(['timer', p.level]); }                          // a plate that makes the timed ledges solid for a while
-  if (p.button && !p.button.btn) { p.button.btn = true; sfx.click(); sparks(p.x + p.w / 2, p.alt + 8, 10, '#4fd66a', 200); events.push(['button', p.level]); openGate(p.button); } // a button that opens this level's gate
+  if (p.timer) { state.ghost = tune.ghost_time; sfx.click(); ring(cx, P.alt, '#3fdcff', 80); events.push(['timer', p.level]); evSend('timer'); }                          // a plate that makes the timed ledges solid for a while
+  if (p.button && !p.button.btn) { p.button.btn = true; sfx.click(); sparks(p.x + p.w / 2, p.alt + 8, 10, '#4fd66a', 200); events.push(['button', p.level]); evSend('btn'); openGate(p.button); } // a button that opens this level's gate
   if (p.rest && !p.seen) { // the end of a level: a chime, a banner, and the climb is kept from here
     p.seen = true;
     if (game.kind !== 'solo' && p.rest >= game.goal) { raceFinish(); return; } // in a race the level that ends it is the finish line, and nothing is kept
@@ -867,7 +908,7 @@ function land(p) {
     const worldDone = p.rest % PER === 0;
     state.banner = tune.banner_time; state.bannerN = p.rest; state.lapCs = Math.round((state.time - state.lt) * 100); state.lt = state.time;
     state.flash = worldDone ? 1 : 0.7; sfx.rest(); if (worldDone) sfx.open(); ring(cx, P.alt, UI.gold, worldDone ? 520 : 340, 0.6); confetti(cx, P.alt + 30, 24 + p.rest * 2 + (worldDone ? 40 : 0));
-    if (game.kind !== 'solo') { events.push(['level', p.rest]); return; }
+    if (game.kind !== 'solo') { events.push(['level', p.rest]); evSend('level', p.rest, state.lapCs); return; }
     events.push(['level', p.rest, metres(p.alt)]);
     const b = save.best[mode]; if (!(b.level >= p.rest)) b.level = p.rest;
     save.run = { mode, from: game.from, goal: game.goal, top: p.rest, cs: Math.round(state.time * 100), falls: state.falls, stars: state.stars }; store();
@@ -875,7 +916,7 @@ function land(p) {
 }
 function openGate(g) {
   const was = g.open; g.open = (!g.needBtn || g.btn) && (!g.needTgt || g.tgt);
-  if (g.open && !was) { sfx.open(); for (let x = 60; x < W; x += 100) sparks(x, g.alt, 4, '#4fd66a', 160); events.push(['gate', g.level]); }
+  if (g.open && !was) { sfx.open(); for (let x = 60; x < W; x += 100) sparks(x, g.alt, 4, '#4fd66a', 160); events.push(['gate', g.level]); evSend('gate', gates.indexOf(g)); }
 }
 function finish() {
   const cs = Math.round(state.time * 100), b = save.best[mode], full = game.from === 1 && game.goal >= LEVELS;
@@ -888,7 +929,7 @@ function knock(fromX, y) { // thrown away from what hit you, and down
   if (shieldBlocks()) return;
   if (P.hang) letGo(false, true);
   P.vx = (P.x + PW / 2 >= fromX ? 1 : -1) * tune.bump_push; P.vy = -220; P.on = null; P.coy = 0; P.cut = false; P.stun = tune.bump_stun;
-  state.shake = 0.2; sfx.bump(); puff(fromX, y, 8, '#ff3b4e', 220); sparks(fromX, y, 10, '#ff3b4e'); events.push(['bump']);
+  state.shake = 0.2; sfx.bump(); puff(fromX, y, 8, '#ff3b4e', 220); sparks(fromX, y, 10, '#ff3b4e'); events.push(['bump']); evSend('bump', 0, 0, fromX, y);
 }
 function stepWorld(dt) {
   const t = state.t;
@@ -903,15 +944,22 @@ function stepWorld(dt) {
   }
   for (const b of bumpers) { if (b.cool > 0) b.cool -= dt; if (b.off > 0) b.off -= dt; }
   if (state.ghost > 0) { const was = Math.ceil(state.ghost); state.ghost = Math.max(0, state.ghost - dt); if (Math.ceil(state.ghost) !== was) sfx.tick(); }
-  for (const tr of turrets) { // a turret near you fires an orb along its ledge every few seconds
+  const focus = cam - tune.cam_lead; // the height the screen is looking at: yours, or the climber you watch
+  for (const tr of turrets) { // a turret in view fires an orb along its ledge every few seconds, on the race's clock, so every screen sees the same orbs
+    const n = Math.floor((t + tr.phase) / tune.turret_period), was = tr.n; tr.n = n;
     if (tr.sleep > 0) { tr.sleep -= dt; continue; }
-    if (Math.abs(tr.alt - P.alt) > 620) continue;
-    tr.next -= dt; if (tr.next <= 0) { tr.next = tune.turret_period; orbs.push({ x: tr.x + tr.dir * 26, alt: tr.alt, vx: tr.dir * tune.orb_speed }); }
+    if (Math.abs(tr.alt - focus) > 620) continue;
+    if (was !== undefined && n > was) orbs.push({ x: tr.x + tr.dir * 26, alt: tr.alt, vx: tr.dir * tune.orb_speed });
   }
   for (const o of orbs) o.x += o.vx * dt;
   orbs = orbs.filter(o => o.x > -20 && o.x < W + 20 && !o.dead);
   for (const s of shots) { // the blaster's shots: they open targets, and put bumpers, turrets and orbs out for a while
-    s.x += s.vx * dt; if (s.remote) continue; // another climber's shot is only to see: what it hits, they tell the room
+    s.x += s.vx * dt;
+    if (s.remote) { // another climber's shot is only to see: it stops where it strikes, and what it hits they tell the room
+      if (targets.some(tg => !tg.hit && Math.hypot(s.x - tg.x, s.alt - (tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp)) < 30) || bumpers.some(b => !(b.off > 0) && Math.hypot(s.x - b.x, s.alt - (b.alt + Math.sin(t * 2 + b.phase) * 30)) < 30) || turrets.some(tr => !(tr.sleep > 0) && Math.abs(s.x - tr.x) < 26 && Math.abs(s.alt - tr.alt) < 26)) { s.dead = true; sparks(s.x, s.alt, 6, '#ffe58a', 160); }
+      for (const o of orbs) if (!s.dead && Math.hypot(s.x - o.x, s.alt - o.alt) < 22) { o.dead = true; s.dead = true; puff(o.x, o.alt, 6, '#c77dff', 150); }
+      continue;
+    }
     for (const tg of targets) if (!tg.hit && Math.hypot(s.x - tg.x, s.alt - (tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp)) < 30) { tg.hit = true; s.dead = true; tg.gate.tgt = true; sfx.hitTarget(); puff(tg.x, tg.alt, 10, '#ffd44f', 200); events.push(['target', tg.gate.level]); openGate(tg.gate); }
     for (const b of bumpers) if (!(b.off > 0) && Math.hypot(s.x - b.x, s.alt - (b.alt + Math.sin(t * 2 + b.phase) * 30)) < 30) { b.off = tune.off_time; s.dead = true; if (b.gift === undefined) fxSend({ k: 'bo', n: bumpers.indexOf(b), a: Math.round(b.alt) }); sfx.zap(); puff(b.x, b.alt, 8, '#ff3b4e', 180); }
     for (const tr of turrets) if (!(tr.sleep > 0) && Math.abs(s.x - tr.x) < 26 && Math.abs(s.alt - tr.alt) < 26) { tr.sleep = tune.off_time; tr.next = tune.turret_period; s.dead = true; fxSend({ k: 'to', n: turrets.indexOf(tr), a: Math.round(tr.alt) }); sfx.zap(); puff(tr.x, tr.alt, 8, '#9aa0a8', 180); }
@@ -1034,7 +1082,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
     if (Math.hypot(pcx - b.x, pcy - by) < 36) { b.cool = 0.5; knock(b.x, by); }
   }
   for (const o of orbs) if (!o.dead && Math.abs(pcx - o.x) < 26 && Math.abs(pcy - o.alt) < 28) { o.dead = true; knock(o.x, o.alt); } // so do a turret's orbs
-  for (const s of stars) if (!s.taken && Math.abs(s.alt - pcy) < 44 && Math.abs(s.x - pcx) < 36) { s.taken = true; state.stars++; sfx.star(); sparks(s.x, s.alt, 14, UI.gold, 240); ring(s.x, s.alt, UI.gold, 60); popText('+1', s.x, s.alt + 30, UI.gold); events.push(['star', s.level]); }
+  for (const s of stars) if (!s.taken && Math.abs(s.alt - pcy) < 44 && Math.abs(s.x - pcx) < 36) { s.taken = true; state.stars++; sfx.star(); sparks(s.x, s.alt, 14, UI.gold, 240); ring(s.x, s.alt, UI.gold, 60); popText('+1', s.x, s.alt + 30, UI.gold); events.push(['star', s.level]); evSend('star', 0, 0, s.x, s.alt); }
   tail();
 }
 
@@ -1530,6 +1578,10 @@ function nameTag(s, x, y, mark) { // a climber's name over its head; a small arr
   pill(x - tw / 2, y - 13, tw, 26, 'rgba(10,12,20,0.6)'); text(s, x, y + 1, 17, '#ffffff', 'center', true);
   if (mark) { ctx.fillStyle = mark; ctx.beginPath(); ctx.moveTo(x - 9, y + 17); ctx.lineTo(x + 9, y + 17); ctx.lineTo(x, y + 28); ctx.fill(); }
 }
+function airLines(px, py, vy, t) { // lines of air streaming up past a climber falling fast
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = 0; i < 5; i++) { const lx = px + (i - 2) * 12, o = (t * 900 + i * 37) % 60, len = 30 + (-vy - 700) * 0.09; ctx.beginPath(); ctx.moveTo(lx, py - 52 - o); ctx.lineTo(lx, py - 52 - o - len); ctx.stroke(); }
+}
 function drawWorld() {
   if (PASS) return; // a slice of a tall screen: the tower is already drawn under it
   const t = state.t, vis = y => y > -70 && y < H + 70, live = scene === 'play' || scene === 'pause' || scene === 'board' || scene === 'watch';
@@ -1556,18 +1608,19 @@ function drawWorld() {
   const mine = !(live && game.spec), racing = live && game.kind !== 'solo';
   if (live) for (const o of others.values()) { // the other climbers, each with a name over its head
     const y = sy(o.alt); if (!vis(y)) continue;
-    drawClimber(o.x, y, o.face || 1, 0, o.vx || 0, Math.abs(o.vy || 0) < 60 ? 0 : o.vy, t, 1, false, o.color, !!o.h);
+    const ovy = o.bot ? o.vy || 0 : o.on >= 0 ? 0 : o.tvy || 0;
+    if (!o.h && ovy < -700) airLines(o.x, y, ovy, t); // a long fall, as they see it
+    if (o.fl & 64) { ctx.globalAlpha = 0.25; dot(o.x - (o.vx || 0) * 0.03, y - 22, 15, '#ffd44f'); ctx.globalAlpha = 1; } // speed: a gold blur behind them
+    drawShield(o.x, y, t, !!(o.fl & 16));
+    drawClimber(o.x, y, o.face || 1, o.squash || 0, o.vx || 0, Math.abs(o.vy || 0) < 60 ? 0 : o.vy, t, 1, !o.h && !!WORLDS[worldAt(o.alt)].gun, o.color, !!o.h);
     nameTag(o.name + (o.bot ? ' (' + K.bot + ')' : ''), o.x, o.h ? y + 20 : y - 66, !o.h && scene === 'watch' && game.watch === o.id ? UI.gold : null);
   }
   if (mine) {
     const px = P.x + PW / 2, py = sy(P.alt), col = game.kind === 'solo' ? '#e8334a' : game.color;
-    if (!P.on && !P.hang && P.vy < -700) { // a long fall: lines of air streaming up past you
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      for (let i = 0; i < 5; i++) { const lx = px + (i - 2) * 12, o = (t * 900 + i * 37) % 60, len = 30 + (-P.vy - 700) * 0.09; ctx.beginPath(); ctx.moveTo(lx, py - 52 - o); ctx.lineTo(lx, py - 52 - o - len); ctx.stroke(); }
-    }
+    if (!P.on && !P.hang && P.vy < -700) airLines(px, py, P.vy, t); // a long fall: lines of air streaming up past you
     if (!P.on && !P.hang && Math.abs(P.vy) > 820) for (let k = 3; k >= 1; k--) { ctx.globalAlpha = 0.2 - k * 0.04; dot(px - P.vx * 0.012 * k, py - 22 + P.vy * 0.012 * k, 17, col); } // thrown fast: an after-image behind you
     ctx.globalAlpha = 1;
-    drawShield(px, py, t);
+    drawShield(px, py, t, buffs.shield > 0 && !watchingId());
     drawClimber(px, py, P.face, P.squash, P.vx, P.on ? 0 : P.vy, t, 1, state.gun && scene !== 'title', col, !!P.hang);
     if (racing && !game.fin && scene !== 'board') { ctx.fillStyle = UI.gold; ctx.beginPath(); ctx.moveTo(px - 9, py - 62); ctx.lineTo(px + 9, py - 62); ctx.lineTo(px, py - 50); ctx.fill(); } // among many climbers, a gold arrow marks you
   }
@@ -1632,6 +1685,13 @@ function hud() {
   if (P.hang) { ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(W / 2 - 100, 96, 200, 6); ctx.fillStyle = UI.gold; ctx.fillRect(W / 2 - 100, 96, 200 * clamp(P.hangT / tune.grab_time, 0, 1), 6); } // how long your grip still holds
   let row = race ? 190 : 112;
   if (race && scene === 'play' && !(state.count > 0) && game.msgT > 0) { toastLine(row + 22); row += 54; }
+  row = statusRows(row);
+  if (state.hintT > 0) { pill(W / 2 - 280, row, 560, 44, 'rgba(120,16,28,0.88)'); text(state.hint, W / 2, row + 23, 21, '#ffffff', 'center', true); }
+  levelBanner();
+  if (state.holdR > 0) { pill(W / 2 - 200, 560, 400, 50); ctx.fillStyle = '#e8334a'; ctx.fillRect(W / 2 - 170, 600, 340 * clamp(state.holdR / 0.8, 0, 1), 4); text(K.holdR, W / 2, 582, 21, '#ffffff'); }
+  hudRest(race);
+}
+function statusRows(row) { // the wind and the timed ledges, for you or for the climber you watch; returns where the next row goes
   if (state.wind) { // which way the wind blows now
     pill(W / 2 - 62, row, 124, 42); text(K.wind, W / 2 + 20, row + 22, 21, '#ffffff', 'center', true);
     ctx.fillStyle = UI.gold; const ax = W / 2 - 28, d = state.wind; ctx.beginPath(); ctx.moveTo(ax + d * 13, row + 21); ctx.lineTo(ax - d * 8, row + 10); ctx.lineTo(ax - d * 8, row + 32); ctx.fill(); row += 52;
@@ -1639,7 +1699,9 @@ function hud() {
   if (state.ghost > 0) { // how long the timed ledges will hold
     pill(W / 2 - 130, row, 260, 42); ctx.fillStyle = '#3fdcff'; ctx.fillRect(W / 2 - 104, row + 33, 208 * state.ghost / tune.ghost_time, 4); text(`${K.hurry} ${Math.ceil(state.ghost)}`, W / 2, row + 18, 21, '#ffffff', 'center', true); row += 52;
   }
-  if (state.hintT > 0) { pill(W / 2 - 280, row, 560, 44, 'rgba(120,16,28,0.88)'); text(state.hint, W / 2, row + 23, 21, '#ffffff', 'center', true); }
+  return row;
+}
+function levelBanner() {
   if (state.banner > 0) { // a level is done: its number, its height, and the next world when there is one
     const a = clamp(Math.min(state.banner, tune.banner_time - state.banner) * 4, 0, 1), n = state.bannerN, nw = n % PER === 0 && WORLDS[n / PER];
     ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(0, 300, W, nw ? (nw.hint ? 196 : 158) : 116);
@@ -1647,7 +1709,8 @@ function hud() {
     if (nw) { text(`${K.next}: ${K.worlds[n / PER]}`, W / 2, 428, 24, '#ffffff'); if (nw.hint) text(K.hints[n / PER], W / 2, 466, 22, UI.gold, 'center', true); }
     ctx.globalAlpha = 1;
   }
-  if (state.holdR > 0) { pill(W / 2 - 200, 560, 400, 50); ctx.fillStyle = '#e8334a'; ctx.fillRect(W / 2 - 170, 600, 340 * clamp(state.holdR / 0.8, 0, 1), 4); text(K.holdR, W / 2, 582, 21, '#ffffff'); }
+}
+function hudRest(race) { // the first keys of a climb, the race's arrows and countdown, the shove and grab keys, and the phone's buttons
   if (state.t < 5 && !race && !touchSeen) { pill(W / 2 - 290, H - 140, 580, 42); text(K.controls[0], W / 2, H - 118, 19, '#ffffff'); } // the keys, for the first seconds of a climb
   if (race) {
     farArrows(P.alt); countdown();
@@ -1675,7 +1738,8 @@ function watchHud() { // watching a race: whose climb you see, the standings, an
   const o = watched(), bots = game.kind === 'bots';
   menuBtn(); clockPill(game.fin ? `${K.youPlace}  #${game.fin.place}  ·  ${clockText(game.fin.cs, true)}` : `${K.goal} ${game.goal}`);
   standings(); heightBar(o ? o.alt : null, o ? o.color : '#ffffff'); if (o) farArrows(o.alt); countdown();
-  if (scene === 'watch' && game.msgT > 0 && !(state.count > 0)) toastLine(212);
+  let row = 190; if (scene === 'watch' && game.msgT > 0 && !(state.count > 0)) { toastLine(212); row += 54; }
+  if (o) { statusRows(row); levelBanner(); } // their wind, their timed ledges, their level done
   if (LAND) { // sideways: the name sits small at the tower's foot, and the panels beside the tower are the two arrows
     pill(W / 2 - 170, H - 62, 340, 48, 'rgba(10,12,20,0.8)'); eye(W / 2 - 138, H - 38, 10, UI.dim); if (o) { dot(W / 2 - 106, H - 38, 8, o.color); text(fitText(o.name, 210, 22), W / 2 + 16, H - 37, 22, '#ffffff', 'center', true); }
     for (const d of [-1, 1]) { const x = d < 0 ? -OX / 2 : W + OX / 2; dot(x, H / 2, 70, 'rgba(255,255,255,0.08)'); chevron(x, H / 2, d, '#ffffff', 26); zone(d < 0 ? -OX : W, 0, OX, H, () => watchNext(d)); }
@@ -1923,7 +1987,7 @@ const scenes = {
   watch: { // watching the race: as a spectator, or once you have finished while the others still climb
     update(dt) {
       if (pressed('KeyP') || pressed('Escape')) { if (audio) musicHush(); pauseSel = 0; pauseFrom = 'watch'; scene = 'pause'; return; }
-      state.t += dt; stepWorld(dt); watchStep(dt); stepOthers(dt); raceTick(dt);
+      state.t += dt; stepWorld(dt); watchStep(dt); liveStep(dt); stepOthers(dt); raceTick(dt);
       if (pressed('ArrowLeft') || pressed('KeyA')) watchNext(-1); if (pressed('ArrowRight') || pressed('KeyD') || pressed('Space')) watchNext(1);
       if (game.kind === 'bots' && (pressed('Enter') || !stillRacing())) { state.t0 = state.t; scene = 'board'; return; } // with bots the results are yours to call up; a room's come when everyone is in
       playWorld(state.world - 1); stepMusic(dt);
@@ -1944,7 +2008,7 @@ const scenes = {
     },
     update(dt) {
       if (game.kind === 'net') { // a room's race does not wait for you
-        state.t += dt; stepWorld(dt); if (pauseFrom === 'play') stepPlayer(dt, true); else if (pauseFrom === 'watch') watchStep(dt); stepOthers(dt); raceTick(dt);
+        state.t += dt; stepWorld(dt); if (pauseFrom === 'play') stepPlayer(dt, true); else if (pauseFrom === 'watch') { watchStep(dt); liveStep(dt); } stepOthers(dt); raceTick(dt);
         if (scene !== 'pause') return; if (game.fin && pauseFrom === 'play') pauseFrom = 'watch';
       }
       const list = this.items(), n = list.length; pauseSel = clamp(pauseSel, 0, n - 1);
@@ -2147,7 +2211,7 @@ function buffStep(dt) { // the buffs run down; power-ups come back; take what yo
 }
 function shieldBlocks() { // a hit the shield takes instead of you; true when it did
   if (!(buffs.shield > 0)) return false;
-  buffs.shield = 0; sfx.hitTarget(); ring(P.x + PW / 2, P.alt + 20, '#5fe0d0', 80); sparks(P.x + PW / 2, P.alt + 20, 14, '#5fe0d0'); events.push(['shield']); return true;
+  buffs.shield = 0; sfx.hitTarget(); ring(P.x + PW / 2, P.alt + 20, '#5fe0d0', 80); sparks(P.x + PW / 2, P.alt + 20, 14, '#5fe0d0'); events.push(['shield']); evSend('shield'); return true;
 }
 function drawBuffs(y) { // the buffs you have, each with a ring that runs out with it; returns where the next row may go
   const on = PU_KINDS.filter(k => buffs[k] > 0); if (!on.length) return y;
@@ -2157,13 +2221,41 @@ function drawBuffs(y) { // the buffs you have, each with a ring that runs out wi
     drawBuffIcon(k, x, y + 22, 12); });
   return y + 52;
 }
-function drawShield(px, py, t) { if (!(buffs.shield > 0)) return; ctx.strokeStyle = `rgba(95,224,208,${0.55 + 0.25 * Math.sin(t * 6)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py - 22, 32, 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(95,224,208,0.12)'; ctx.fill(); }
+function drawShield(px, py, t, on = buffs.shield > 0) { if (!on) return; ctx.strokeStyle = `rgba(95,224,208,${0.55 + 0.25 * Math.sin(t * 6)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py - 22, 32, 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(95,224,208,0.12)'; ctx.fill(); }
 
 // ---- What a room shares besides where everyone is ---------------------------------------------------
 // In a room's race these go to everyone: the piano's notes (quieter the farther away), a crate starting to
 // give, a blaster's shot (only to see: it hurts nobody), a red bumper or a turret shot out, and the chaos of
 // the streamer's TikTok gifts (CONFIG.gifts.share). Each player's gates and timed ledges stay their own.
 function fxSend(m) { if (game.kind === 'net' && !game.spec && net.ws) net.send(Object.assign({ t: 'fx' }, m)); }
+function evSend(e, v = 0, w = 0, x = P.x + PW / 2, a = P.alt) { fxSend({ k: 'ev', e, v, w, x: Math.round(x), a: Math.round(a) }); } // a moment of your climb the room sees on your climber: a hard fall, a bump, a level...
+// What a climber carries that changes slowly: the gates, buttons and targets they have opened, the stars they took, the
+// time left on their timed ledges and on each buff. Sent when it changes and every two seconds, so whoever watches them sees their tower.
+function zNow() {
+  let gm = 0, bm = 0, tm = 0, sm = 0;
+  gates.forEach((g, i) => { if (i < 31) { if (g.open) gm |= 1 << i; if (g.btn) bm |= 1 << i; if (g.tgt) tm |= 1 << i; } });
+  stars.forEach((s, i) => { if (i < 31 && s.taken) sm |= 1 << i; });
+  return { gm, bm, tm, sm, gh: Math.round(state.ghost * 10), bf: PU_KINDS.map(k => Math.round(buffs[k] * 10)) };
+}
+function zTick(dt) {
+  const z = zNow(), sig = [z.gm, z.bm, z.tm, z.sm, z.gh > 0 ? 1 : 0, ...z.bf.map(v => v > 0 ? 1 : 0)].join(',');
+  net.zT = (net.zT || 0) - dt;
+  if (sig !== net.zSig || net.zT <= 0) { net.zSig = sig; net.zT = 2; fxSend(Object.assign({ k: 'z' }, z)); }
+}
+const watchingId = () => scene === 'watch' || (scene === 'pause' && pauseFrom === 'watch') ? game.watch : null;
+function onEv(m, near) { // another climber's moment, shown on their climber; with sound when it is near, or the one you watch
+  const o = others.get(m.from), x = clamp(Number(m.x) || 0, 0, W), a = Number(m.a) || 0, v = Math.round(Number(m.v) || 0), mine = watchingId() === m.from, loud = mine || near > 0.6;
+  if (m.e === 'fall') { puff(x, a, 12, '#ffffff', 220); ring(x, a, '#ffffff', 96, 0.45); popText('-' + v, x, a + 70, '#ff8a96', 30); if (loud) sfx.thud(); if (mine) state.shake = 0.3; if (o) o.squash = 0.3; }
+  else if (m.e === 'bump') { puff(x, a, 8, '#ff3b4e', 220); sparks(x, a, 10, '#ff3b4e'); if (loud) sfx.bump(); if (mine) state.shake = 0.2; }
+  else if (m.e === 'push') { sparks(x, a + 20, 14, '#ffffff'); ring(x, a + 20, '#ffffff', 56); if (loud) sfx.bump(); if (mine) state.shake = 0.18; }
+  else if (m.e === 'shield') { ring(x, a + 20, '#5fe0d0', 80); sparks(x, a + 20, 14, '#5fe0d0'); if (loud) sfx.hitTarget(); }
+  else if (m.e === 'star') { sparks(x, a, 14, UI.gold, 240); ring(x, a, UI.gold, 60); popText('+1', x, a + 30, UI.gold); if (mine) { const s = stars.find(q => Math.abs(q.x - x) < 4 && Math.abs(q.alt - a) < 4); if (s) s.taken = true; sfx.star(); } }
+  else if (m.e === 'btn') { sparks(x, a + 8, 10, '#4fd66a', 200); if (loud) sfx.click(); }
+  else if (m.e === 'timer') { ring(x, a, '#3fdcff', 80); if (mine) { state.ghost = tune.ghost_time; sfx.click(); } }
+  else if (m.e === 'gate') { const g = gates[v]; if (mine && g) { g.open = true; sfx.open(); for (let gx = 60; gx < W; gx += 100) sparks(gx, g.alt, 4, '#4fd66a', 160); } }
+  else if (m.e === 'level') { ring(x, a, UI.gold, 340, 0.6); confetti(x, a + 30, 24); if (mine) { state.banner = tune.banner_time; state.bannerN = clamp(v, 1, LEVELS); state.lapCs = Math.max(0, Math.round(Number(m.w) || 0)); state.flash = v % PER === 0 ? 1 : 0.7; sfx.rest(); if (v % PER === 0) sfx.open(); } }
+  else if (m.e === 'drop') { let best = null, bd = 120; for (const f of live.falling) { const d = Math.hypot(f.x - x, f.alt - a); if (!f.done && d < bd) { best = f; bd = d; } } if (best) best.done = true; puff(x, a, 10, '#ff5a7a', 200); if (loud) sfx.bonk(); }
+}
 function climbersNow(all) { // you, and with all the others climbing in the room: where each is and which way they face
   const list = [{ x: P.x + PW / 2, alt: P.alt, face: P.face || 1 }];
   if (all) for (const o of others.values()) if (!o.bot && !o.fin && !o.spec) list.push({ x: o.x, alt: o.alt, face: o.face || 1 });
@@ -2172,7 +2264,9 @@ function climbersNow(all) { // you, and with all the others climbing in the room
 function shareGift(k) { const sh = (CONFIG.gifts && CONFIG.gifts.share) || 'chaos'; return sh === 'all' || (sh === 'chaos' && ['wind', 'bumper', 'shake', 'drop'].includes(k)); }
 function onFx(m) { // something another climber did
   const far = P ? Math.abs((Number(m.a) || P.alt) - P.alt) : 0, near = clamp(1 - far / 1200, 0.12, 1);
-  if (m.k === 'pu') { const p = pickups[m.n]; if (p && !(p.taken > 0)) takePickup(p, false); }
+  if (m.k === 'ev') { onEv(m, near); return; }
+  if (m.k === 'z') { const o = others.get(m.from); if (o) { const n = k => Math.max(0, Math.round(Number(m[k]) || 0)); o.z = { gm: n('gm'), bm: n('bm'), tm: n('tm'), sm: n('sm') }; o.gh = n('gh') / 10; o.bf = PU_KINDS.map((k, i) => Math.max(0, Number(Array.isArray(m.bf) ? m.bf[i] : 0) || 0) / 10); } return; }
+  if (m.k === 'pu') { const p = pickups[m.n], o = others.get(m.from); if (p && !(p.taken > 0)) { takePickup(p, false); if (o) { ring(o.x, o.alt + 20, PU_COL[p.kind], 70); popText(K.buffs[p.kind], o.x, o.alt + 90, PU_COL[p.kind]); if (watchingId() === m.from) [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.1, 0, i * 0.05)); } } }
   else if (m.k === 'snd') { if (THING_SFX[m.s] && audio && !muted) THING_SFX[m.s](near * 0.8); }
   else if (m.k === 'pn') pianoPlay(clamp(Math.round(m.i) || 0, 0, PIANO_STEPS.length - 1), !!m.c, near);
   else if (m.k === 'cr') { const p = plats[m.n]; if (p && p.kind === 'c' && !p.shake && !(p.gone > 0)) { p.shake = tune.crumble_delay; if (near > 0.5) sfx.crack(); } }
@@ -2182,7 +2276,7 @@ function onFx(m) { // something another climber did
   else if (m.k === 'gift' && m.g) {
     const g = { user: String(m.g.user || 'viewer').slice(0, 24), gift: String(m.g.gift || 'Gift').slice(0, 24), n: clamp(Math.round(m.g.n) || 1, 1, 99), d: Math.max(1, Number(m.g.d) || 1), k: FX.includes(m.g.k) ? m.g.k : 'wind', remote: true };
     if (m.g.dir === 1 || m.g.dir === -1) g.dir = m.g.dir; if (Array.isArray(m.g.spots)) g.spots = m.g.spots.slice(0, 80).map(p => ({ x: clamp(Number(p.x) || 0, 0, W), alt: Number(p.alt) || 0 }));
-    if (game.spec || scene !== 'play' || !P) { liveFeed(`${g.user}: ${g.gift}  →  ${K.fx[g.k]}`, UI.dim); if (g.spots) g.spots.forEach((p, i) => bumpers.push({ x: p.x, alt: p.alt, phase: i, cool: 0.6, off: 0, gift: tune.gift_bumper_time })); } else applyGift(g); // at once: the streamer already spaced them
+    if (game.spec || scene !== 'play' || !P) { liveFeed(`${g.user}: ${g.gift}  →  ${K.fx[g.k]}`, UI.dim); if (g.k === 'shake') { state.shake = 0.8; sfx.thud(); } if (g.k !== 'wind' && g.k !== 'jump') live.big = { s1: K.fx[g.k], s2: g.user, t: 1.8 }; if (g.spots) g.spots.forEach((p, i) => bumpers.push({ x: p.x, alt: p.alt, phase: i, cool: 0.6, off: 0, gift: tune.gift_bumper_time })); } else applyGift(g); // at once: the streamer already spaced them
   } else if (m.k === 'drop' && Array.isArray(m.list)) { const user = String(m.user || 'viewer').slice(0, 24); for (const o of m.list.slice(0, 40)) live.falling.push({ x: clamp(Number(o.x) || 0, 30, W - 30), alt: Number(o.alt) || 0, kind: DROPS.includes(o.kind) ? o.kind : 'heart', user, spin: 0 }); liveFeed(`${user}: ${tune.like_drop} ${K.likes}  →  ${K.dropN[DROPS.includes(m.list[0] && m.list[0].kind) ? m.list[0].kind : 'heart']}`, '#ffb0c8'); sfx.whistle(); }
 }
 
@@ -2263,7 +2357,7 @@ function stepDrops(dt, can) {
     if (can && !o.done && Math.abs(o.x - (P.x + PW / 2)) < 32 && o.alt - 20 < P.alt + PH && o.alt + 20 > P.alt) { // it hit you
       o.done = true; sfx.bonk(); puff(o.x, o.alt, 10, o.kind === 'heart' ? '#ff5a7a' : o.kind === 'pot' ? '#c8693a' : '#7a5a3a', 200); popText(o.user, o.x, o.alt + 40, '#ffb0c8');
       if (tune.drop_push > 0) { knock(o.x, o.alt); P.vx *= tune.drop_push; }
-      events.push(['drophit', o.user]);
+      events.push(['drophit', o.user]); evSend('drop', 0, 0, o.x, o.alt);
     }
   }
   live.falling = live.falling.filter(o => !o.done && o.alt > cam - H);
@@ -2337,7 +2431,7 @@ function drawFrame() {
   ctx.save(); if (LAND) { ctx.fillStyle = '#0b0d14'; ctx.fillRect(0, 0, CW, H); ctx.translate(OX, 0); }
   if (LAND && sc.cols) splitDraw(sc); else sc.draw();
   if (dev.on && !con.open && scene === 'play') drawDevBadge();
-  if (!con.open && scene === 'play') drawLive();
+  if (!con.open && (scene === 'play' || scene === 'watch')) drawLive(); // the falling likes, the gift feed and the buffs: yours, or those of the climber you watch
   if (con.open) drawConsole();
   ctx.restore();
 }
