@@ -120,6 +120,25 @@ window.CONFIG = {
   cam_speed: { value: 7, min: 2, max: 20, step: 0.5 },           // how fast the camera catches up, per second
   banner_time: { value: 2.8, min: 1, max: 6, step: 0.1 },        // seconds a level's banner stays
 
+  // Funny lines: a speech bubble over the climber's head (the room sees yours too)
+  quote_fall: { value: 12, min: 4, max: 60, step: 1 },           // metres a fall must cost for a sure line from the bigfall list (smaller falls: the fall list, sometimes)
+  quote_idle: { value: 8, min: 3, max: 30, step: 1 },            // seconds standing still before the idle list teases you
+  quote_chance: { value: 0.6, min: 0, max: 1, step: 0.05 },      // how often the other moments get a line (0: only big falls and standing still)
+  quote_gap: { value: 3, min: 0, max: 15, step: 0.5 },           // seconds at least between two lines, big falls aside
+  quote_time: { value: 2.6, min: 1, max: 6, step: 0.1 },         // seconds a bubble stays
+  // The lines for each moment, in any number; add your own. They show in Kurdish in either language.
+  quotes: {
+    bigfall: ['ئەی لە قەبری بام!', 'ئاخ برا گیان...', 'ئەی هاوار!', 'وای دایکە گیان!', 'هەموو ڕەنجم بە با چوو', 'ئۆف خوایە، دیسانەوە؟', 'بەخوا ئەمجارە دەیبەمەوە'],
+    fall: ['ئاخ برا گیان', 'ئۆف!', 'هێواش هێواش...', 'ئاخ پشتم!'],
+    bump: ['سەرم گێژ بوو', 'ئەمە چی بوو؟!', 'ئەی لە قەبری بام!', 'کێ ئەمەی لێرە داناوە؟'],
+    pushed: ['کێ پاڵی پێوەنام؟!', 'ئەی بێ ویژدان!', 'ئاخ برا گیان، بۆ؟', 'دەمبینیتەوە!'],
+    rider: ['دابەزە لە پێم!', 'قورسی برا گیان!', 'ئەمە پاسە؟'],
+    idle: ['چیە بۆ ناجوڵێیتەوە، ئەترسی شێرەکەم؟', 'خەوت لێکەوت؟', 'یەڵڵا، هەستە!', 'چاوەڕێی چی دەکەیت؟'],
+    level: ['بژی شێرەکەم!', 'دەستت خۆش!', 'ئەوەتا!', 'کەس ناگاتە من!'],
+    gift: ['قوربانت بم!', 'دەستت خۆش برا گیان!', 'ئەوەتا، بفڕە!'],
+    finish: ['لووتکە هی منە!', 'بژی شێرەکەم!', 'کێ وەک من؟'],
+  },
+
   volume: { value: 0.5, min: 0, max: 1, step: 0.05 },
   music_volume: { value: 0.5, min: 0, max: 1, step: 0.05 },      // the built-in tunes and your songs
   music_tempo: { value: 72, min: 55, max: 110, step: 1 },        // beats a minute of the built-in tunes in the first world; each world after adds 1.5

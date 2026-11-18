@@ -69,6 +69,8 @@ After play: remove the highest point as well; the TikTok API key goes in an .env
 
 After play: show all details in spectate mode (the wind, the gun shots, almost everything), match details on both sides, and reduce the lag between players
 
+After play: add funny Kurdish lines when he falls from high or other things: "ay laqabri bam", "ah bra gyan", "chya bo najuleytawa atrsi sherakam"
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -129,6 +131,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
 - [x] TikTok LIVE gifts change the climb (start-live.bat asks your TikTok name): by worth, a gust of wind, super jumps, red bumpers, an earthquake, a rocket about a level up; set by worth or by gift name in config.js; one at a time, a feed down the left says who sent what, a banner for the big ones; follows and shares get confetti. Only the game on the server's own PC hears them. "gift 30" in the dev console, or node server.js 8080 --test-gifts, tries them without going live
 - [x] Likes fill a counter on screen; every 10 (like_drop; it was 50, lowered for a small LIVE) a heart, a shoe or a flowerpot falls near you with the liker's name, a red mark at the top showing where; dodge it or it knocks you (drop_push, 0 for harmless). A share gives a super jump. "likes 50" in the dev console tries it
+- [x] Funny Kurdish lines in a speech bubble over the climber, with a little cartoon voice: a big fall (quote_fall, 12 m) always (ئەی لە قەبری بام!, ئاخ برا گیان...), standing still 8 s teases (چیە بۆ ناجوڵێیتەوە، ئەترسی شێرەکەم؟), and now and then a small fall, a bump, a shove, someone on your feet, a level done, a good gift, the finish; bots say some too; the room and spectators see yours. The lines are in config.js (quotes), to change or add to, in Kurdish in either language
 - [x] Each level's end cheers louder the higher you are, shows how long the level took, and the end of a world gets a bigger cheer
 - [x] Three difficulties, picked on the title: easy, normal, hard
 - [x] Machines in some worlds: a button that opens the level's gate, a plate that makes timed ledges solid

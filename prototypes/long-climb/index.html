@@ -633,7 +633,7 @@ function hitMe(dir, from) { // another climber shoved you: off whatever feet you
   if (shieldBlocks()) return;
   if (P.hang) letGo(false, true);
   P.vx = dir * tune.push_speed; P.vy = 300; P.on = null; P.coy = 0; P.cut = false; P.stun = 0.35; state.shake = 0.18; sfx.bump();
-  sparks(P.x + PW / 2, P.alt + 20, 14, '#ffffff'); ring(P.x + PW / 2, P.alt + 20, '#ffffff', 56); events.push(['pushed', from]); evSend('push');
+  sparks(P.x + PW / 2, P.alt + 20, 14, '#ffffff'); ring(P.x + PW / 2, P.alt + 20, '#ffffff', 56); events.push(['pushed', from]); evSend('push'); say('pushed');
 }
 function botDrop(o) { // a bot lets go of your feet: it lands on the ledge under it, and climbs on from there
   o.h = null; let k = 0; for (let i = 0; i < route.length && route[i].alt <= o.alt + 1; i++) k = i;
@@ -667,7 +667,7 @@ function stepBot(o, dt, goalI) {
     if (can && P.hang === o.id) { if (o.r() < 0.3) hitMe(o.r() < 0.5 ? 1 : -1, o.name); }                                                          // it shakes you off
     else if (can && P.on === b && !b.rest && !(P.stun > 0) && o.r() < 0.5) hitMe(Math.sign(pcx - o.x) || 1, o.name);
     else if (can && !P.hang && !b.rest && Math.abs(pcx - o.x) < tune.grab_reach + 10 && up > 20 && up < tune.grab_up + 20 && o.r() < tune.bot_grab) { o.h = 'me'; o.hangT = tune.grab_time; }
-    else if (!b.rest && o.i > o.base + 1 && o.r() < tune.bot_slip + d * 0.1) o.fall = Math.max(o.base, o.i - 1 - Math.floor(o.r() * 3));
+    else if (!b.rest && o.i > o.base + 1 && o.r() < tune.bot_slip + d * 0.1) { o.fall = Math.max(o.base, o.i - 1 - Math.floor(o.r() * 3)); botSay(o, 'fall'); }
   }
 }
 function stepOthers(dt) { // the bots think; real players glide to where they last said they were; anyone hanging is drawn on the feet they hold
@@ -697,7 +697,7 @@ function raceFinish() { // you reached the finish: the race goes on for the othe
   const cs = Math.round(state.time * 100); let place = 1; for (const o of others.values()) if (o.fin) place++;
   state.done = true; state.cs = cs; game.fin = { cs, place };
   if (game.kind === 'net') { net.send({ t: 's', x: Math.round(P.x + PW / 2), a: Math.round(P.alt), f: P.face, l: state.level, h: 0 }); net.send({ t: 'fin', cs }); }
-  sfx.win(); confetti(P.x + PW / 2, P.alt + 40, 70); state.flash = 1; events.push(['race', place, cs]);
+  sfx.win(); confetti(P.x + PW / 2, P.alt + 40, 70); state.flash = 1; events.push(['race', place, cs]); say('finish', true);
   game.watch = null; state.t0 = state.t; scene = stillRacing() ? 'watch' : 'board';
 }
 const net = { ws: null, can: location.protocol.startsWith('http'), room: null, id: 0, host: false, tick: 0,
@@ -891,7 +891,7 @@ function hint(s) { state.hint = s; state.hintT = 2.2; }
 function land(p) {
   const drop = P.last - p.alt, cx = P.x + PW / 2, hard = drop > tune.fall_min * 40;
   P.alt = topAt(p, cx); P.last = P.alt; P.whistled = false;
-  if (hard) { state.falls++; state.shake = 0.3; sfx.thud(); puff(cx, P.alt, 12, '#ffffff', 220); ring(cx, P.alt, '#ffffff', 96, 0.45); popText('-' + metres(drop), cx, P.alt + 70, '#ff8a96', 30); events.push(['fall', metres(drop)]); evSend('fall', metres(drop)); }
+  if (hard) { state.falls++; state.shake = 0.3; sfx.thud(); puff(cx, P.alt, 12, '#ffffff', 220); ring(cx, P.alt, '#ffffff', 96, 0.45); popText('-' + metres(drop), cx, P.alt + 70, '#ff8a96', 30); events.push(['fall', metres(drop)]); evSend('fall', metres(drop)); if (metres(drop) >= tune.quote_fall) say('bigfall', true); else say('fall'); }
   if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(cx, P.alt, 6, '#ff8fd8'); ring(cx, P.alt, '#ff8fd8', 70); return; } // a bouncer throws you straight back up
   P.on = p; P.vy = 0; P.squash = 0.22; P.airJump = true;
   if (p.kind === 'n' && thingOf(p) === 'piano') pianoAt(p, cx, true); // a chord, where you came down on the keys
@@ -907,7 +907,7 @@ function land(p) {
     // each level's cheer grows with the climb, and the end of a world gets a bigger one
     const worldDone = p.rest % PER === 0;
     state.banner = tune.banner_time; state.bannerN = p.rest; state.lapCs = Math.round((state.time - state.lt) * 100); state.lt = state.time;
-    state.flash = worldDone ? 1 : 0.7; sfx.rest(); if (worldDone) sfx.open(); ring(cx, P.alt, UI.gold, worldDone ? 520 : 340, 0.6); confetti(cx, P.alt + 30, 24 + p.rest * 2 + (worldDone ? 40 : 0));
+    state.flash = worldDone ? 1 : 0.7; say('level'); sfx.rest(); if (worldDone) sfx.open(); ring(cx, P.alt, UI.gold, worldDone ? 520 : 340, 0.6); confetti(cx, P.alt + 30, 24 + p.rest * 2 + (worldDone ? 40 : 0));
     if (game.kind !== 'solo') { events.push(['level', p.rest]); evSend('level', p.rest, state.lapCs); return; }
     events.push(['level', p.rest, metres(p.alt)]);
     const b = save.best[mode]; if (!(b.level >= p.rest)) b.level = p.rest;
@@ -927,6 +927,7 @@ function finish() {
 }
 function knock(fromX, y) { // thrown away from what hit you, and down
   if (shieldBlocks()) return;
+  say('bump');
   if (P.hang) letGo(false, true);
   P.vx = (P.x + PW / 2 >= fromX ? 1 : -1) * tune.bump_push; P.vy = -220; P.on = null; P.coy = 0; P.cut = false; P.stun = tune.bump_stun;
   state.shake = 0.2; sfx.bump(); puff(fromX, y, 8, '#ff3b4e', 220); sparks(fromX, y, 10, '#ff3b4e'); events.push(['bump']); evSend('bump', 0, 0, fromX, y);
@@ -995,7 +996,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
   if (pushCool > 0) pushCool -= dt; if (grabCool > 0) grabCool -= dt;
   const racing = game.kind !== 'solo' && !(state.count > 0);
   let load = 0, rider = null; if (racing) for (const o of others.values()) if (o.h === me) { load++; rider = o; } // who hangs on your feet
-  if (load > P.load) { toast(rider.name + ' ' + K.rider); sfx.grab(); } P.load = load;
+  if (load > P.load) { toast(rider.name + ' ' + K.rider); sfx.grab(); say('rider'); } P.load = load;
   const tail = () => { // what every step ends with, hanging or not
     if (P.squash > 0) P.squash = Math.max(0, P.squash - dt * 1.6); else if (P.squash < 0) P.squash = Math.min(0, P.squash + dt * 1.6);
     if (P.alt < -400) { P.alt = 0; P.vy = 0; P.on = rests[0]; P.last = 0; } // nothing lies under the tower's foot
@@ -1011,6 +1012,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
   }
   const dir = P.stun > 0 || state.count > 0 ? 0 : (right ? 1 : 0) - (left ? 1 : 0);
   if (dir) P.face = dir;
+  if (!idle && state.started && !(state.count > 0) && P.on && !dir && !(P.buf > 0) && Math.abs(P.vx) < 20) { P.still = (P.still || 0) + dt; if (P.still >= tune.quote_idle) { P.still = -tune.quote_idle; say('idle', true); } } else if (!idle) P.still = 0; // standing still too long: teased
   const acc = P.on ? (P.on.kind === 'i' ? tune.ice_accel : tune.ground_accel) : tune.air_accel;
   const want = dir * tune.move_speed * (load ? tune.carry_run : 1) * (buffs.speed > 0 ? tune.buff_speed_mult : 1), dv = want - P.vx, md = acc * dt; // with someone on your feet you run slower and jump lower
   if (!(P.stun > 0)) P.vx += Math.abs(dv) <= md ? dv : Math.sign(dv) * md;
@@ -1034,7 +1036,7 @@ function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so
       let o = rider, bd = 80; if (!o) for (const q of others.values()) { const dx = Math.abs(q.x - cx); if (!q.fin && Math.abs(q.alt - P.alt) < 52 && dx < bd) { o = q; bd = dx; } }
       if (o) {
         const d = o === rider ? P.face : Math.sign(o.x - cx) || P.face;
-        if (o.bot) { if (o.h) botDrop(o); o.kx = d * 320; o.fall = Math.max(o.base, (o.fall >= 0 ? o.fall : o.i) - 1 - Math.floor(o.r() * 2)); } else net.send({ t: 'hit', to: o.id, d });
+        if (o.bot) { if (o.h) botDrop(o); botSay(o, 'pushed'); o.kx = d * 320; o.fall = Math.max(o.base, (o.fall >= 0 ? o.fall : o.i) - 1 - Math.floor(o.r() * 2)); } else net.send({ t: 'hit', to: o.id, d });
         sparks(o.x, o.alt + 20, 14, '#ffffff'); ring(o.x, o.alt + 20, '#ffffff', 56); state.shake = 0.1; sfx.bump(); events.push(['push', o.name]);
       }
     }
@@ -1633,6 +1635,8 @@ function drawWorld() {
     else { ctx.fillStyle = q.color; ctx.beginPath(); ctx.ellipse(q.x, y, q.s, q.s * 0.8, 0, 0, 7); ctx.fill(); }
   }
   ctx.globalAlpha = 1;
+  if (live) for (const o of others.values()) { const y = sy(o.alt); if (vis(y)) drawSay(o.say, o.x, o.h ? y + 40 : y - 20); } // what the others said, over their heads (above the name)
+  if (mine) drawSay(P.say, P.x + PW / 2, sy(P.alt));
   ctx.restore();
   if (state.flash > 0) { ctx.fillStyle = `rgba(255,236,170,${clamp(state.flash, 0, 1) * 0.28})`; ctx.fillRect(0, 0, W, H); } // a short warm flash for a level, a finish
 }
@@ -2242,9 +2246,41 @@ function zTick(dt) {
   net.zT = (net.zT || 0) - dt;
   if (sig !== net.zSig || net.zT <= 0) { net.zSig = sig; net.zT = 2; fxSend(Object.assign({ k: 'z' }, z)); }
 }
+// ---- Funny lines: a speech bubble over a climber's head (CONFIG.quotes, in Kurdish) ------------------
+// A big fall always gets one, standing still too long gets teased, and the other moments get one now and then
+// (tune.quote_chance), never two too close (tune.quote_gap). Yours go to the room, so everyone sees what you said.
+const SAY = ['bigfall', 'fall', 'bump', 'pushed', 'rider', 'idle', 'level', 'gift', 'finish'];
+const quoteList = cat => { const q = (CONFIG.quotes || {})[cat]; return Array.isArray(q) ? q.filter(s => typeof s === 'string' && s) : []; };
+function chirp(vol = 1) { if (!audio || muted) return; tone(700, 0.06, 'square', 0.035 * vol, 820); tone(560, 0.09, 'square', 0.035 * vol, 480, 0.07); } // a little cartoon voice
+function pickLine(list, last) { let i = Math.floor(fxr() * list.length); if (list.length > 1 && i === last) i = (i + 1) % list.length; return i; }
+function say(cat, sure) { // you say a line of this moment's list
+  const list = quoteList(cat), now = clock.now(); if (!list.length || !P || game.spec) return;
+  if (!sure && (now - (P.sayAt || -99) < tune.quote_gap || fxr() > tune.quote_chance)) return;
+  const i = pickLine(list, P.sayI); P.sayI = i; P.sayAt = now; P.say = { s: list[i], at: now, end: now + tune.quote_time }; chirp();
+  events.push(['say', cat, i]); fxSend({ k: 'ev', e: 'say', v: SAY.indexOf(cat), w: i, x: Math.round(P.x + PW / 2), a: Math.round(P.alt) });
+}
+function botSay(o, cat) { // a bot's line, now and then
+  const list = quoteList(cat), now = clock.now(); if (!list.length || now - (o.sayAt || -99) < tune.quote_gap + 1 || fxr() > tune.quote_chance * 0.6) return;
+  o.sayI = pickLine(list, o.sayI); o.sayAt = now; o.say = { s: list[o.sayI], at: now, end: now + tune.quote_time };
+}
+function drawSay(b, x, footY) { // the bubble: white, with a tail down to the head; it pops in and fades out
+  const now = clock.now(); if (!b || now > b.end) return;
+  const pop = clamp((now - b.at) / 0.16, 0, 1), sc = 0.55 + 0.45 * (1 - Math.pow(1 - pop, 3)) + Math.sin(pop * PI) * 0.08, a = clamp((b.end - now) / 0.3, 0, 1);
+  ctx.save(); ctx.font = `bold 21px ${FONT}`; ctx.direction = 'rtl';
+  let lines = [b.s]; if (ctx.measureText(b.s).width > 300) { const w = b.s.split(' '), h = Math.ceil(w.length / 2); lines = [w.slice(0, h).join(' '), w.slice(h).join(' ')]; } // a long line goes on two
+  const tw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 30, th = lines.length * 26 + 16, by = footY - 96 - th, bx = clamp(x, tw / 2 + 8, W - tw / 2 - 8);
+  ctx.globalAlpha = a; ctx.translate(x, footY - 80); ctx.scale(sc, sc); ctx.translate(-x, -(footY - 80));
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(bx - tw / 2, by, tw, th, 16); ctx.fill(); ctx.stroke();
+  const tx = clamp(x, bx - tw / 2 + 18, bx + tw / 2 - 18); ctx.beginPath(); ctx.moveTo(tx - 9, by + th - 2); ctx.lineTo(tx + 2, by + th + 14); ctx.lineTo(tx + 10, by + th - 2); ctx.fill(); ctx.stroke();
+  ctx.fillRect(tx - 7.5, by + th - 5, 16, 5); // hides the bubble's edge where the tail joins
+  ctx.fillStyle = '#1b1f2e'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; lines.forEach((l, i) => ctx.fillText(l, bx, by + 8 + 13 + i * 26));
+  ctx.restore();
+}
 const watchingId = () => scene === 'watch' || (scene === 'pause' && pauseFrom === 'watch') ? game.watch : null;
 function onEv(m, near) { // another climber's moment, shown on their climber; with sound when it is near, or the one you watch
   const o = others.get(m.from), x = clamp(Number(m.x) || 0, 0, W), a = Number(m.a) || 0, v = Math.round(Number(m.v) || 0), mine = watchingId() === m.from, loud = mine || near > 0.6;
+  if (m.e === 'say') { const s = quoteList(SAY[v] || '')[Math.round(Number(m.w) || 0)], now = clock.now(); if (o && s) { o.say = { s, at: now, end: now + tune.quote_time }; if (loud) chirp(mine ? 1 : 0.6); } return; }
   if (m.e === 'fall') { puff(x, a, 12, '#ffffff', 220); ring(x, a, '#ffffff', 96, 0.45); popText('-' + v, x, a + 70, '#ff8a96', 30); if (loud) sfx.thud(); if (mine) state.shake = 0.3; if (o) o.squash = 0.3; }
   else if (m.e === 'bump') { puff(x, a, 8, '#ff3b4e', 220); sparks(x, a, 10, '#ff3b4e'); if (loud) sfx.bump(); if (mine) state.shake = 0.2; }
   else if (m.e === 'push') { sparks(x, a + 20, 14, '#ffffff'); ring(x, a + 20, '#ffffff', 56); if (loud) sfx.bump(); if (mine) state.shake = 0.18; }
@@ -2320,6 +2356,7 @@ function applyGift(m) { // one gift, now: what it does, a line in the feed, and 
   else if (k === 'shake') { state.shake = 0.8; sfx.thud(); if (!shieldBlocks()) { if (P.hang) letGo(false, true); if (P.on) { P.on = null; P.vy = 380; P.vx = (P.face || 1) * -220; P.coy = 0; P.cut = false; P.stun = 0.3; } } }
   else { if (P.hang) letGo(false, true); P.on = null; P.coy = 0; P.cut = false; P.stun = 0; P.vy = tune.gift_rocket; live.rocket = 1.2; sfx.go(); ring(cx, P.alt, '#ffb347', 90); }
   if (k !== 'wind' && k !== 'jump') { live.big = { s1: K.fx[k], s2: m.user, t: 1.8 }; }
+  if (k === 'jump' || k === 'rocket') say('gift', k === 'rocket'); else if (k === 'shake') say('bump', true);
   events.push(['gift', m.user, m.gift, n, m.d, k]);
   if (share) fxSend({ k: 'gift', g: out }); // the room gets it too, with the very same places
 }
