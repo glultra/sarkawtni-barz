@@ -50,7 +50,7 @@ window.CONFIG = {
 
   // Hazards
   bounce_speed: { value: 1120, min: 800, max: 1500, step: 20 },  // a bouncer throws you up this fast
-  wind_speed: { value: 115, min: 0, max: 260, step: 5 },         // the wind carries you sideways in the air
+  wind_speed: { value: 75, min: 0, max: 260, step: 5 },          // the wind carries you sideways in the air (it was 115: too strong); it eases in and out around each turn
   wind_period: { value: 3.6, min: 1.5, max: 8, step: 0.1 },      // seconds before the wind turns
   crumble_delay: { value: 0.5, min: 0.15, max: 1.5, step: 0.05 },// seconds a crumbling ledge holds you
   crumble_back: { value: 1.2, min: 0.5, max: 8, step: 0.1 },       // seconds until it comes back
@@ -90,8 +90,9 @@ window.CONFIG = {
   // The things: 'wind' a gust that pushes you, 'jump' super jumps, 'bumper' red bumpers by you,
   // 'shake' an earthquake that throws you off your ledge, 'rocket' a blast about a level up.
   gifts: {
-    rules: [[1, 'wind'], [5, 'jump'], [30, 'bumper'], [99, 'shake'], [500, 'rocket']],
+    rules: [[1, 'piano'], [5, 'jump'], [30, 'bumper'], [99, 'shake'], [500, 'rocket']], // [diamonds at least, what it does]: 'piano' (a grand piano falls on you), 'wind', 'jump', 'bumper', 'shake', 'rocket'
     names: { /* 'Rose': 'wind', 'Lion': 'rocket' */ },
+    like_prize: 'rocket', // what reaching the like goal (like_goal) gives everyone: 'rocket' or 'jump'
     share: 'all', // in a room: 'chaos' sends wind, bumpers, earthquakes and falling things to everyone and keeps super jumps and rockets yours; 'all' sends everything; 'none' keeps it all yours
   },
   gift_gap: { value: 0.6, min: 0.3, max: 6, step: 0.1 },          // seconds between two gifts' effects (the rest wait their turn)
@@ -103,6 +104,12 @@ window.CONFIG = {
   // Likes: every like_drop of them, a heart, a shoe or a flowerpot falls at you with the liker's name. A share gives a super jump.
   like_drop: { value: 5, min: 1, max: 500, step: 1 },            // likes for one falling thing (raise it as your LIVE grows: 50 or more for a busy one)
   drop_speed: { value: 430, min: 150, max: 900, step: 10 },       // how fast it falls, pixels per second
+  like_goal: { value: 1000, min: 50, max: 100000, step: 50 },     // the like goal on screen: when the LIVE's likes reach it, everyone gets the prize (gifts.like_prize), and it starts again
+  // A gift's grand piano: it falls slowly with a red mark and a shadow where it will land; it flattens you if it hits,
+  // then stays a while as a ledge you can climb, playing notes under your feet
+  piano_speed: { value: 210, min: 80, max: 600, step: 10 },      // how fast it falls, pixels per second (a falling heart: drop_speed)
+  piano_stay: { value: 7, min: 2, max: 20, step: 0.5 },          // seconds it stays once landed
+  piano_w: { value: 150, min: 90, max: 260, step: 10 },          // its width in pixels
   drop_push: { value: 1, min: 0, max: 2, step: 0.1 },             // how hard a hit knocks you, as a share of a red bumper's push (0: they never hurt)
   drop_gap: { value: 1, min: 0.5, max: 8, step: 0.5 },            // seconds at least between two falling things             // seats in a room you make, until you change it on the room screen
 
@@ -137,6 +144,7 @@ window.CONFIG = {
     level: ['بژی شێرەکەم!', 'دەستت خۆش!', 'ئەوەتا!', 'کەس ناگاتە من!'],
     gift: ['قوربانت بم!', 'دەستت خۆش برا گیان!', 'ئەوەتا، بفڕە!'],
     finish: ['لووتکە هی منە!', 'بژی شێرەکەم!', 'کێ وەک من؟'],
+    piano: ['پیانۆ؟! بەڕاستی؟', 'ئەی لە قەبری بام!', 'کێ پیانۆ فڕێ دەدات؟!', 'سەرم بوو بە دەهۆڵ'], // flattened by a gift's piano
   },
 
   volume: { value: 0.5, min: 0, max: 1, step: 0.05 },

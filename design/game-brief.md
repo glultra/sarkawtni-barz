@@ -71,6 +71,8 @@ After play: show all details in spectate mode (the wind, the gun shots, almost e
 
 After play: add funny Kurdish lines when he falls from high or other things: "ay laqabri bam", "ah bra gyan", "chya bo najuleytawa atrsi sherakam"
 
+After play: the wind is so annoying; drop something bigger, like a piano, slowly; yes to a ghost of the best run with splits, and a like goal on screen
+
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
 **Genre:** precision platformer, one long climb of thirty levels
@@ -130,6 +132,10 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] The sky turns to space as you climb: the sun, a passing plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, the Milky Way and the universe, one after another
 - [x] A console on ` (the key under Esc): help, dev (dev mode on or off, kept), map (the whole tower to scroll, zoom and click to put the climber anywhere), level N, clear, close; in dev mode PgUp / PgDn go a level up or down and Home opens the map. Not in a room race
 - [x] TikTok LIVE gifts change the climb (start-live.bat asks your TikTok name): by worth, a gust of wind, super jumps, red bumpers, an earthquake, a rocket about a level up; set by worth or by gift name in config.js; one at a time, a feed down the left says who sent what, a banner for the big ones; follows and shares get confetti. Only the game on the server's own PC hears them. "gift 30" in the dev console, or node server.js 8080 --test-gifts, tries them without going live
+- [x] A gift's grand piano instead of the wind (the cheapest gifts, Roses, 1 diamond up): it falls slowly with the sender's name, a red mark at the top and a shadow where it will land, at your height (it falls past the ledges above); if it hits you you are flattened and thrown (with a line: پیانۆ؟! بەڕاستی؟), it lands with a crash of low keys and stays 7 s as a ledge that plays notes, then blinks and goes (piano_speed, piano_stay, piano_w); in a room it falls at the same places for everyone
+- [x] A like goal on screen: a bar that fills with the LIVE's likes (like_goal, 1000); full, everyone in the room gets a rocket (gifts.like_prize), with a banner and confetti, and it starts again
+- [x] The ghost of your best climb, alone: a see-through climber where you were at this moment of your best climb from this start level and difficulty (the one that got highest, then fastest), a ring for it on the height bar, and at each level done how far ahead (green) or behind (red) your best you are
+- [x] World 6's wind is gentler (wind_speed 75, was 115), eases in and out around each turn, and its sign blinks just before it turns
 - [x] Likes fill a counter on screen; every 10 (like_drop; it was 50, lowered for a small LIVE) a heart, a shoe or a flowerpot falls near you with the liker's name, a red mark at the top showing where; dodge it or it knocks you (drop_push, 0 for harmless). A share gives a super jump. "likes 50" in the dev console tries it
 - [x] Funny Kurdish lines in a speech bubble over the climber, with a little cartoon voice: a big fall (quote_fall, 12 m) always (ئەی لە قەبری بام!, ئاخ برا گیان...), standing still 8 s teases (چیە بۆ ناجوڵێیتەوە، ئەترسی شێرەکەم؟), and now and then a small fall, a bump, a shove, someone on your feet, a level done, a good gift, the finish; bots say some too; the room and spectators see yours. The lines are in config.js (quotes), to change or add to, in Kurdish in either language
 - [x] Each level's end cheers louder the higher you are, shows how long the level took, and the end of a world gets a bigger cheer
@@ -201,14 +207,13 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - Each player's gates (button and target) and timed ledges stay their own in a room, so nobody opens the puzzle for the others
 - A kicked player is kept out by their browser, not by who they are: another browser or a cleared one gets back in: not built yet
 - TikTok chat commands (viewers typing to change the game): not built yet; gifts are
-- A ghost of your best run: change it after play
 - Real Kurdish songs: yours to add, since the game ships none; put the files in assets/music/ and name them in config.js
 - New moves over time: grow it
 - A daily course: change it after play
 
 ## Build order
 1. The slice: the whole tower from the garden to the top, with falls, rest floors, the HUD, the finish code and the code checker.
-2. A ghost of your best run and zone split times.
+2. A ghost of your best run and split times (done).
 3. A shared leaderboard on a server.
 
 ---
