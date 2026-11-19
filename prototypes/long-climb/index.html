@@ -1218,9 +1218,9 @@ function mix(a, b, t) {
 // of stars. A fine grain lies over the sky so it reads painted, not flat. prefs.scenery 0 keeps only the
 // plain sky, the clouds, the stars and the far things, for a slow phone. None of it touches the game.
 const LOOK = [ // per world: the glow low in the sky, the land's three depths, the clouds, and the light over everything
-  { glow: '#ff8a3a', far: '#4a1609', near: '#220804', rim: '#ffa04a', light: '#ff8a3a' },
-  { glow: '#ff5a1a', far: '#3a0e0a', near: '#1a0605', rim: '#ff6a2a', light: '#ff6a2a' },
-  { glow: '#e0a070', far: '#3a2c26', near: '#1c1513', rim: '#d9a77a', light: '#d9a070' },
+  { glow: '#ff7a2a', far: '#3a140a', near: '#1c0905', rim: '#ff9a4a', light: '#ff8a3a', sky: ['#160907', '#4a160a'] },
+  { glow: '#ff5a1a', far: '#2e0f0a', near: '#160706', rim: '#ff7a3a', light: '#ff6a2a', sky: ['#120807', '#381209'] },
+  { glow: '#c9926a', far: '#342822', near: '#1a1412', rim: '#c9a07a', light: '#d9a070', sky: ['#0f0c0b', '#2a1f1a'] },
   { glow: '#fff2cc', far: '#9dbcd6', mid: '#6f9a84', near: '#3d7350', cloud: '#ffffff', shade: '#b7c9dc', light: '#fff1c8' },
   { glow: '#ffb070', far: '#b88a98', mid: '#7e5170', near: '#46284a', cloud: '#ffe6cc', shade: '#d6909a', light: '#ffae76' },
   { glow: '#4f63b8', far: '#34407a', mid: '#222a58', near: '#141a3a', cloud: '#6d7ab0', shade: '#2a3266', light: '#8090ff' },
@@ -1232,15 +1232,16 @@ const LOOK = [ // per world: the glow low in the sky, the land's three depths, t
 const hex3 = c => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const mixHex = (a, b, t) => { const B = hex3(b); return '#' + hex3(a).map((v, i) => Math.round(lerp(v, B[i], t)).toString(16).padStart(2, '0')).join(''); };
 const rgba = (c, a) => { const [r, g, b] = hex3(c); return `rgba(${r},${g},${b},${a})`; };
-function skyNow() { // the world the camera is in, the next, and how far into the blend between them (the last fifth of a world)
+function skyNow() { // the world the camera is in, the next, and how far into the blend between them (the last two fifths of a world). The ground's surface is a line, not a blend: the cave never turns blue
   const z = worldAt(cam), Z = WORLDS[z], n = Math.min(z + 1, WORLDS.length - 1), t = clamp((cam - Z.base) / (Z.end - Z.base), 0, 1);
-  return { z, n, k: Math.max(0, t * 5 - 4) };
+  const k = z === 2 ? 0 : clamp(t * 2.5 - 1.5, 0, 1); return { z, n, k: k * k * (3 - 2 * k) };
 }
 function looks(key, s) { const a = LOOK[s.z][key], b = LOOK[s.n][key]; return a && b ? mixHex(a, b, s.k) : a || b; }
+const weigh = (s, w) => lerp(w[s.z] || 0, w[s.n] || 0, s.k); // how much of a layer a moment has, from each world's own share: it fades across a border, never switches
 const NZ = (() => { const r = fixedRng(1234), t = []; for (let i = 0; i < 512; i++) t.push(r()); return t; })(); // smooth noise for the shapes of rock, hills and mountains
 function vn(x) { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f), a = NZ[i & 511], b = NZ[(i + 1) & 511]; return a + (b - a) * u; }
 function fbm(x, oct = 4) { let s = 0, a = 0.5, f = 1, n = 0; for (let k = 0; k < oct; k++) { s += vn(x * f + k * 37.3) * a; n += a; a *= 0.5; f *= 2.03; } return s / n; }
-let GRAIN = null, RIDGES = null; const CLOUDS = {};
+let GRAIN = null, RIDGES = null, ROCK = null; const CLOUDS = {};
 function grain() { // the fine grain: black and white specks, faint, made once
   if (!GRAIN) {
     const N = 256, c = document.createElement('canvas'); c.width = c.height = N; const m = c.getContext('2d'), img = m.createImageData(N, N), g = fixedRng(99);
@@ -1248,6 +1249,16 @@ function grain() { // the fine grain: black and white specks, faint, made once
     m.putImageData(img, 0, 0); GRAIN = ctx.createPattern(c, 'repeat');
   }
   return GRAIN;
+}
+function rock() { // the cavern's far wall, painted once and tiled: soft patches of lighter and darker stone, a few fine seams; it wraps without a join
+  if (!ROCK) {
+    const N = 512, c = document.createElement('canvas'); c.width = c.height = N; const m = c.getContext('2d'), g = fixedRng(2024);
+    for (let i = 0; i < 140; i++) { const x = g() * N, y = g() * N, r = 30 + g() * 90, light = g() < 0.45, a = 0.05 + g() * 0.07;
+      for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) { const q = m.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r); q.addColorStop(0, light ? `rgba(255,220,190,${a})` : `rgba(0,0,0,${a * 1.6})`); q.addColorStop(1, 'rgba(0,0,0,0)'); m.fillStyle = q; m.fillRect(x + dx - r, y + dy - r, 2 * r, 2 * r); } }
+    m.lineCap = 'round'; for (let i = 0; i < 18; i++) { let x = g() * N, y = g() * N, a = g() * 7; m.strokeStyle = `rgba(0,0,0,${0.12 + g() * 0.1})`; m.lineWidth = 1 + g() * 1.5; m.beginPath(); m.moveTo(x, y); for (let k = 0; k < 8; k++) { a += (g() - 0.5) * 1.2; x += Math.cos(a) * 16; y += Math.sin(a) * 16; m.lineTo(x, y); } m.stroke(); }
+    ROCK = ctx.createPattern(c, 'repeat');
+  }
+  return ROCK;
 }
 function ridges() { // the land's far shapes across the screen, worked out once: mountains, hills, a line of pines
   if (RIDGES) return RIDGES;
@@ -1268,127 +1279,140 @@ function cloudSprite(z, v) { // painted once per world and shape: puffs lit from
   m.globalCompositeOperation = 'destination-out'; const b = m.createLinearGradient(0, CH - 48, 0, CH - 6); b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(1, 'rgba(0,0,0,1)'); m.fillStyle = b; m.fillRect(0, CH - 48, CWd, 48);
   return (CLOUDS[key] = c);
 }
-function drawSky() {
-  const s = skyNow(), Z = WORLDS[s.z], N = WORLDS[s.n], t = state.t || 0, rich = !!prefs.scenery;
-  const top = mixHex(Z.sky[0], N.sky[0], s.k), bot = mixHex(Z.sky[1], N.sky[1], s.k), glowC = looks('glow', s);
+const skyCol = (z, i) => (LOOK[z].sky || WORLDS[z].sky)[i]; // the backdrop's own sky: deep down darker and calmer than the colours the menus show for a world
+function backdrop(s, cave, t) { // one side of the ground's surface: the cavern under it, or the open sky over it
+  const rich = !!prefs.scenery, top = mixHex(skyCol(s.z, 0), skyCol(s.n, 0), s.k), bot = mixHex(skyCol(s.z, 1), skyCol(s.n, 1), s.k), glowC = looks('glow', s);
   const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, top); g.addColorStop(0.55, mixHex(top, bot, 0.6)); g.addColorStop(1, bot);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  { const deep = s.z <= 2, hg = ctx.createLinearGradient(0, deep ? H : H * 0.45, 0, deep ? H * 0.35 : H); hg.addColorStop(0, rgba(glowC, deep ? 0.32 : 0)); hg.addColorStop(1, rgba(glowC, deep ? 0 : 0.3)); ctx.fillStyle = hg; ctx.fillRect(0, 0, W, H); } // the glow low in the sky: the lava under the deep, the horizon above
-  if (rich && s.z >= 6) nebula(s, t);
-  farDecor(t); drawBodies(t);
-  if (rich && (s.z === 3 || s.z === 4)) sunRays(s, t);
+  { const hg = ctx.createLinearGradient(0, cave ? H : H * 0.45, 0, cave ? H * 0.35 : H); hg.addColorStop(0, rgba(glowC, cave ? 0.26 : 0)); hg.addColorStop(1, rgba(glowC, cave ? 0 : 0.3)); ctx.fillStyle = hg; ctx.fillRect(0, 0, W, H); } // the glow low down: the lava under the deep, the horizon above
+  if (cave && rich) { const o = (cam * 0.2) % 512; ctx.save(); ctx.translate(0, o); ctx.fillStyle = rock(); ctx.fillRect(0, -o - 4, W, H + 8); ctx.restore(); } // the cavern's far wall
+  if (!cave && rich) nebula(s, t);
+  farDecor(t, cave); drawBodies(t, cave);
+  if (cave) { if (rich) caveWalls(s); return; }
+  if (rich) sunRays(s, t);
   clouds(t, 0.28, 0.55, 0.62, c => c.k < 0.16); // far clouds: small and pale
   if (rich) panorama(s, bot);
   clouds(t, 0.6, 1, 0.9, c => c.k >= 0.16 && c.k < 0.34); // near clouds
-  if (rich) { motes(s, t); caveWalls(s); }
+  if (rich) motes(s, t);
+}
+function drawSky() {
+  const t = state.t || 0, sb = WORLDS[3].base, ys = sb === undefined ? -1e9 : sy(sb), s = skyNow();
+  const cave = { z: Math.min(s.z, 2), n: Math.min(s.n, 2), k: s.z >= 2 ? 0 : s.k }, open = s.z >= 3 ? s : { z: 3, n: 3, k: 0 };
+  if (ys <= 0) backdrop(cave, true, t); else if (ys >= H) backdrop(open, false, t); // the surface above the screen: you are under the ground; below it: you are over it
+  else { // the surface is on the screen: sky above its line, the cavern below it, each whole
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, ys); ctx.clip(); backdrop(open, false, t); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(0, ys, W, H - ys); ctx.clip(); backdrop(cave, true, t); ctx.restore();
+  }
   if (cam < 900) { // a sea of lava under the tower's foot, bubbling, a crust of darker rock drifting on it
-    const y = sy(0) + 14; glow(W / 2, y, 460, 'rgba(255,120,30,0.45)', 'rgba(255,90,20,0)');
-    const lg = ctx.createLinearGradient(0, y, 0, H + 40); lg.addColorStop(0, '#ffcf6a'); lg.addColorStop(0.08, '#ff8a2a'); lg.addColorStop(0.3, '#e0420f'); lg.addColorStop(1, '#6a0f05'); ctx.fillStyle = lg;
+    const y = sy(0) + 14; glow(W / 2, y, 460, 'rgba(255,120,30,0.4)', 'rgba(255,90,20,0)');
+    const lg = ctx.createLinearGradient(0, y, 0, H + 40); lg.addColorStop(0, '#ffcf6a'); lg.addColorStop(0.08, '#ff8a2a'); lg.addColorStop(0.3, '#d63e10'); lg.addColorStop(1, '#5a0d05'); ctx.fillStyle = lg;
     ctx.beginPath(); ctx.moveTo(0, H + 40); for (let x = 0; x <= W; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.03 + t * 1.6) * 3 + Math.sin(x * 0.011 - t) * 2); ctx.lineTo(W, H + 40); ctx.closePath(); ctx.fill();
-    if (rich) { ctx.fillStyle = 'rgba(90,16,6,0.45)'; for (let i = 0; i < 6; i++) { const cx = ((i * 137 + t * (8 + i * 3)) % (W + 160)) - 80, cy = y + 34 + (i % 3) * 26; ctx.beginPath(); ctx.ellipse(cx, cy, 46 + (i % 2) * 30, 6 + (i % 3) * 2, 0, 0, 7); ctx.fill(); } }
+    if (prefs.scenery) { ctx.fillStyle = 'rgba(80,14,6,0.45)'; for (let i = 0; i < 6; i++) { const cx = ((i * 137 + t * (8 + i * 3)) % (W + 160)) - 80, cy = y + 34 + (i % 3) * 26; ctx.beginPath(); ctx.ellipse(cx, cy, 46 + (i % 2) * 30, 6 + (i % 3) * 2, 0, 0, 7); ctx.fill(); } }
     for (let i = 0; i < 9; i++) { const bx = (i * 83 + 40) % W, ph = (t * 0.6 + i * 0.37) % 1, br = 4 + (i % 3) * 3; ctx.fillStyle = `rgba(255,236,170,${0.7 * (1 - ph)})`; ctx.beginPath(); ctx.arc(bx, y + 20 + (1 - ph) * 40, br * (0.5 + ph), 0, 7); ctx.fill(); }
   }
-  { const sb = WORLDS[3].base, y = sy(sb); if (sb !== undefined && y > -200 && y < H + 260) { // the ground's surface: a rolling edge of grass, soil with stones and roots under it, darkening into rock
-    const edge = x => y - 10 - 22 * fbm(x / 110 + 400, 3);
-    ctx.beginPath(); ctx.moveTo(0, H + 40); for (let x = 0; x <= W; x += 10) ctx.lineTo(x, edge(x)); ctx.lineTo(W, H + 40); ctx.closePath();
-    const sg = ctx.createLinearGradient(0, y - 34, 0, y + 440); sg.addColorStop(0, '#6cb85a'); sg.addColorStop(0.07, '#3f7d3a'); sg.addColorStop(0.1, '#6a4a30'); sg.addColorStop(0.35, '#43301f'); sg.addColorStop(1, '#1d1614'); ctx.fillStyle = sg; ctx.fill();
+  if (ys > -60 && ys < H + 600) { // the ground's surface: a rolling edge of grass, then a band of soil with stones and roots that thins into the cavern below
+    const y = ys, edge = x => y - 10 - 22 * fbm(x / 110 + 400, 3), depth = 520;
+    ctx.beginPath(); ctx.moveTo(0, y + depth); for (let x = 0; x <= W; x += 10) ctx.lineTo(x, edge(x)); ctx.lineTo(W, y + depth); ctx.closePath();
+    const sg = ctx.createLinearGradient(0, y - 34, 0, y + depth); sg.addColorStop(0, '#6cb85a'); sg.addColorStop(0.06, '#3f7d3a'); sg.addColorStop(0.09, '#6a4a30'); sg.addColorStop(0.4, 'rgba(58,40,28,0.95)'); sg.addColorStop(0.75, 'rgba(36,26,20,0.6)'); sg.addColorStop(1, 'rgba(26,18,14,0)'); ctx.fillStyle = sg; ctx.fill();
     ctx.strokeStyle = '#4f9a46'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); // the grass, a blade at a time, stirring
     for (let x = 2; x < W; x += 6) { const e = edge(x), h = 5 + 9 * vn(x * 0.37), sw = Math.sin(t * 1.5 + x * 0.05) * 2; ctx.moveTo(x, e + 3); ctx.quadraticCurveTo(x + sw * 0.5, e - h * 0.5, x + sw + (vn(x) - 0.5) * 4, e - h); }
     ctx.stroke();
-    const st = fixedRng(77); for (let i = 0; i < 22; i++) { const sx = st() * W, sy2 = y + 50 + st() * 330, sr = 3 + st() * 9; ctx.fillStyle = `rgba(${st() < 0.5 ? '120,100,86' : '30,22,18'},${0.35 + st() * 0.25})`; ctx.beginPath(); ctx.ellipse(sx, sy2, sr * 1.4, sr, st() * 3, 0, 7); ctx.fill(); } // stones in the soil
-    ctx.strokeStyle = 'rgba(70,48,30,0.55)'; ctx.lineWidth = 2.5; for (const rx of [90, 260, 470, 640]) { ctx.beginPath(); ctx.moveTo(rx, y + 12); ctx.quadraticCurveTo(rx + 22, y + 60, rx - 8, y + 118); ctx.quadraticCurveTo(rx - 18, y + 150, rx + 6, y + 180); ctx.stroke(); } // roots
-  } }
-  if (rich && tune.scenery_grain > 0) { ctx.globalAlpha = tune.scenery_grain; ctx.fillStyle = grain(); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    const st = fixedRng(77); for (let i = 0; i < 18; i++) { const sx = st() * W, d = st(), sr = 3 + st() * 9, a = (0.35 + st() * 0.25) * (1 - d); ctx.fillStyle = `rgba(${st() < 0.5 ? '120,100,86' : '30,22,18'},${a})`; ctx.beginPath(); ctx.ellipse(sx, y + 50 + d * 300, sr * 1.4, sr, st() * 3, 0, 7); ctx.fill(); } // stones in the soil, fewer as it thins
+    ctx.strokeStyle = 'rgba(70,48,30,0.5)'; ctx.lineWidth = 2.5; for (const rx of [90, 260, 470, 640]) { ctx.beginPath(); ctx.moveTo(rx, y + 12); ctx.quadraticCurveTo(rx + 22, y + 60, rx - 8, y + 118); ctx.quadraticCurveTo(rx - 18, y + 150, rx + 6, y + 180); ctx.stroke(); } // roots
+  }
+  if (prefs.scenery && tune.scenery_grain > 0) { ctx.globalAlpha = tune.scenery_grain; ctx.fillStyle = grain(); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
 }
-function farDecor(t) { // the far things that stay behind the planets: embers and glints in the deep, two depths of stars at night and in space
+function farDecor(t, cave) { // the far things behind the planets: embers and glints in the deep; two depths of stars from the night on, fewer near ones so space stays calm
   for (const d of decor) {
     const wz = worldAt(d.alt);
     if (wz <= 2) {
+      if (!cave || d.k > 0.6) continue; // a few embers, not a storm of them
       const y = H * camY() - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
-      if (wz < 2) { const ry = y - ((t * 40 * (0.5 + d.k)) % 160) + 80, fl = 0.6 + 0.4 * Math.sin(t * 7 + d.x); ctx.fillStyle = `rgba(255,${140 + Math.round(d.k * 80)},60,${(0.3 + 0.4 * d.k) * fl})`; ctx.beginPath(); ctx.arc(d.x + Math.sin(t + d.k * 9) * 6, ry, 1.2 + d.s * 1.3, 0, 7); ctx.fill(); }
-      else { const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + d.x)); ctx.fillStyle = `rgba(200,220,255,${0.45 * tw})`; const sz = 2 + d.s * 2; ctx.fillRect(d.x - sz / 2, y - 0.5, sz, 1.5); ctx.fillRect(d.x - 0.75, y - sz / 2, 1.5, sz); }
+      if (wz < 2) { const ry = y - ((t * 40 * (0.5 + d.k)) % 160) + 80, fl = 0.6 + 0.4 * Math.sin(t * 7 + d.x); ctx.fillStyle = `rgba(255,${140 + Math.round(d.k * 80)},60,${(0.25 + 0.35 * d.k) * fl})`; ctx.beginPath(); ctx.arc(d.x + Math.sin(t + d.k * 9) * 6, ry, 1.1 + d.s * 1.1, 0, 7); ctx.fill(); }
+      else { const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + d.x)); ctx.fillStyle = `rgba(200,220,255,${0.35 * tw})`; const sz = 1.5 + d.s * 1.5; ctx.fillRect(d.x - sz / 2, y - 0.5, sz, 1.2); ctx.fillRect(d.x - 0.6, y - sz / 2, 1.2, sz); }
       continue;
     }
-    if (wz < 5) continue;
-    for (const [p, a, r] of [[0.14, 0.75, 0.8], [0.55, 1, 1.3]]) { // far stars barely move; near ones drift past
+    if (cave || wz < 5) continue;
+    for (const [p, a, r, keep] of [[0.14, 0.6, 0.75, 0], [0.55, 0.8, 1.15, 0.45]]) { // far stars barely move; near ones drift past, only some of them
+      if (d.k < keep) continue;
       const y = H * camY() - (d.alt - cam) * p, x = (d.x * (p < 0.2 ? 1.7 : 1) + (p < 0.2 ? 97 : 0)) % W; if (y < -10 || y > H + 10) continue;
-      const tw = 0.55 + 0.45 * Math.sin(t * (1.3 + d.k * 2) + d.x), rad = r * (0.6 + d.s * 0.8);
+      const tw = 0.55 + 0.45 * Math.sin(t * (1.3 + d.k * 2) + d.x), rad = r * (0.6 + d.s * 0.7);
       ctx.fillStyle = `rgba(${d.k < 0.2 ? '255,226,200' : d.k > 0.8 ? '200,220,255' : '255,255,255'},${a * tw * (0.5 + d.k * 0.5)})`; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();
-      if (p > 0.2 && d.k > 0.93) { ctx.fillStyle = `rgba(255,255,255,${0.12 * tw})`; ctx.beginPath(); ctx.arc(x, y, rad * 5, 0, 7); ctx.fill(); ctx.fillRect(x - rad * 6, y - 0.5, rad * 12, 1); ctx.fillRect(x - 0.5, y - rad * 6, 1, rad * 12); } // the brightest few, with a soft halo
+      if (p > 0.2 && d.k > 0.96) { ctx.fillStyle = `rgba(255,255,255,${0.1 * tw})`; ctx.beginPath(); ctx.arc(x, y, rad * 4, 0, 7); ctx.fill(); } // the brightest few, with a soft halo
     }
   }
 }
-function clouds(t, p, sc, a, which) { // clouds in the open-sky worlds at one depth, each tinted by the world it floats in, drifting with the wind
+function clouds(t, p, sc, a, which) { // clouds in the open-sky worlds at one depth, each tinted by the world it floats in, drifting with the wind; those in the night fade as they near space
   for (const d of decor) {
     if (!which(d)) continue; const wz = worldAt(d.alt); if (wz < 3 || wz > 5) continue;
     const y = H * camY() - (d.alt - cam) * p, s = sc * (0.6 + d.s * 0.5), img = cloudSprite(wz, Math.floor(d.k * 97) % 6), w = 360 * s, h = 160 * s; if (y < -h || y > H + h) continue;
-    const x = ((d.x + t * (4 + d.k * 10) * p) % (W + w)) - w * 0.5;
-    ctx.globalAlpha = a * (wz === 5 ? 0.7 : 1); ctx.drawImage(img, x - w / 2, y - h * 0.75, w, h);
+    const x = ((d.x + t * (4 + d.k * 10) * p) % (W + w)) - w * 0.5, Z = WORLDS[wz], up = wz === 5 ? clamp((Z.end - d.alt) / (0.4 * (Z.end - Z.base)), 0, 1) : 1;
+    ctx.globalAlpha = a * (wz === 5 ? 0.7 : 1) * up; if (ctx.globalAlpha > 0.01) ctx.drawImage(img, x - w / 2, y - h * 0.75, w, h);
   }
   ctx.globalAlpha = 1;
 }
-function panorama(s, skyBot) { // out of the ground: far mountains, hills, then pines, each sinking slower than the tower, with mist at their feet
-  const sb = WORLDS[3].base; if (sb === undefined || cam < sb - 900 || s.z >= 6) return;
+function panorama(s, skyBot) { // out of the ground: far mountains, hills, then pines, each sinking slower than the tower, with mist at their feet; gone under the horizon before space
+  const sb = WORLDS[3].base; if (sb === undefined || cam < sb - 900) return;
   const R = ridges(), glowC = looks('glow', s);
-  for (const [p, hs, key, haze] of [[0.05, R.mount, 'far', 0.45], [0.13, R.hills, 'mid', 0.28], [0.3, R.near, 'near', 0.1]]) {
+  for (const [p, hs, key, haze] of [[0.085, R.mount, 'far', 0.45], [0.18, R.hills, 'mid', 0.28], [0.35, R.near, 'near', 0.1]]) {
     const base = H * camY() - (sb - cam) * p + 40; if (base - 420 > H) continue;
     const col = mixHex(looks(key, s) || '#203040', skyBot, haze);
     ctx.beginPath(); ctx.moveTo(R.xs[0], H + 40); R.xs.forEach((x, i) => ctx.lineTo(x, base - hs[i])); ctx.lineTo(R.xs[R.xs.length - 1], H + 40); ctx.closePath();
     const g = ctx.createLinearGradient(0, base - 400, 0, base + 40); g.addColorStop(0, mixHex(col, glowC, 0.18)); g.addColorStop(1, col); ctx.fillStyle = g; ctx.fill();
-    if (key === 'far' && s.z <= 4) { ctx.save(); ctx.clip(); ctx.fillStyle = rgba(mixHex('#ffffff', glowC, 0.3), 0.55); ctx.beginPath(); R.xs.forEach((x, i) => { const yy = base - hs[i]; i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); for (let i = R.xs.length - 1; i >= 0; i--) ctx.lineTo(R.xs[i], Math.max(base - hs[i], base - 300 + 14 * vn(i * 0.7))); ctx.closePath(); ctx.fill(); ctx.restore(); } // snow on the high peaks
+    if (key === 'far') { ctx.save(); ctx.clip(); ctx.fillStyle = rgba(mixHex(mixHex('#ffffff', glowC, 0.3), skyBot, 0.25), 0.55); ctx.beginPath(); R.xs.forEach((x, i) => { const yy = base - hs[i]; i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); for (let i = R.xs.length - 1; i >= 0; i--) ctx.lineTo(R.xs[i], Math.max(base - hs[i], base - 300 + 14 * vn(i * 0.7))); ctx.closePath(); ctx.fill(); ctx.restore(); } // snow on the high peaks, in the hour's light
     if (key === 'near') { ctx.fillStyle = g; ctx.beginPath(); for (const [x, h] of R.pines) { const y0 = base - ridgeAt(R, hs, x) + 4; ctx.moveTo(x, y0 - h); ctx.lineTo(x + h * 0.3, y0 - h * 0.35); ctx.lineTo(x + h * 0.17, y0 - h * 0.38); ctx.lineTo(x + h * 0.36, y0 + 2); ctx.lineTo(x - h * 0.36, y0 + 2); ctx.lineTo(x - h * 0.17, y0 - h * 0.38); ctx.lineTo(x - h * 0.3, y0 - h * 0.35); ctx.closePath(); } ctx.fill(); } // pines along the near hill
     const m = ctx.createLinearGradient(0, base - 90, 0, base + 30); m.addColorStop(0, rgba(skyBot, 0)); m.addColorStop(1, rgba(skyBot, 0.6)); ctx.fillStyle = m; ctx.fillRect(0, base - 90, W, H - base + 130); // mist at its foot
   }
 }
-function caveWalls(s) { // deep down: rough walls of rock at both sides, two depths, their edges lit by the glow; they open out as the surface nears
-  const sb = WORLDS[3].base; if (sb === undefined) return;
-  const fade = clamp((sb - cam) / 700, 0, 1); if (fade <= 0) return;
+function caveWalls(s) { // deep down: rough walls of rock at both sides, two depths, their edges catching a little of the glow; the surface's line ends them
   const rim = looks('rim', s) || '#ffa04a';
-  ctx.globalAlpha = fade; ctx.lineJoin = 'round';
-  for (const [p, wd, key, seed, sc, ra] of [[0.35, 150, 'far', 0, 260, 0.3], [0.72, 92, 'near', 40, 150, 0.45]]) {
+  ctx.lineJoin = 'round';
+  for (const [p, wd, key, seed, sc, ra] of [[0.35, 140, 'far', 0, 280, 0.16], [0.72, 86, 'near', 40, 170, 0.26]]) {
     const col = looks(key, s) || '#1c1513';
     for (const side of [-1, 1]) {
       const pts = [];
       for (let y = -30; y <= H + 30; y += 16) { const u = (cam * p + (H - y)) / sc + seed + (side > 0 ? 113 : 0), d = wd * (0.3 + 0.95 * fbm(u, 4)); pts.push([side < 0 ? d : W - d, y]); }
       const x0 = side < 0 ? -2 : W + 2, g = ctx.createLinearGradient(x0, 0, side < 0 ? wd * 1.2 : W - wd * 1.2, 0); g.addColorStop(0, mixHex(col, '#000000', 0.45)); g.addColorStop(1, col);
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x0, -30); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.lineTo(x0, H + 30); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = rgba(rim, ra); ctx.lineWidth = 2.5; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); // the edge catches the light
+      ctx.strokeStyle = rgba(rim, ra); ctx.lineWidth = 2; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); // the edge catches the light
     }
   }
-  ctx.globalAlpha = 1;
 }
-function sunRays(s, t) { // a few long soft beams down from the sun's side of the sky
-  const c = looks('light', s), a = s.z === 3 ? 0.07 : 0.09;
+function sunRays(s, t) { // a few long soft beams down from the sun's side of the sky, by day and at sunset; they fade out into the night
+  const a = weigh(s, { 3: 0.07, 4: 0.09 }); if (a < 0.004) return; const c = looks('light', s);
   for (let i = 0; i < 5; i++) {
     const ang = 2.05 + i * 0.13 + Math.sin(t * 0.13 + i * 1.7) * 0.025, wd = 0.035 + (i % 2) * 0.025, L = H * 1.5, ox = W - 90, oy = -60;
     const g = ctx.createLinearGradient(ox, oy, ox + Math.cos(ang) * L, oy + Math.sin(ang) * L); g.addColorStop(0, rgba(c, a)); g.addColorStop(1, rgba(c, 0));
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(ang - wd) * L, oy + Math.sin(ang - wd) * L); ctx.lineTo(ox + Math.cos(ang + wd) * L, oy + Math.sin(ang + wd) * L); ctx.closePath(); ctx.fill();
   }
 }
-function motes(s, t) { // dust and seeds floating in the light of the open sky
-  if (s.z < 3 || s.z > 5) return; const c = looks('light', s);
+function motes(s, t) { // dust and seeds floating in the light of the open sky, fewer at night, none in space
+  const w = weigh(s, { 3: 1, 4: 1, 5: 0.5 }); if (w < 0.02) return; const c = looks('light', s);
   for (const d of decor) {
     if (d.k < 0.7) continue; const y = H * camY() - (d.alt - cam) * 0.9 + Math.sin(t * 0.7 + d.k * 20) * 14; if (y < -10 || y > H + 10) continue;
-    const x = (d.x + Math.sin(t * 0.4 + d.k * 30) * 24 + t * 6) % W, a = 0.25 + 0.25 * Math.sin(t * 2 + d.x);
+    const x = (d.x + Math.sin(t * 0.4 + d.k * 30) * 24 + t * 6) % W, a = (0.25 + 0.25 * Math.sin(t * 2 + d.x)) * w;
     ctx.fillStyle = rgba(c, a); ctx.beginPath(); ctx.arc(x, y, 1.4 + d.s, 0, 7); ctx.fill();
   }
 }
-function nebula(s, t) { // in space: great faint clouds of glowing gas, far behind everything
-  const L = LOOK[s.z]; if (!L.neb) return;
+function nebula(s, t) { // in space: a few great faint clouds of glowing gas, far behind everything, each the colour of the world it hangs in; they fade in as the night ends
+  const w = weigh(s, { 5: 0, 6: 1, 7: 1, 8: 1, 9: 1 }); if (w < 0.02) return;
   for (const d of decor) {
-    if (d.k > 0.1) continue; const y = H * camY() - (d.alt - cam) * 0.1; if (y < -340 || y > H + 340) continue;
-    const r = 180 + d.s * 120, x = (d.x + Math.sin(t * 0.05 + d.k * 50) * 30), col = L.neb[Math.floor(d.k * 100) % 2];
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},0.13)`); g.addColorStop(0.5, `rgba(${col},0.05)`); g.addColorStop(1, `rgba(${col},0)`);
+    if (d.k > 0.05) continue; const L = LOOK[Math.max(6, worldAt(d.alt))]; const y = H * camY() - (d.alt - cam) * 0.1; if (y < -340 || y > H + 340) continue;
+    const r = 180 + d.s * 120, x = (d.x + Math.sin(t * 0.05 + d.k * 50) * 30), col = L.neb[Math.floor(d.k * 1000) % 2];
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},${0.07 * w})`); g.addColorStop(0.5, `rgba(${col},${0.025 * w})`); g.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
 }
-function worldLight() { // one soft wash of the world's light over the tower: from the lava below in the deep, from above in the open
+function worldLight() { // one soft wash of the world's light over the tower: from the lava below in the deep, from above in the open; it turns over gently at the surface
   const a = tune.scenery_light; if (!(a > 0)) return;
-  const s = skyNow(), c = looks('light', s), deep = s.z <= 2, g = ctx.createLinearGradient(0, deep ? H : 0, 0, deep ? 0 : H);
-  const k = clamp(a * 3, 0, 1); g.addColorStop(0, rgba(c, k)); g.addColorStop(0.55, rgba(c, k * 0.3)); g.addColorStop(1, rgba(c, 0)); // soft-light is gentle: three times the setting reads as the setting
-  ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40); ctx.globalCompositeOperation = 'source-over';
+  const sb = WORLDS[3].base, s = skyNow(), deep = sb === undefined ? 1 : clamp((sb - cam) / 900 + 0.5, 0, 1), c = deep > 0 && deep < 1 ? mixHex(LOOK[2].light, LOOK[3].light, 1 - deep) : looks('light', s), k = clamp(a * 3, 0, 1);
+  ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 1;
+  for (const [from, share] of [[H, deep], [0, 1 - deep]]) { // soft-light is gentle: three times the setting reads as the setting
+    if (share < 0.01) continue; const g = ctx.createLinearGradient(0, from, 0, H - from);
+    g.addColorStop(0, rgba(c, k * share)); g.addColorStop(0.55, rgba(c, k * 0.3 * share)); g.addColorStop(1, rgba(c, 0)); ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
+  }
+  ctx.globalCompositeOperation = 'source-over';
 }
-
 // ---- Far away: the sun, the moon, the earth, the planets, then a galaxy and the universe --------
 // Each hangs at a height in its world and drifts far slower than the tower (0.22 of it), so a climb
 // passes them one after another, each named faintly beneath. None of it touches the game.
@@ -1396,10 +1420,10 @@ const BODIES = [
   { k: 'core', w: 0, at: 0.3, x: 360, r: 250, name: 'core' }, { k: 'mantle', w: 1, at: 0.5, x: 360, r: 320, name: 'mantle' }, { k: 'crust', w: 2, at: 0.45, x: 360, r: 320, name: 'crust' },
   { k: 'sun', w: 3, at: 0.2, x: 590, r: 56 }, { k: 'plane', w: 3, at: 0.95, x: 0, r: 30 }, { k: 'sunset', w: 4, at: 0.95, x: 170, r: 95 },
   { k: 'moon', w: 5, at: 0.05, x: 570, r: 44, cres: true }, { k: 'moon', w: 5, at: 0.85, x: 190, r: 115, name: 'moon' },
-  { k: 'earth', w: 6, at: 0.25, x: 390, r: 230, name: 'earth' }, { k: 'mars', w: 6, at: 0.9, x: 540, r: 88, name: 'mars' },
-  { k: 'jupiter', w: 7, at: 0.5, x: 220, r: 150, name: 'jupiter' }, { k: 'saturn', w: 8, at: 0.28, x: 480, r: 90, name: 'saturn' },
-  { k: 'uranus', w: 8, at: 0.68, x: 170, r: 46, name: 'uranus' }, { k: 'neptune', w: 8, at: 0.95, x: 560, r: 44, name: 'neptune' },
-  { k: 'galaxy', w: 9, at: 0.12, x: 430, r: 200, name: 'galaxy' }, { k: 'universe', w: 9, at: 1.15, x: 360, r: 330, name: 'universe' },
+  { k: 'earth', w: 6, at: 0.25, x: 420, r: 160, name: 'earth' }, { k: 'mars', w: 6, at: 0.92, x: 200, r: 58, name: 'mars' },
+  { k: 'jupiter', w: 7, at: 0.5, x: 230, r: 105, name: 'jupiter' }, { k: 'saturn', w: 8, at: 0.2, x: 480, r: 62, name: 'saturn' },
+  { k: 'uranus', w: 8, at: 0.58, x: 180, r: 34, name: 'uranus' }, { k: 'neptune', w: 8, at: 0.97, x: 540, r: 32, name: 'neptune' },
+  { k: 'galaxy', w: 9, at: 0.12, x: 430, r: 150, name: 'galaxy' }, { k: 'universe', w: 9, at: 1.15, x: 360, r: 330, name: 'universe' },
 ];
 function glow(x, y, r, c0, c1, r0 = 0) { const g = ctx.createRadialGradient(x, y, r0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
 function ball(x, y, r, light, dark) { const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r); g.addColorStop(0, light); g.addColorStop(1, dark); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
@@ -1407,30 +1431,25 @@ function nightSide(x, y, r) { const g = ctx.createLinearGradient(x - r, y - r * 
 function clipBall(x, y, r, f) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip(); f(); ctx.restore(); }
 let GAL = null, UNI = null, MOONC = null; // the galaxy, the universe and the moon, each painted once into its own picture
 const FAR = {
-  core(x, y, r, t) { // the inner core: white-hot at the heart, churning orange, a red rim, a wide glow
-    glow(x, y, r * 1.9, 'rgba(255,120,40,0.35)', 'rgba(255,90,20,0)');
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, '#fffbe0'); g.addColorStop(0.3, '#ffd45a'); g.addColorStop(0.65, '#ff7a1c'); g.addColorStop(1, '#a8180a');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-    clipBall(x, y, r, () => { ctx.lineCap = 'round'; for (let i = 0; i < 9; i++) { const a = t * 0.12 * (i % 2 ? 1 : -1) + i * 0.7, rr2 = r * (0.3 + (i % 5) * 0.14); ctx.strokeStyle = `rgba(255,${200 + (i % 3) * 18},${120 + (i % 4) * 25},0.28)`; ctx.lineWidth = r * 0.05; ctx.beginPath(); ctx.arc(x, y, rr2, a, a + 1.6 + (i % 3) * 0.4); ctx.stroke(); } }); // the churning
+  core(x, y, r, t) { // the inner core, far below and through the rock: only its heat, a wide soft glow that breathes
+    const b = 0.85 + 0.15 * Math.sin(t * 0.8);
+    glow(x, y, r * 2.4, `rgba(255,110,40,${0.2 * b})`, 'rgba(255,90,20,0)'); glow(x, y, r * 1.1, `rgba(255,190,110,${0.16 * b})`, 'rgba(255,160,80,0)');
   },
-  mantle(x, y, r, t) { // the mantle: dark rock split by glowing cracks of magma that pulse slowly
+  mantle(x, y, r, t) { // the mantle: three faint seams of magma deep in the far rock, pulsing slowly, fading at their ends
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    for (let i = 0; i < 6; i++) {
-      const y0 = y + (i - 2.5) * r * 0.36, pulse = 0.55 + 0.45 * Math.sin(t * 1.4 + i * 1.7), pts = [];
-      for (let k = 0; k <= 12; k++) pts.push([k / 12 * W, y0 + Math.sin(k * 1.3 + i * 2.1) * 26 + Math.sin(k * 3.1 + i) * 9]);
-      for (const [lw, c] of [[22, `rgba(255,80,20,${0.16 * pulse})`], [8, `rgba(255,120,40,${0.5 * pulse})`], [2.5, `rgba(255,220,140,${0.85 * pulse})`]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); pts.forEach(([px, py], k) => k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke(); }
+    for (let i = 0; i < 3; i++) {
+      const y0 = y + (i - 1) * r * 0.55, pulse = 0.55 + 0.45 * Math.sin(t * 1.1 + i * 1.7), pts = [], x0 = W * (0.12 + 0.1 * i), x1 = W * (0.62 + 0.12 * i);
+      for (let k = 0; k <= 10; k++) pts.push([lerp(x0, x1, k / 10), y0 + Math.sin(k * 1.3 + i * 2.1) * 20 + Math.sin(k * 3.1 + i) * 7]);
+      const g = (a) => { const q = ctx.createLinearGradient(x0, 0, x1, 0); q.addColorStop(0, `rgba(255,110,40,0)`); q.addColorStop(0.5, `rgba(255,${a > 0.3 ? 200 : 110},${a > 0.3 ? 120 : 40},${a * pulse})`); q.addColorStop(1, 'rgba(255,110,40,0)'); return q; };
+      for (const [lw, a] of [[14, 0.07], [5, 0.2], [1.5, 0.45]]) { ctx.strokeStyle = g(a); ctx.lineWidth = lw; ctx.beginPath(); pts.forEach(([px, py], k) => k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke(); }
     }
   },
-  crust(x, y, r, t) { // the crust: layers of rock, and clusters of crystals that catch the light
-    for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 2 ? 'rgba(90,64,48,0.22)' : 'rgba(40,28,22,0.22)'; ctx.beginPath(); const y0 = y + (i - 3.5) * r * 0.28; ctx.moveTo(0, y0); for (let k = 0; k <= 10; k++) ctx.lineTo(k / 10 * W, y0 + Math.sin(k * 0.9 + i) * 14); ctx.lineTo(W, y0 + r * 0.14); ctx.lineTo(0, y0 + r * 0.14); ctx.fill(); }
-    for (const [cx, cy, s, hue] of [[120, -0.5, 1, '160,110,255'], [600, -0.15, 1.3, '90,220,230'], [210, 0.35, 0.9, '255,120,200'], [520, 0.6, 1.1, '160,110,255'], [360, 0.05, 0.7, '90,220,230']]) {
-      const by = y + cy * r; glow(cx, by - 30 * s, 70 * s, `rgba(${hue},0.25)`, `rgba(${hue},0)`);
-      for (const [dx, h, lean] of [[-14, 46, -0.35], [0, 70, 0], [15, 52, 0.3], [28, 30, 0.55]]) {
-        ctx.save(); ctx.translate(cx + dx * s, by); ctx.rotate(lean); const w2 = 9 * s, h2 = h * s;
-        ctx.beginPath(); ctx.moveTo(-w2, 0); ctx.lineTo(-w2, -h2 * 0.8); ctx.lineTo(0, -h2); ctx.lineTo(w2, -h2 * 0.8); ctx.lineTo(w2, 0); ctx.closePath();
-        ctx.fillStyle = `rgba(${hue},0.75)`; ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.moveTo(-w2 * 0.2, -2); ctx.lineTo(-w2 * 0.2, -h2 * 0.8); ctx.lineTo(0, -h2 * 0.97); ctx.lineTo(w2 * 0.1, -h2 * 0.8); ctx.lineTo(w2 * 0.1, -2); ctx.fill(); ctx.restore();
-      }
-      const tw = 0.5 + 0.5 * Math.sin(t * 3 + cx); ctx.fillStyle = `rgba(255,255,255,${tw})`; ctx.fillRect(cx - 1, by - 72 * s, 2, 10); ctx.fillRect(cx - 5, by - 68 * s, 10, 2); // a glint
+  crust(x, y, r, t) { // the crust: faint layers in the far rock and a few small crystals catching the light
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = i % 2 ? 'rgba(110,84,64,0.08)' : 'rgba(0,0,0,0.1)'; ctx.beginPath(); const y0 = y + (i - 2.5) * r * 0.32; ctx.moveTo(0, y0); for (let k = 0; k <= 10; k++) ctx.lineTo(k / 10 * W, y0 + Math.sin(k * 0.9 + i) * 12); ctx.lineTo(W, y0 + r * 0.12); ctx.lineTo(0, y0 + r * 0.12); ctx.fill(); }
+    for (const [cx, cy, sz, hue] of [[150, -0.4, 0.55, '160,130,255'], [560, 0.1, 0.65, '110,210,220'], [330, 0.55, 0.45, '230,140,200']]) {
+      const by = y + cy * r; glow(cx, by - 14 * sz, 40 * sz, `rgba(${hue},0.12)`, `rgba(${hue},0)`);
+      for (const [dx, h, lean] of [[-10, 40, -0.35], [0, 58, 0], [11, 36, 0.35]]) { ctx.save(); ctx.translate(cx + dx * sz, by); ctx.rotate(lean); const w2 = 8 * sz, h2 = h * sz; ctx.beginPath(); ctx.moveTo(-w2, 0); ctx.lineTo(-w2, -h2 * 0.8); ctx.lineTo(0, -h2); ctx.lineTo(w2, -h2 * 0.8); ctx.lineTo(w2, 0); ctx.closePath(); ctx.fillStyle = `rgba(${hue},0.4)`; ctx.fill(); ctx.restore(); }
+      const tw = Math.max(0, Math.sin(t * 1.5 + cx)); ctx.fillStyle = `rgba(255,255,255,${0.6 * tw})`; ctx.fillRect(cx - 0.75, by - 60 * sz, 1.5, 8); ctx.fillRect(cx - 4, by - 56.75 * sz, 8, 1.5); // now and then a glint
     }
   },
   sun(x, y, r, t) { // a soft wide glow, faint turning rays, then a disc that is white at the heart and warmer at its edge
@@ -1555,12 +1574,14 @@ const FAR = {
     ctx.drawImage(UNI, x - r * 1.35, y - r * 1.35, r * 2.7, r * 2.7);
   },
 };
-function drawBodies(t) {
+function drawBodies(t, cave) {
   for (const b of BODIES) {
+    if (cave !== undefined && (b.w <= 2) !== cave) continue; // the cavern's far things under the ground, the sky's over it
     const Wd = WORLDS[b.w]; if (Wd.base === undefined) continue;
     const alt = lerp(Wd.base, Wd.end, b.at), y = H * 0.55 - (alt - cam) * 0.22, R = b.k === 'saturn' ? b.r * 2.3 : b.k === 'universe' || b.k === 'galaxy' ? b.r : b.r * 1.3;
     if (y < -R - 60 || y > H + R + 60) continue;
-    ctx.globalAlpha = b.w >= 4 ? 0.8 : 1; FAR[b.k](b.x, y, b.r, t, b); ctx.globalAlpha = 1; // far things stay a little faint, so the ledges read first
+    const set = b.k === 'sunset' && WORLDS[5].base !== undefined ? clamp((WORLDS[5].base + 600 - cam) / 1800, 0, 1) : 1; if (set <= 0) continue; // the setting sun is gone once the night is in
+    ctx.globalAlpha = (b.w >= 6 ? 0.62 : b.w >= 4 ? 0.8 : 1) * set; FAR[b.k](b.x, y + (1 - set) * 120, b.r, t, b); ctx.globalAlpha = 1; // far things stay a little faint, so the ledges read first
     if (b.name) text(K.bodies[b.name], b.x, y + (b.k === 'galaxy' ? b.r * 0.6 : b.k === 'universe' ? b.r * 0.75 : b.r) + 28, 19, 'rgba(255,255,255,0.6)', 'center', true);
   }
 }
