@@ -95,6 +95,7 @@ After play: adding ufos moving in the background, and from the bottom u show som
 After play: i don't like it so much they are look so fake ish not realistics ! · picked: roll back
 After play: idk what arts but i would like to go all with one arts nice and cute one · picked: soft toy
 After play: i mean it is childish appeared and some stuffs doesn't look nice except the sun i just liked the sun so rollback and redesign something else not just on phone mb both sides
+After play: (style picked) polished painted
 
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
@@ -206,6 +207,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] Smooth on phones: the backdrop is painted at half resolution on its own canvas and laid over the screen at once (the grass, lava and everything you stand on stay sharp); a phone draws at most 2 pixels per screen point instead of 3; the world's light is plain see-through paint, not a slow blend; when a phone still falls under about 45 frames a second from the game's own work, it quietly draws a step less sharp (never below 70%)
 - [x] Sun and moon (world 6, and some of the last world): some plain ledges are sun (gold) or moon (blue), and only one colour is solid at a time; every jump swaps them (the other shows as a faint dashed ghost); a plain ledge stays solid, so a hop on it sets the colour you need; two coloured ledges in a row always alternate, so the way up can always be climbed; a chip under the clock shows what is up now and after your next jump; the wind blows only on Hard
 - [x] A smiling sun in the day sky (from the soft-toy try, the one part kept)
+- [x] Polished ledges: each plain ledge painted once into its own sharp picture with thinner, softer outlines, lit from above and shaded beneath, a breath of its world's light, the top edge catching the light; the HUD and menu panels with a thin light rim
 
 ## Your systems
 - parkour · in the slice

@@ -179,7 +179,8 @@ function text(s, x, y, size, c, align = 'center', bold = false) {
   ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
 }
 function plain(s, x, y, size, c) { ctx.direction = 'ltr'; ctx.fillStyle = c; ctx.font = `bold ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y); }
-function rr(x, y, w, h, r, fill, stroke, lw = 4) {
+let RRLW = 4; // rr's outline width when none is given: thinner while a ledge is painted into its picture
+function rr(x, y, w, h, r, fill, stroke, lw = RRLW) {
   ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
@@ -220,7 +221,7 @@ function dragEnd() {
 }
 function dim(a) { if (PASS) return; ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, -MOFF, W, H + 2 * MOFF); }
 function full(fn) { if (!MOFF) { fn(); return; } const m = MOFF, h = H, hy = HUDY; ctx.save(); ctx.translate(0, -m); H = h + 2 * m; MOFF = 0; HUDY = 0; try { fn(); } finally { ctx.restore(); H = h; MOFF = m; HUDY = hy; } } // inside a centred menu: draw on the whole screen
-function pill(x, y, w, h, fill = UI.bg) { rr(x, y, w, h, Math.min(h / 2, 26), fill); }
+function pill(x, y, w, h, fill = UI.bg) { rr(x, y, w, h, Math.min(h / 2, 26), fill, 'rgba(255,255,255,0.09)', 1.5); } // a dark glass panel with a thin light rim
 function dot(x, y, r, c) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); }
 function chevron(x, y, d, c = '#ffffff', s = 9) { ctx.strokeStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - d * s * 0.5, y - s); ctx.lineTo(x + d * s * 0.5, y); ctx.lineTo(x - d * s * 0.5, y + s); ctx.stroke(); }
 function eye(x, y, s, c) { ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y, s, s * 0.6, 0, 0, 7); ctx.stroke(); dot(x, y, s * 0.3, c); }
@@ -1618,7 +1619,7 @@ function drawBodies(t, cave) {
     if (b.name) text(K.bodies[b.name], b.x, y + (b.k === 'galaxy' ? b.r * 0.6 : b.k === 'universe' ? b.r * 0.75 : b.r) + 28, 19, 'rgba(255,255,255,0.6)', 'center', true);
   }
 }
-const OUT = '#2a1c14';
+let OUT = '#2a1c14'; // the outline colour; softer while a ledge is painted into its picture
 // ---- Real things to stand on ----------------------------------------------------------------
 // A plain ledge is something from the real world, by height: furniture low down, buses, vans and
 // trucks in the middle, planes, rockets and satellites high up. Only its top edge holds you; the
@@ -1665,7 +1666,26 @@ function drawMinecart(x, y, w, spin) { // an iron mine cart: its rim is the ledg
   for (const [rx, ry] of [[x + 6, y + 6], [x + w - 6, y + 6], [x + 12, y + 26], [x + w - 12, y + 26]]) dot(rx, ry, 1.8, '#2a2d33');
   rr(x - 2, y, w + 4, 6, 2, '#9aa4b0', OUT, 2.5);
 }
-function drawThing(p, x, y, w) {
+const SPR_PAD = 34, SPR_TOP = 44, SPR_H = 124; // the margin round a ledge's picture: things reach above its top (fins, a lid) and well below (legs, wheels)
+function drawThing(p, x, y, w) { // a plain ledge: from its own picture, painted the first time it comes into view and let go when it leaves (see drawWorld)
+  if (!prefs.scenery || PASS || p.x0 === undefined) { drawThingRaw(p, x, y, w); return; } // a falling piano or a figure on the figures screen is new each frame: drawn as it is
+  const k = RES, key = k + ':' + w;
+  if (!p.spr || p.spr.key !== key) {
+    const c = p.spr && p.spr.c || document.createElement('canvas'), cw = Math.ceil((w + SPR_PAD * 2) * k), ch = Math.ceil(SPR_H * k);
+    if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; } const m = c.getContext('2d'); m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, cw, ch); m.setTransform(k, 0, 0, k, 0, 0);
+    const main = ctx, out = OUT, lw = RRLW; ctx = m; OUT = 'rgba(42,28,24,0.78)'; RRLW = 2.6; m.lineJoin = 'round'; m.lineCap = 'round';
+    try { drawThingRaw(p, SPR_PAD, SPR_TOP, w); } finally { ctx = main; OUT = out; RRLW = lw; }
+    m.globalCompositeOperation = 'source-atop'; // the light, only where the ledge is
+    const g = m.createLinearGradient(0, SPR_TOP - 16, 0, SPR_TOP + 62); g.addColorStop(0, 'rgba(255,255,255,0.32)'); g.addColorStop(0.2, 'rgba(255,255,255,0.08)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(18,10,26,0.42)');
+    m.fillStyle = g; m.fillRect(0, 0, w + SPR_PAD * 2, SPR_H); // lit from above, shaded beneath
+    const L = LOOK[clamp(p.world | 0, 0, LOOK.length - 1)]; m.fillStyle = rgba(L.light || '#ffffff', 0.1); m.fillRect(0, 0, w + SPR_PAD * 2, SPR_H); // a breath of the world's own light
+    m.fillStyle = 'rgba(255,255,255,0.32)'; m.fillRect(0, SPR_TOP, w + SPR_PAD * 2, 1.6); // the top edge catching the light
+    m.globalCompositeOperation = 'source-over';
+    p.spr = { c, key };
+  }
+  ctx.drawImage(p.spr.c, x - SPR_PAD, y - SPR_TOP, w + SPR_PAD * 2, SPR_H);
+}
+function drawThingRaw(p, x, y, w) {
   const v = lookOf(p), k = thingOf(p), c = PAINT[(v >> 3) % PAINT.length], wood = WOOD[(v >> 2) % 3], dark = mix(c, '#000000', 0.3);
   const legs = (h, col = OUT) => { ctx.fillStyle = col; ctx.fillRect(x + 8, y + h, 8, 16); ctx.fillRect(x + w - 16, y + h, 8, 16); };
   if (k === 'minecart') drawMinecart(x, y, w, 0);
@@ -1938,7 +1958,7 @@ function drawWorld() {
     for (let i = 0; i < 14; i++) { const y = (i * 97 + 40) % H, x = ((i * 173 + t * 420 * state.wind) % (W + 200) + W + 200) % (W + 200) - 100; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - state.wind * (40 + (i % 3) * 20), y); ctx.stroke(); }
   }
   for (const g of gates) { const y = sy(g.alt); if (vis(y)) drawGate(g, y, t); }
-  for (const p of plats) { const y = sy(p.alt); if (!vis(y)) continue; if (p.temp && p.temp < 1.2 && Math.floor(t * 10) % 2) continue; /* a gift's piano blinks before it goes */ if (p.tilt) { const cx = p.x + p.w / 2; ctx.save(); ctx.translate(cx, y); ctx.rotate(-Math.atan(p.tilt)); ctx.translate(-cx, -y); drawLedge(p, p.x, y, t); ctx.restore(); } else drawLedge(p, p.x, y, t); } // a leaning ledge is drawn turned about its middle
+  for (const p of plats) { const y = sy(p.alt); if (!vis(y)) { if (p.spr && (y < -400 || y > H + 400)) p.spr = null; continue; } if (p.temp && p.temp < 1.2 && Math.floor(t * 10) % 2) continue; /* a gift's piano blinks before it goes */ if (p.tilt) { const cx = p.x + p.w / 2; ctx.save(); ctx.translate(cx, y); ctx.rotate(-Math.atan(p.tilt)); ctx.translate(-cx, -y); drawLedge(p, p.x, y, t); ctx.restore(); } else drawLedge(p, p.x, y, t); } // a leaning ledge is drawn turned about its middle
   for (const tg of targets) { const y = sy(tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp); if (vis(y)) drawTarget(tg.x, y, tg.hit); }
   for (const tr of turrets) { const y = sy(tr.alt); if (vis(y)) drawTurret(tr.x, y, tr.dir, tr.sleep > 0, t); }
   for (const s of stars) { const y = sy(s.alt); if (!s.taken && vis(y)) drawStar(s.x, y, t); }
