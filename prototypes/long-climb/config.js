@@ -168,7 +168,7 @@ window.CONFIG = {
     ghost: true,          // the see-through ghost of your best climb
     bubbles: true,        // the funny lines in a speech bubble
   },
-  scenery_grain: { value: 0.07, min: 0, max: 0.2, step: 0.01 },  // the fine grain over the sky, so it reads painted rather than flat
+  scenery_grain: { value: 0, min: 0, max: 0.2, step: 0.01 },  // the fine grain over the sky, so it reads painted rather than flat
   scenery_light: { value: 0.12, min: 0, max: 0.3, step: 0.01 },  // how strongly each world's light tints everything
   music_tempo: { value: 72, min: 55, max: 110, step: 1 },        // beats a minute of the built-in tunes in the first world; each world after adds 1.5
 };

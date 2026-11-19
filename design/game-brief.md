@@ -93,6 +93,7 @@ After play: i just feel that the main furnitures and other things needs a bit mo
 After play: nah i don't like it much rollback please
 After play: adding ufos moving in the background, and from the bottom u show some beasts like in eldenring worlds smth huge yeah and for each other worlds u decide what are good things too add
 After play: i don't like it so much they are look so fake ish not realistics ! · picked: roll back
+After play: idk what arts but i would like to go all with one arts nice and cute one · picked: soft toy
 
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
@@ -114,6 +115,7 @@ After play: i don't like it so much they are look so fake ish not realistics ! �
   - Values: the climber and what you can stand on are the brightest things; the sky behind stays soft.
   - Palette: the climb goes from the centre of the Earth to the edge of the universe, so height reads at a glance: the molten core over a sea of lava, the mantle's glowing cracks, the crust's rock and crystals, out through green hills into day, sunset, night and space. Far off, the climb passes the core, the mantle, the crust, the sun, a plane, the Moon, Earth, Mars, Jupiter, Saturn, Uranus and Neptune, the Milky Way and the universe, each named faintly. Hazards are red; safe rest floors are gold.
   - Detail: on the climber, the platforms and the height bar; the background stays quiet.
+  - Style: soft toy, one style for everything: chunky rounded shapes, a pastel palette in every world (rose and plum caves, sky blue days, peach sunsets, lavender nights, soft violet space), soft deep-plum outlines instead of black, flat colour with a gentle highlight, little faces on the sun, the moon and some clouds; no grain, no realistic textures *(you picked it)*
   - Signature: a slim height bar down the side with every level marked, where you are and your best.
   - Every figure drawn, no emoji, no plain circles.
 - References: none named.
@@ -203,6 +205,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] No background ever switches at once: the ground's surface is the line between the cavern and the sky (no soil sheet covering the screen, no cave turning blue), each world's sky blends over the last two fifths of it, and sun rays, dust, gas clouds, the setting sun and the mountains fade or sink away rather than vanish; the underground is a calm dark cavern (a far wall of rock, the core's heat as a soft glow, three faint seams of magma, faint layers and a few small crystals); space is quieter (smaller planets, fainter, less gas, fewer near stars)
 - [x] Smooth on phones: the backdrop is painted at half resolution on its own canvas and laid over the screen at once (the grass, lava and everything you stand on stay sharp); a phone draws at most 2 pixels per screen point instead of 3; the world's light is plain see-through paint, not a slow blend; when a phone still falls under about 45 frames a second from the game's own work, it quietly draws a step less sharp (never below 70%)
 - [x] Sun and moon (world 6, and some of the last world): some plain ledges are sun (gold) or moon (blue), and only one colour is solid at a time; every jump swaps them (the other shows as a faint dashed ghost); a plain ledge stays solid, so a hop on it sets the colour you need; two coloured ledges in a row always alternate, so the way up can always be climbed; a chip under the clock shows what is up now and after your next jump; the wind blows only on Hard
+- [x] One soft-toy art style: candy-pastel ledges with plum outlines; round rolling hills with lollipop trees; puffy flat clouds with soft outlines, some smiling; smooth rounded cave walls in rose, plum and lilac; a bumpy edge of grass with tiny flowers and round pebbles in the soil; a smiling sun, a sleepy sunset and moon, flat cute planets (blob-continent Earth, striped Jupiter, candy-ringed Saturn), a pastel galaxy swirl and twinkle stars
 
 ## Your systems
 - parkour · in the slice
