@@ -1452,7 +1452,7 @@ const BODIES = [ // the sky's far things, spaced so a screen holds one big one a
   { k: 'earth', w: 6, at: 0.45, x: 500, r: 150, name: 'earth' }, { k: 'moon', w: 6, at: 0.62, x: 230, r: 20 }, // the Moon from out here: small and far beside Earth
   { k: 'mars', w: 7, at: 0.15, x: 190, r: 56, name: 'mars' }, { k: 'jupiter', w: 7, at: 0.85, x: 480, r: 110, name: 'jupiter' },
   { k: 'saturn', w: 8, at: 0.45, x: 220, r: 66, name: 'saturn' }, { k: 'uranus', w: 8, at: 0.95, x: 540, r: 32, name: 'uranus' },
-  { k: 'neptune', w: 9, at: 0.3, x: 180, r: 30, name: 'neptune' }, { k: 'galaxy', w: 9, at: 0.78, x: 460, r: 150, name: 'galaxy' }, { k: 'universe', w: 9, at: 1.15, x: 360, r: 330, name: 'universe' },
+  { k: 'neptune', w: 9, at: 0.12, x: 180, r: 30, name: 'neptune' }, { k: 'galaxy', w: 9, at: 0.5, x: 460, r: 150, name: 'galaxy' }, { k: 'universe', w: 9, at: 1.02, x: 360, r: 330, name: 'universe' },
 ];
 function glow(x, y, r, c0, c1, r0 = 0) { const g = ctx.createRadialGradient(x, y, r0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
 function ball(x, y, r, light, dark) { const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r); g.addColorStop(0, light); g.addColorStop(1, dark); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
@@ -1468,6 +1468,7 @@ function vn3(x, y, z) {
   return l(l(l(c(0, 0, 0), c(1, 0, 0), u), l(c(0, 1, 0), c(1, 1, 0), u), v), l(l(c(0, 0, 1), c(1, 0, 1), u), l(c(0, 1, 1), c(1, 1, 1), u), v), w);
 }
 function fbm3(x, y, z, oct) { let s = 0, a = 0.5, f = 1, n = 0; for (let k = 0; k < oct; k++) { s += vn3(x * f + k * 17.1, y * f + k * 3.7, z * f - k * 9.3) * a; n += a; a *= 0.5; f *= 2.02; } return s / n; }
+const smooth01 = v => { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); }; // 0 to 1 with soft ends
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const CRATERS = (() => { const g = fixedRng(808), out = []; for (let i = 0; i < 70; i++) { const z = g() * 2 - 1, a = g() * PI * 2, s = Math.sqrt(1 - z * z), r = 0.02 + Math.pow(g(), 2.4) * 0.16; out.push([Math.cos(a) * s, Math.sin(a) * s, z, r, Math.cos(r)]); } return out; })();
 const SURF = { // the colour of each planet at a point on its sphere (x right, y down, z toward you)
@@ -1498,7 +1499,7 @@ const SURF = { // the colour of each planet at a point on its sphere (x right, y
   neptune(x, y, z) { const b = Math.sin(y * 11 + fbm3(x * 3, y * 6, z * 3, 3)) * 0.5 + 0.5; let c = mixc([74, 112, 214], [52, 84, 180], b * 0.6); const sx = (x + 0.25) / 0.16, sy = (y - 0.25) / 0.09; if (sx * sx + sy * sy < 1) c = mixc(c, [30, 50, 120], 0.6); return c; },
 };
 const ATMO = { earth: '120,180,255', uranus: '170,240,245', neptune: '110,150,255', mars: '255,170,130' };
-const PLANET = {}, PLANET_Q = ['moon', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
+const PLANET = {}, PLANET_Q = ['moon', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'universe'];
 function paintPlanet(k) { // one sphere, pixel by pixel: its surface, lit from the upper left, the rim darkened, a soft edge
   const N = 320, c = document.createElement('canvas'); c.width = c.height = N; const m = c.getContext('2d'), img = m.createImageData(N, N), d = img.data, R = N / 2 - 1;
   const L = k === 'moon' ? [-0.28, -0.22, 0.93] : [-0.55, -0.48, 0.68], ln = Math.hypot(...L), lx = L[0] / ln, ly = L[1] / ln, lz = L[2] / ln, f = SURF[k], air = ATMO[k] && ATMO[k].split(',').map(Number); // the Moon nearly full; the planets lit from the upper left
@@ -1517,7 +1518,30 @@ function paintPlanet(k) { // one sphere, pixel by pixel: its surface, lit from t
   }
   PLANET[k] = c;
 }
-function planetTick() { if (PLANET_Q.length && prefs.scenery) paintPlanet(PLANET_Q.shift()); } // one a frame
+function paintUniverse() { // the edge of everything, painted once pixel by pixel: a nebula of fine filaments shading blue to violet to magenta, a warm heart, dark dust across it, then stars, a few bright with spikes, and far galaxies; it fades out at its rim
+  const N = 440, c = document.createElement('canvas'); c.width = c.height = N; const m = c.getContext('2d'), img = m.createImageData(N, N), d = img.data;
+  const A = [70, 120, 255], B = [150, 90, 235], C = [235, 90, 170], HEART = [255, 196, 140];
+  for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+    const u = (px + 0.5) / N * 2 - 1, v = (py + 0.5) / N * 2 - 1, r = Math.hypot(u, v * 1.15); if (r >= 1) continue;
+    const n1 = fbm3(u * 2.1 + 3, v * 2.1, 0.5, 5); if (n1 <= 0.4) continue; // empty space: nothing more to work out
+    const fade = smooth01((1 - r) / 0.55), rd = 1 - Math.abs(2 * fbm3(u * 3.2 + 7, v * 3.2, 1.3, 4) - 1), fil = rd * rd * rd;
+    let gas = clamp((n1 - 0.4) * 2.4, 0, 1) * (0.35 + 0.95 * fil) * fade; if (gas < 0.004) continue;
+    const hue = fbm3(u * 1.2 + 20, v * 1.2, 2, 3), heart = Math.exp(-(u * u + v * v) * 5.5);
+    let col = hue < 0.5 ? mixc(A, B, clamp(hue * 2, 0, 1)) : mixc(B, C, clamp(hue * 2 - 1, 0, 1)); col = mixc(col, HEART, heart * 0.75);
+    const dust = smooth01((fbm3(u * 2.7 + 40, v * 2.7, 3, 4) - 0.56) * 7); gas *= 1 - dust * 0.85; // dark lanes of dust
+    const o = (py * N + px) * 4, b = 0.55 + 0.9 * heart; d[o] = col[0] * b; d[o + 1] = col[1] * b; d[o + 2] = col[2] * b; d[o + 3] = 255 * clamp(gas * 1.15, 0, 1);
+  }
+  m.putImageData(img, 0, 0);
+  const g = fixedRng(777), tint = () => { const k = g(); return k < 0.2 ? '255,214,180' : k < 0.45 ? '190,210,255' : '255,255,255'; };
+  for (let i = 0; i < 900; i++) { const x = g() * N, y = g() * N, rr2 = Math.hypot(x / N * 2 - 1, (y / N * 2 - 1) * 1.15); if (rr2 > 1) continue; const s = g() < 0.06 ? 1.6 : 0.8; m.fillStyle = `rgba(${tint()},${(0.35 + g() * 0.6) * (1 - rr2 * 0.6)})`; m.fillRect(x, y, s, s); } // stars
+  for (let i = 0; i < 10; i++) { const x = N * (0.15 + g() * 0.7), y = N * (0.15 + g() * 0.7); m.save(); m.translate(x, y); m.rotate(g() * PI); m.scale(1, 0.3 + g() * 0.35); const q = m.createRadialGradient(0, 0, 0, 0, 0, 5 + g() * 6); q.addColorStop(0, 'rgba(255,240,220,0.75)'); q.addColorStop(1, 'rgba(255,240,220,0)'); m.fillStyle = q; m.beginPath(); m.arc(0, 0, 12, 0, 7); m.fill(); m.restore(); } // far galaxies
+  for (let i = 0; i < 9; i++) { const x = N * (0.12 + g() * 0.76), y = N * (0.12 + g() * 0.76), s = 7 + g() * 9, c2 = tint(); // bright stars: a soft halo and thin spikes
+    const q = m.createRadialGradient(x, y, 0, x, y, s * 1.4); q.addColorStop(0, `rgba(${c2},0.9)`); q.addColorStop(0.25, `rgba(${c2},0.35)`); q.addColorStop(1, `rgba(${c2},0)`); m.fillStyle = q; m.beginPath(); m.arc(x, y, s * 1.4, 0, 7); m.fill();
+    for (const [dx, dy] of [[1, 0], [0, 1]]) { const l = m.createLinearGradient(x - dx * s * 2.4, y - dy * s * 2.4, x + dx * s * 2.4, y + dy * s * 2.4); l.addColorStop(0, `rgba(${c2},0)`); l.addColorStop(0.5, `rgba(${c2},0.75)`); l.addColorStop(1, `rgba(${c2},0)`); m.fillStyle = l; m.fillRect(x - (dx ? s * 2.4 : 0.6), y - (dy ? s * 2.4 : 0.6), dx ? s * 4.8 : 1.2, dy ? s * 4.8 : 1.2); }
+  }
+  PLANET.universe = c;
+}
+function planetTick() { if (PLANET_Q.length && prefs.scenery) { const k = PLANET_Q.shift(); if (k === 'universe') paintUniverse(); else paintPlanet(k); } } // one a frame
 function planet(k, x, y, r) { // a painted sphere where it is ready, a plain ball until then; then its air
   const c = PLANET[k];
   if (c) ctx.drawImage(c, x - r, y - r, 2 * r, 2 * r); else ball(x, y, r, '#c8c8c8', '#555555');
@@ -1602,26 +1626,7 @@ const FAR = {
     ctx.save(); ctx.translate(x, y); ctx.rotate(-0.45); ctx.scale(1, 0.5); ctx.rotate(t * 0.015);
     ctx.drawImage(GAL, -r * 1.15, -r * 1.15, r * 2.3, r * 2.3); ctx.restore();
   },
-  universe(x, y, r, t) { // painted once: a great cloud of glowing gas in many colours, dark dust across it, stars of every colour, far galaxies
-    if (!UNI) {
-      const N = 820, c = document.createElement('canvas'); c.width = c.height = N; const m = c.getContext('2d'), g = fixedRng(777);
-      const puff = (px, py, pr, col, a) => { const q = m.createRadialGradient(px, py, 0, px, py, pr); q.addColorStop(0, `rgba(${col},${a})`); q.addColorStop(1, `rgba(${col},0)`); m.fillStyle = q; m.beginPath(); m.arc(px, py, pr, 0, 7); m.fill(); };
-      m.globalCompositeOperation = 'lighter';
-      const strands = [['210,60,170', 0.05], ['40,170,230', 0.05], ['255,150,70', 0.045], ['120,90,255', 0.05], ['60,230,200', 0.035]];
-      for (const [col, a] of strands) { let px = N * (0.2 + g() * 0.6), py = N * (0.2 + g() * 0.6), dir = g() * 7; // each colour a winding strand of gas
-        for (let i = 0; i < 220; i++) { dir += (g() - 0.5) * 0.6; px += Math.cos(dir) * 9; py += Math.sin(dir) * 9; if (px < 80 || px > N - 80) dir = Math.PI - dir; if (py < 80 || py > N - 80) dir = -dir; puff(px + (g() - 0.5) * 60, py + (g() - 0.5) * 60, 30 + g() * 70, col, a); } }
-      puff(N * 0.5, N * 0.48, 160, '255,235,210', 0.22); // the bright heart of it
-      m.globalCompositeOperation = 'source-over';
-      let dx = N * 0.15, dy = N * 0.7, dd = -0.5; for (let i = 0; i < 160; i++) { dd += (g() - 0.5) * 0.3; dx += Math.cos(dd) * 6; dy += Math.sin(dd) * 6; m.fillStyle = 'rgba(6,3,14,0.06)'; m.beginPath(); m.arc(dx + (g() - 0.5) * 30, dy + (g() - 0.5) * 30, 18 + g() * 30, 0, 7); m.fill(); } // a dark lane of dust
-      m.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 2600; i++) { const v = g(); m.fillStyle = `rgba(${v < 0.2 ? '255,200,170' : v < 0.45 ? '190,210,255' : '255,255,255'},${0.2 + g() * 0.7})`; const s = g() < 0.04 ? 2.4 : 1.1; m.fillRect(g() * N, g() * N, s, s); }
-      for (let i = 0; i < 14; i++) { const px = g() * N, py = g() * N, a = g() * Math.PI; m.save(); m.translate(px, py); m.rotate(a); m.scale(1, 0.35 + g() * 0.3); puff(0, 0, 8 + g() * 12, '255,240,220', 0.8); m.restore(); } // far galaxies
-      for (let i = 0; i < 18; i++) { const px = g() * N, py = g() * N, s = 6 + g() * 12; puff(px, py, s * 1.6, '255,255,255', 0.5); m.fillStyle = 'rgba(255,255,255,0.75)'; m.fillRect(px - s, py - 0.6, 2 * s, 1.2); m.fillRect(px - 0.6, py - s, 1.2, 2 * s); } // near bright stars, with spikes
-      { m.globalCompositeOperation = 'destination-in'; const fd = m.createRadialGradient(N / 2, N / 2, N * 0.2, N / 2, N / 2, N / 2); fd.addColorStop(0, 'rgba(0,0,0,1)'); fd.addColorStop(1, 'rgba(0,0,0,0)'); m.fillStyle = fd; m.fillRect(0, 0, N, N); m.globalCompositeOperation = 'source-over'; } // soft all round: no edge
-      UNI = c;
-    }
-    ctx.drawImage(UNI, x - r * 1.35, y - r * 1.35, r * 2.7, r * 2.7);
-  },
+  universe(x, y, r) { const c = PLANET.universe; if (c) ctx.drawImage(c, x - r * 1.5, y - r * 1.5, r * 3, r * 3); }, // the deep field, painted once (paintUniverse)
 };
 function drawBodies(t, cave) {
   for (const b of BODIES) {
@@ -1630,7 +1635,7 @@ function drawBodies(t, cave) {
     const alt = lerp(Wd.base, Wd.end, b.at), y = H * 0.55 - (alt - cam) * 0.35, R = b.k === 'saturn' ? b.r * 2.3 : b.k === 'universe' || b.k === 'galaxy' ? b.r : b.r * 1.3;
     if (y < -R - 60 || y > H + R + 60) continue;
     const set = b.k === 'sunset' && WORLDS[5].base !== undefined ? clamp((WORLDS[5].base + 600 - cam) / 1800, 0, 1) : 1; if (set <= 0) continue; // the setting sun is gone once the night is in
-    ctx.globalAlpha = (SURF[b.k] ? 0.95 : b.w >= 6 ? 0.62 : b.w >= 4 ? 0.8 : 1) * set; FAR[b.k](b.x, y + (1 - set) * 120, b.r, t, b); ctx.globalAlpha = 1; // the painted planets whole; the other far things a little faint, so the ledges read first
+    ctx.globalAlpha = (SURF[b.k] || b.k === 'universe' ? 0.95 : b.w >= 6 ? 0.62 : b.w >= 4 ? 0.8 : 1) * set; FAR[b.k](b.x, y + (1 - set) * 120, b.r, t, b); ctx.globalAlpha = 1; // the painted planets whole; the other far things a little faint, so the ledges read first
     if (b.name) text(K.bodies[b.name], b.x, y + (b.k === 'galaxy' ? b.r * 0.6 : b.k === 'universe' ? b.r * 0.75 : b.r) + 28, 19, 'rgba(255,255,255,0.6)', 'center', true);
   }
 }
