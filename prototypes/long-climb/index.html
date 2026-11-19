@@ -26,7 +26,7 @@
 const params = new URLSearchParams(location.search);
 const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
 const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
-const W = 720, UI_H = 1280; let H = UI_H, SCALE = 1, MOFF = 0; // MOFF: how far a menu screen sits down on a phone taller than 9:16, so it is centred    // logical size: a phone held upright, as TikTok shows it (sideways on a phone, H is what fits: see fit)
+const W = 720, UI_H = 1280; let H = UI_H, SCALE = 1, MOFF = 0, RES = 1, QUAL = 1; // RES: canvas pixels per game pixel; QUAL: the auto quality, lowered a step when a phone cannot keep up // MOFF: how far a menu screen sits down on a phone taller than 9:16, so it is centred    // logical size: a phone held upright, as TikTok shows it (sideways on a phone, H is what fits: see fit)
 const FONT = '"Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif';
 const TITLE = 'Long Climb';
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
@@ -149,7 +149,7 @@ CKB.set = { title: 'ڕێکخستنەکان', tabs: ['دەنگ', 'کۆنتڕۆڵ'
 
 // ---- Screen ---------------------------------------------------------------------------
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d'); // the canvas being drawn on now: the screen's, or for a moment the backdrop's own (drawSky)
 // A phone held sideways gets a view of its own: the tower in the middle at the size it has upright, the
 // buttons on the dark panels beside it, and as much of the tower's height as fits. A PC's window never does.
 const phone = params.get('land') === '1' || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
@@ -165,7 +165,8 @@ function hudShift(fn) { if (!STREAM || LAND || touchSeen) { fn(); return; } ctx.
 function fit() { // fills the window at any size and pixel ratio
   const iw = innerWidth, ih = innerHeight; LAND = phone && iw > ih * 1.15;
   H = LAND ? clamp(Math.round(2 * W * ih / iw), 600, UI_H) : phone ? clamp(Math.round(W * ih / iw), UI_H, 1760) : UI_H; CW = LAND ? Math.max(W, H * iw / ih) : W; OX = (CW - W) / 2; // upright on a tall phone, the whole screen: more of the tower above and below
-  const k = LAND ? ih / H : Math.min(iw / W, ih / H), r = Math.max(k * (devicePixelRatio || 1), STREAM ? 1.5 : 0); // the TikTok view: never under 1080 x 1920
+  const k = LAND ? ih / H : Math.min(iw / W, ih / H), r = Math.max(k * Math.min(devicePixelRatio || 1, phone ? 2 : 3) * QUAL, STREAM ? 1.5 : 0); // the TikTok view: never under 1080 x 1920; a phone at most 2x, times the auto quality
+  RES = r;
   SCALE = k; // screen pixels (CSS) for one of the game's: the phone's buttons are sized by it
   canvas.width = Math.round(CW * r); canvas.height = Math.round(H * r);
   canvas.style.width = Math.round(CW * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
@@ -637,6 +638,7 @@ function buildTower(mode) {
   WORLDS.forEach((Wd, w) => { Wd.base = rests[w * PER].alt; Wd.end = rests[(w + 1) * PER].alt; });
   const r = fixedRng(7); decor = [];
   for (let i = 0; i < 360; i++) decor.push({ x: r() * W, alt: r() * SUMMIT, s: 0.6 + r() * 1.2, k: r() });
+  for (const d of decor) d.w = worldAt(d.alt);
 }
 const levelAt = alt => { let n = 0; for (let i = 1; i < rests.length; i++) if (alt >= rests[i].alt - 1) n = i; return n; };
 const metres = alt => Math.max(0, Math.round(alt / 40));
@@ -1295,7 +1297,17 @@ function backdrop(s, cave, t) { // one side of the ground's surface: the cavern 
   clouds(t, 0.6, 1, 0.9, c => c.k >= 0.16 && c.k < 0.34); // near clouds
   if (rich) motes(s, t);
 }
-function drawSky() {
+const BGK = 0.5; let BGC = null; // the backdrop is soft: half the screen's resolution is plenty, and a quarter of the painting
+function drawSky() { // paints the backdrop on its own smaller canvas, then lays it over the screen at once
+  const w = Math.max(1, Math.round(W * RES * BGK)), h = Math.max(1, Math.round(H * RES * BGK));
+  if (!BGC) { BGC = document.createElement('canvas'); BGC.x = BGC.getContext('2d'); }
+  if (BGC.width !== w || BGC.height !== h) { BGC.width = w; BGC.height = h; }
+  const main = ctx; ctx = BGC.x; ctx.setTransform(w / W, 0, 0, h / H, 0, 0);
+  try { paintSky(); } finally { ctx = main; }
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(BGC, 0, 0, W, H);
+  paintGround();
+}
+function paintSky() {
   const t = state.t || 0, sb = WORLDS[3].base, ys = sb === undefined ? -1e9 : sy(sb), s = skyNow();
   const cave = { z: Math.min(s.z, 2), n: Math.min(s.n, 2), k: s.z >= 2 ? 0 : s.k }, open = s.z >= 3 ? s : { z: 3, n: 3, k: 0 };
   if (ys <= 0) backdrop(cave, true, t); else if (ys >= H) backdrop(open, false, t); // the surface above the screen: you are under the ground; below it: you are over it
@@ -1303,6 +1315,10 @@ function drawSky() {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, ys); ctx.clip(); backdrop(open, false, t); ctx.restore();
     ctx.save(); ctx.beginPath(); ctx.rect(0, ys, W, H - ys); ctx.clip(); backdrop(cave, true, t); ctx.restore();
   }
+  if (prefs.scenery && tune.scenery_grain > 0) { ctx.globalAlpha = tune.scenery_grain; ctx.fillStyle = grain(); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+}
+function paintGround() { // the lava and the ground's surface: near things, drawn at the screen's full sharpness
+  const t = state.t || 0, ys = WORLDS[3].base === undefined ? -1e9 : sy(WORLDS[3].base);
   if (cam < 900) { // a sea of lava under the tower's foot, bubbling, a crust of darker rock drifting on it
     const y = sy(0) + 14; glow(W / 2, y, 460, 'rgba(255,120,30,0.4)', 'rgba(255,90,20,0)');
     const lg = ctx.createLinearGradient(0, y, 0, H + 40); lg.addColorStop(0, '#ffcf6a'); lg.addColorStop(0.08, '#ff8a2a'); lg.addColorStop(0.3, '#d63e10'); lg.addColorStop(1, '#5a0d05'); ctx.fillStyle = lg;
@@ -1320,11 +1336,10 @@ function drawSky() {
     const st = fixedRng(77); for (let i = 0; i < 18; i++) { const sx = st() * W, d = st(), sr = 3 + st() * 9, a = (0.35 + st() * 0.25) * (1 - d); ctx.fillStyle = `rgba(${st() < 0.5 ? '120,100,86' : '30,22,18'},${a})`; ctx.beginPath(); ctx.ellipse(sx, y + 50 + d * 300, sr * 1.4, sr, st() * 3, 0, 7); ctx.fill(); } // stones in the soil, fewer as it thins
     ctx.strokeStyle = 'rgba(70,48,30,0.5)'; ctx.lineWidth = 2.5; for (const rx of [90, 260, 470, 640]) { ctx.beginPath(); ctx.moveTo(rx, y + 12); ctx.quadraticCurveTo(rx + 22, y + 60, rx - 8, y + 118); ctx.quadraticCurveTo(rx - 18, y + 150, rx + 6, y + 180); ctx.stroke(); } // roots
   }
-  if (prefs.scenery && tune.scenery_grain > 0) { ctx.globalAlpha = tune.scenery_grain; ctx.fillStyle = grain(); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
 }
 function farDecor(t, cave) { // the far things behind the planets: embers and glints in the deep; two depths of stars from the night on, fewer near ones so space stays calm
   for (const d of decor) {
-    const wz = worldAt(d.alt);
+    const wz = d.w;
     if (wz <= 2) {
       if (!cave || d.k > 0.6) continue; // a few embers, not a storm of them
       const y = H * camY() - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
@@ -1344,7 +1359,7 @@ function farDecor(t, cave) { // the far things behind the planets: embers and gl
 }
 function clouds(t, p, sc, a, which) { // clouds in the open-sky worlds at one depth, each tinted by the world it floats in, drifting with the wind; those in the night fade as they near space
   for (const d of decor) {
-    if (!which(d)) continue; const wz = worldAt(d.alt); if (wz < 3 || wz > 5) continue;
+    if (!which(d)) continue; const wz = d.w; if (wz < 3 || wz > 5) continue;
     const y = H * camY() - (d.alt - cam) * p, s = sc * (0.6 + d.s * 0.5), img = cloudSprite(wz, Math.floor(d.k * 97) % 6), w = 360 * s, h = 160 * s; if (y < -h || y > H + h) continue;
     const x = ((d.x + t * (4 + d.k * 10) * p) % (W + w)) - w * 0.5, Z = WORLDS[wz], up = wz === 5 ? clamp((Z.end - d.alt) / (0.4 * (Z.end - Z.base)), 0, 1) : 1;
     ctx.globalAlpha = a * (wz === 5 ? 0.7 : 1) * up; if (ctx.globalAlpha > 0.01) ctx.drawImage(img, x - w / 2, y - h * 0.75, w, h);
@@ -1397,7 +1412,7 @@ function motes(s, t) { // dust and seeds floating in the light of the open sky, 
 function nebula(s, t) { // in space: a few great faint clouds of glowing gas, far behind everything, each the colour of the world it hangs in; they fade in as the night ends
   const w = weigh(s, { 5: 0, 6: 1, 7: 1, 8: 1, 9: 1 }); if (w < 0.02) return;
   for (const d of decor) {
-    if (d.k > 0.05) continue; const L = LOOK[Math.max(6, worldAt(d.alt))]; const y = H * camY() - (d.alt - cam) * 0.1; if (y < -340 || y > H + 340) continue;
+    if (d.k > 0.05) continue; const L = LOOK[Math.max(6, d.w)]; const y = H * camY() - (d.alt - cam) * 0.1; if (y < -340 || y > H + 340) continue;
     const r = 180 + d.s * 120, x = (d.x + Math.sin(t * 0.05 + d.k * 50) * 30), col = L.neb[Math.floor(d.k * 1000) % 2];
     const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},${0.07 * w})`); g.addColorStop(0.5, `rgba(${col},${0.025 * w})`); g.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
@@ -1406,12 +1421,12 @@ function nebula(s, t) { // in space: a few great faint clouds of glowing gas, fa
 function worldLight() { // one soft wash of the world's light over the tower: from the lava below in the deep, from above in the open; it turns over gently at the surface
   const a = tune.scenery_light; if (!(a > 0)) return;
   const sb = WORLDS[3].base, s = skyNow(), deep = sb === undefined ? 1 : clamp((sb - cam) / 900 + 0.5, 0, 1), c = deep > 0 && deep < 1 ? mixHex(LOOK[2].light, LOOK[3].light, 1 - deep) : looks('light', s), k = clamp(a * 3, 0, 1);
-  ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 1;
-  for (const [from, share] of [[H, deep], [0, 1 - deep]]) { // soft-light is gentle: three times the setting reads as the setting
+  ctx.globalAlpha = 0.45; // plain paint, faint: as soft as a soft-light wash, at a fraction of the cost on a phone
+  for (const [from, share] of [[H, deep], [0, 1 - deep]]) {
     if (share < 0.01) continue; const g = ctx.createLinearGradient(0, from, 0, H - from);
     g.addColorStop(0, rgba(c, k * share)); g.addColorStop(0.55, rgba(c, k * 0.3 * share)); g.addColorStop(1, rgba(c, 0)); ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
   }
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
 }
 // ---- Far away: the sun, the moon, the earth, the planets, then a galaxy and the universe --------
 // Each hangs at a height in its world and drifts far slower than the tower (0.22 of it), so a climb
@@ -3046,8 +3061,13 @@ function drawFrame() {
   if (prefs.fps) { pill(-OX + 8, H - 40, 92, 30, 'rgba(10,12,20,0.7)'); ltr(`${fpsNow} FPS`, -OX + 54, H - 24, 15, fpsNow >= 50 ? '#7be08a' : fpsNow >= 30 ? UI.gold : '#ff8a96'); } // the frame-rate, when asked for
   ctx.restore();
 }
-let fpsNow = 0, fpsN = 0, fpsT = 0;
-function frame() { tick(); fpsN++; const n = performance.now() / 1000; if (n - fpsT >= 0.5) { fpsNow = Math.round(fpsN / (n - fpsT)); fpsN = 0; fpsT = n; } requestAnimationFrame(frame); }
+let fpsNow = 0, fpsN = 0, fpsT = 0, workMs = 0, slowRuns = 0;
+function autoQuality() { // every half second: slow frames AND heavy work three times running (not a phone that caps itself at 30 to save power) lower the sharpness a step
+  if (!phone || (scene !== 'play' && scene !== 'watch')) { slowRuns = 0; return; }
+  if (fpsNow < 45 && workMs > 12) slowRuns++; else slowRuns = 0;
+  if (slowRuns >= 3 && QUAL > 0.7) { QUAL = Math.round((QUAL - 0.15) * 100) / 100; slowRuns = 0; fit(); events.push(['quality', QUAL]); }
+}
+function frame() { const w0 = performance.now(); tick(); workMs = workMs * 0.9 + (performance.now() - w0) * 0.1; fpsN++; const n = performance.now() / 1000; if (n - fpsT >= 0.5) { fpsNow = Math.round(fpsN / (n - fpsT)); fpsN = 0; fpsT = n; autoQuality(); } requestAnimationFrame(frame); }
 // A headless browser on a time budget runs timers but almost no animation frames: a timer
 // ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
 function timer() { if (document.visibilityState === 'visible' && clock.now() - last > 0.1) tick(); }
