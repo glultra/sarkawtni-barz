@@ -1,0 +1,1 @@
+Nearest game: Fez; this one differs in that the world is not rotated: two flat versions of one room are laid over each other, and floor portals are seams that swap which version you stand in, with crates carried across and switches that open doors in the other version.

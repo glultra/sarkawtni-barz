@@ -1,0 +1,23 @@
+L1	pass	evidence/z3.png	chunky outlined ledges, round climber with a red scarf, sky that changes by zone, gold rest floors, red bumpers; the side bar marks your best height and this climb's top, and the best time sits in its own box rather than on the bar
+L2	pass	evidence/play.png	no reference was named and none was used
+L3	pass	evidence/play.png	2D side view in a tall 9:16 window, the camera following the climber with more view above
+L4	pass	evidence/title.png	every word is Sorani drawn right to left with Western digits; whether the Kurdish reads well was not judged
+F1	pass	index.html:159	ten zones laid out ledge by ledge, 123 ledges and 11 gold floors; only the first two ledges were climbed in a run, the rest were checked by arithmetic on gap and rise
+F2	pass	index.html:315	a fall lands on the highest ledge under your feet; every zone ends in a full-width gold floor
+F3	pass	index.html:295	coyote time, a remembered early press, and a hop when the key is let go; the held jump was used in the check run
+F4	pass	evidence/z3.png	height, time and falls in the top bar and the height bar down the left side
+F5	pass	index.html:199	best height and best time are written to the browser's storage; reopening the game to read them back was not run
+F6	pass	evidence/results.png	the finish shows time, falls and a code; the checker screen is evidence/code.png; making and reading codes was tested on four times and one forged code
+F7	pass	evidence/z6.png	two arrow buttons and a jump button are drawn and wired to touch; no check plays by touch
+F8	not_assessed	index.html:141	the sounds are made in code and called on jump, landing, a long fall and each rest floor; the check cannot hear them
+S1	pass	evidence/z9.png	the climb itself
+S2	pass	evidence/results.png	stand-in: a finish code a viewer sends, and a screen that compares it with the streamer's best time
+M1	pass	evidence/play.png	the climb starts on the garden floor at 0 m
+M2	pass	index.html:298	zone 1's ledges are 5 and 4 columns wide; tap and hold give different heights
+M3	pass	index.html:160	the ledges go from 5 columns to 4 at about 14 m; a miss lands on what is below, never a death
+M4	not_assessed	index.html:252	the first gold floor is at 30 m with a chime and a banner in the code; no run climbed that far to see it
+M5	pass	evidence/z2.png	a moving ledge is the second ledge above the first gold floor
+C1	pass	evidence/z2.png	zone 2 has two-column ledges and the first moving one; when a player gets there was not timed
+C2	pass	index.html:239	nothing kills; gold floors about every 30 to 40 m catch any fall
+C3	pass	evidence/z9.png	crumbling, ice, wind, bouncers, belts and red bumpers each have a zone, and zone 10 mixes them (evidence/z10.png)
+C4	not_assessed	index.html:159	nobody has climbed it yet, so how long a first clear or a practised run takes is unknown

@@ -1,0 +1,22 @@
+{
+  "lookSens": 0.0021,
+  "lookSmooth": 0.025,
+  "turnRate": 2.3,
+  "fov": 74,
+  "moveSpeed": 4.3,
+  "moveAccel": 38,
+  "eyeHeight": 1.6,
+  "bob": 0.03,
+  "gravity": 22,
+  "reach": 2.6,
+  "putDist": 1.3,
+  "doorSpeed": 1.6,
+  "gateLightDist": 9,
+  "fadeTime": 0.5,
+  "portalDepth": 2,
+  "volume": 0.5,
+  "sunIntensity": 1.35,
+  "ambient": 0.85,
+  "bloom": 0.55,
+  "shadowDistance": 70
+}

@@ -1,0 +1,1449 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: Is one long, punishing climb fun to play and to watch for an hour? -->
+<!-- Date: 2026-11-15 -->
+<html lang="ckb" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Long Climb</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d14; overflow: hidden; }
+  body { font-variant-numeric: tabular-nums; }
+  canvas { display: block; margin: 0 auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script src="config.js"></script>
+<script>
+'use strict';
+// Long Climb: one tall tower of fifty levels in a tall 9:16 window. Every ledge is one-way: you
+// rise through it from below and land on its top, so a miss drops you to whatever is underneath.
+// Some worlds add machines (buttons, gates, timed ledges) and some hand you a blaster.
+
+// ---- Built to be checked ----------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
+const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
+const W = 720, H = 1280;        // logical size: a phone held upright, as TikTok shows it
+const FONT = '"Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif';
+const TITLE = 'Long Climb';
+const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
+let seed;
+function rng() { // mulberry32; every gameplay random call reads this, never Math.random
+  seed = (seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), seed | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function fixedRng(s) { // the tower's own generator: the same seed lays the same ledges for everyone
+  return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), s | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const events = []; // window.game.events: anything the game wants a run to see
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const PI = Math.PI;
+const fxr = fixedRng(4242); // what only decorates (sparks, confetti) draws from its own generator, never the game's
+
+// ---- Words: Sorani Kurdish, right to left -------------------------------------------------
+const CKB = {
+  dir: 'rtl', langName: 'کوردی', lang: 'زمان', player: 'یاریزان', bots: ['ئارام', 'شیلان', 'هێمن', 'ڕۆژان'], pad: 'کۆنتڕۆڵەر بەسترا', tapType: 'دەست لێبدە بۆ نووسین',
+  title: 'سەرکەوتنی درێژ',
+  tagline: 'پەنجا ئاست، یەک تاوەر، یەک هەڵە و دەکەویتە خوارەوە',
+  controls: ['A / D یان تیرەکان: جووڵە', 'Space: باز (بۆ بازی بەرزتر دایبگرە)', 'F: تەقە، لەو ئاستانەی تفەنگت هەیە', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ', 'C: پشکنینی کۆدی بینەر'],
+  start: 'Enter یان دەست لێدان بۆ دەستپێکردن', cont: 'B: بەردەوامبوون لە ئاستی',
+  pick: 'ئاستی سەختی (تیرەکان یان 1 2 3)', modes: ['ئاسان', 'ئاسایی', 'سەخت'],
+  height: 'بەرزی', time: 'کات', falls: 'کەوتن', stars: 'ئەستێرە', best: 'باشترین', metre: 'م', level: 'ئاستی', next: 'جیهانی نوێ',
+  paused: 'وەستاوە', resume: 'P بۆ بەردەوامبوون', holdR: 'R دابگرە بۆ دەستپێکردنەوە', wind: 'با', gun: 'F: تەقە', hurry: 'خێرا بە!',
+  needBtn: 'دەروازە داخراوە: دوگمە سوورەکە بدۆزەوە', needTgt: 'دەروازە داخراوە: تەقە لە ئامانجەکە بکە',
+  summit: 'گەیشتیتە لووتکە!', yourCode: 'کۆدەکەت', sendCode: 'ئەم کۆدە بنێرە بۆ سەلماندنی کاتەکەت', again: 'Enter بۆ دووبارە سەرکەوتن',
+  codeTitle: 'پشکنینی کۆدی بینەر', codeAsk: 'کۆدەکە بنووسە و Enter لێبدە', codeBad: 'کۆدەکە هەڵەیە', codeOk: 'کۆدەکە دروستە',
+  viewerTime: 'کاتی بینەر', yourTime: 'کاتی تۆ', viewerWins: 'بینەر بردیەوە!', youWin: 'تۆ بردتەوە', noTime: 'تۆ هێشتا ئەم ئاستی سەختییەت تەواو نەکردووە', back: 'Esc بۆ گەڕانەوە',
+  bestTime: 'باشترین کات',
+  menu: ['سەرکەوتنی تاک', 'پێشبڕکێ لەگەڵ بۆتەکان', 'دروستکردنی ژوور', 'چوونە ناو ژوور', 'ناوەکەت', 'پشکنینی کۆدی بینەر'],
+  needServer: 'بۆ ژوور، یارییەکە بە server.js بکەرەوە', nameAsk: 'ناوەکەت بنووسە و Enter لێبدە', roomAsk: 'کۆدی ژوور بنووسە و Enter لێبدە',
+  room: 'کۆدی ژوور', players: 'یاریزانان', hostStart: 'Enter: دەستپێکردنی پێشبڕکێ', waitHost: 'چاوەڕێی خاوەنی ژوور بە', goal: 'پێشبڕکێ تا ئاستی', leave: 'Esc: دەرچوون',
+  hostKeys: 'تیرەکان: ئاستی کۆتایی     1 2 3: سەختی', share: 'ئەم ناونیشانە و کۆدەکە بنێرە بۆ هاوڕێکانت', bot: 'بۆت', you: 'تۆ', finished: 'گەیشت!', board: 'ئەنجامەکان',
+  toLobby: 'Enter: گەڕانەوە', hostEnds: 'خاوەنی ژوور پێشبڕکێکە کۆتایی پێ دەهێنێت', held: 'گیرایت!', go: 'بڕۆ!', errFull: 'ژوورەکە پڕە', errNone: 'ژوور نەدۆزرایەوە', errGone: 'پەیوەندی پچڕا',
+  arrows: 'تیرەکان: هەڵبژاردن     Enter: دەستپێکردن', diff: 'ئاستی سەختی',
+  nameTitle: 'ناوەکەت چییە؟', nameHint: 'N: گۆڕینی ناو', codeLine: 'C: پشکنینی کۆدی بینەر', simple: ['بە تەنیا یاری بکە', 'پێشبڕکێ لەگەڵ بۆتەکان', 'ژوورێک دروست بکە', 'بچۆ ناو ژوورێک'],
+  pauseMenu: ['بەردەوامبوون', 'دەستپێکردنەوە لە سەرەتاوە', 'دەنگ', 'مینیوی سەرەکی'], leaveRoom: 'دەرچوون لە ژوور', on: 'کراوە', off: 'کوژاوە', arrows2: 'تیرەکان و Enter     Esc: بەردەوامبوون',
+  figures: ['سەرکەوتوو', 'سەکۆ', 'سەکۆی جووڵاو', 'سەکۆی داڕماو', 'سەهۆڵ', 'هەڵبەزێنەر', 'پشتێنی گوازەرەوە', 'سەکۆی کاتی', 'دوگمە', 'دەروازە', 'ئامانج', 'قوللە', 'تۆپی سوور', 'ئەستێرە', 'پانکە'],
+};
+CKB.controls = ['A / D یان جۆیستیک: جووڵە     Space: باز     F: تەقە', 'کلیکی چەپ یان E: پاڵنان     کلیکی ڕاست یان Q: گرتن', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ'];
+CKB.needServer = 'بۆ ژوور، یارییەکە بە start-room.bat بکەرەوە';
+// Ten worlds of five levels. Each has its sky, the mix of special ledges it uses, what it adds,
+// the hint its banner shows, and the scale and speed of its tune.
+const WORLDS = [
+  { name: 'باخچە', sky: ['#8fd6ff', '#dff5ff'], cap: '#6fcf5a', mix: {}, scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 220, bpm: 96 },
+  { name: 'سەکۆی جووڵاو', sky: ['#9ad0ff', '#f2f8ff'], cap: '#ffffff', mix: { m: 0.35 }, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 102 },
+  { name: 'سەکۆی داڕماو', sky: ['#ffd39a', '#fff0d8'], cap: '#f2c14e', mix: { c: 0.4, m: 0.1 }, scale: [0, 1, 3, 5, 7, 8, 10], root: 233, bpm: 108 },
+  { name: 'دوگمە و دەروازە', sky: ['#b7e3c0', '#eefaf0'], cap: '#58c9a0', mix: { m: 0.2 }, gate: 'btn', timed: true, hint: 'دوگمە سوورەکە دەروازە دەکاتەوە', scale: [0, 2, 3, 5, 7, 8, 11], root: 247, bpm: 104 },
+  { name: 'سەهۆڵ', sky: ['#a9e4ff', '#f0fbff'], cap: '#e8fbff', mix: { i: 0.55, m: 0.12 }, scale: [0, 1, 4, 5, 7, 8, 10], root: 262, bpm: 100 },
+  { name: 'با', sky: ['#ff9a6a', '#ffd9a8'], cap: '#ffb347', mix: { c: 0.15, m: 0.15, f: 0.12 }, wind: true, scale: [0, 1.5, 3, 4, 7, 8, 10], root: 220, bpm: 112 },
+  { name: 'تفەنگ', sky: ['#c86fb8', '#ffb0a0'], cap: '#ff8fb8', mix: { m: 0.2, c: 0.15 }, gun: true, gate: 'tgt', bumpers: true, hint: 'F: تەقە لە ئامانجەکە بکە', scale: [0, 2, 3.5, 5, 7, 9, 10.5], root: 294, bpm: 118 },
+  { name: 'هەڵبەزێنەر و پشتێن', sky: ['#5a4fb0', '#b58ad6'], cap: '#9a8cff', mix: { b: 0.16, v: 0.3, m: 0.12, f: 0.1 }, timed: true, scale: [0, 1.5, 3, 5, 7, 8, 10], root: 196, bpm: 120 },
+  { name: 'قوللەکان', sky: ['#23246a', '#5a4fb0'], cap: '#7f8cff', mix: { i: 0.15, c: 0.15, m: 0.15, v: 0.1 }, gun: true, gate: 'tgt', bumpers: true, turrets: true, hint: 'تەقە لە قوللەکان بکە بۆ وەستاندنیان', scale: [0, 1, 4, 5, 7, 8, 10], root: 233, bpm: 126 },
+  { name: 'کۆتایی', sky: ['#0d0e2a', '#3a1040'], cap: '#ff5a7a', mix: { c: 0.18, i: 0.15, m: 0.15, b: 0.1, v: 0.14, f: 0.08 }, gun: true, gate: 'both', timed: true, bumpers: true, turrets: true, wind: true, hint: 'هەموو شتێک پێکەوە', scale: [0, 1, 3, 5, 7, 8, 10], root: 262, bpm: 132 },
+];
+const LEVELS = 50, PER = 5;
+CKB.worlds = WORLDS.map(w => w.name); CKB.hints = WORLDS.map(w => w.hint || '');
+const EN = {
+  dir: 'ltr', langName: 'English', lang: 'Language', player: 'Player', bots: ['Aram', 'Shilan', 'Hemin', 'Rozhan'], pad: 'Controller connected', tapType: 'Tap to type',
+  title: 'Long Climb', tagline: 'Fifty levels, one tower, one slip and down you go',
+  controls: ['A / D or stick: move     Space: jump     F: fire', 'Left click or E: push     Right click or Q: grab', 'Esc: menu     Hold R: restart     M: mute'],
+  start: 'Press Enter or tap to start', cont: 'B: continue from level', pick: 'Difficulty (arrows or 1 2 3)', modes: ['Easy', 'Normal', 'Hard'],
+  height: 'Height', time: 'Time', falls: 'Falls', stars: 'Stars', best: 'Best', metre: 'm', level: 'Level', next: 'New world',
+  paused: 'Paused', resume: 'P to go on', holdR: 'Hold R to restart', wind: 'Wind', gun: 'F: fire', hurry: 'Hurry!',
+  needBtn: 'Gate shut: find the red button', needTgt: 'Gate shut: shoot the target',
+  summit: 'You reached the top!', yourCode: 'Your code', sendCode: 'Send this code to prove your time', again: 'Enter to climb again',
+  codeTitle: "Check a viewer's code", codeAsk: 'Type the code and press Enter', codeBad: 'That code is not valid', codeOk: 'The code is valid',
+  viewerTime: "Viewer's time", yourTime: 'Your time', viewerWins: 'The viewer wins!', youWin: 'You win', noTime: 'You have not finished this difficulty yet', back: 'Esc to go back',
+  bestTime: 'Best time',
+  menu: ['Climb alone', 'Race the bots', 'Make a room', 'Join a room', 'Your name', "Check a viewer's code"],
+  needServer: 'Rooms need the game opened through start-room.bat', nameAsk: 'Type your name and press Enter', roomAsk: 'Type the room code and press Enter',
+  room: 'Room code', players: 'Players', hostStart: 'Enter: start the race', waitHost: 'Waiting for the host', goal: 'Race to level', leave: 'Esc: leave',
+  hostKeys: 'Arrows: finish level     1 2 3: difficulty', share: 'Send this link to your friends', bot: 'bot', you: 'you', finished: 'finished!', board: 'Results',
+  toLobby: 'Enter: go back', hostEnds: 'The host ends the race', held: 'Grabbed!', go: 'GO!', errFull: 'The room is full', errNone: 'Room not found', errGone: 'Connection lost',
+  arrows: 'Arrows: choose     Enter: go', diff: 'Difficulty',
+  nameTitle: "What's your name?", nameHint: 'N: change', codeLine: "C: check a viewer's code", simple: ['Play alone', 'Race the bots', 'Make a room', 'Join a room'],
+  pauseMenu: ['Go on', 'Start again from the bottom', 'Sound', 'Main menu'], leaveRoom: 'Leave the room', on: 'on', off: 'off', arrows2: 'Arrows and Enter     Esc: go on',
+  figures: ['Climber', 'Ledge', 'Moving ledge', 'Crumbling ledge', 'Ice', 'Bouncer', 'Conveyor belt', 'Timed ledge', 'Button', 'Gate', 'Target', 'Turret', 'Red bumper', 'Star', 'Fan'],
+  worlds: ['Garden', 'Moving ledges', 'Crumbling ledges', 'Buttons and gates', 'Ice', 'Wind', 'Blaster', 'Bouncers and belts', 'Turrets', 'Ultimate'],
+  hints: ['', '', '', 'The red button opens the gate', '', '', 'F: shoot the target', '', 'Shoot the turrets to stop them', 'Everything at once'],
+};
+CKB.share = 'ئەم بەستەرە بنێرە بۆ هاوڕێکانت';
+let lang = 'ckb'; try { lang = localStorage.getItem('long-climb-lang') || 'ckb'; } catch (e) {}
+if (params.get('lang')) lang = params.get('lang');
+let K = lang === 'en' ? EN : CKB; // the words on screen, in the language picked on the menu
+function setLang(l) { lang = l; K = l === 'en' ? EN : CKB; try { localStorage.setItem('long-climb-lang', l); } catch (e) {} }
+// Words added with the rooms of twenty-five, the spectators and hanging on to feet.
+Object.assign(EN, {
+  controls: ['A / D or stick: move     Space: jump     F: fire', 'Left click or E: shove     Right click or Q: hang on to their feet', 'Esc: menu     Hold R: restart     M: mute'],
+  spectators: 'Watching', watching: 'Watching', watch: 'Watch only', play: 'Play', kick: 'Kick', toWatch: 'Move to watching', toPlay: 'Move to players',
+  startRace: 'Start the race', copy: 'tap the link to copy it', copied: 'Link copied', kicked: 'The host removed you from the room', nowWatching: 'You are watching now', noSlot: 'No free place: you are watching',
+  endRace: 'End the race for everyone', joinRace: 'Join the race', youPlace: 'You finished', skip: 'Enter: results', rider: 'is on your feet: shove to shake them off', hangHint: 'Jump to leap off',
+  menuT: 'Menu', cont2: 'Continue from level', raceLeft: 'still climbing', size: 'Players', finishAt: 'Finish', backRoom: 'Back to the room',
+  hostKeys: 'Enter: start     Tab: pick a player     V: watch / play     K: kick', guestKeys: 'V: watch / play     Esc: leave', watchKeys: 'Arrows: next climber     Esc: menu',
+});
+Object.assign(CKB, {
+  controls: ['A / D یان جۆیستیک: جووڵە     Space: باز     F: تەقە', 'کلیکی چەپ یان E: پاڵنان     کلیکی ڕاست یان Q: خۆهەڵواسین بە پێیەکانی', 'Esc: مینیو     R دابگرە: دەستپێکردنەوە     M: بێدەنگ'],
+  spectators: 'بینەران', watching: 'سەیرکردنی', watch: 'تەنیا سەیر بکە', play: 'یاری بکە', kick: 'دەرکردن', toWatch: 'بیکە بە بینەر', toPlay: 'بیکە بە یاریزان',
+  startRace: 'پێشبڕکێ دەست پێبکە', copy: 'دەست لە بەستەرەکە بدە بۆ کۆپیکردنی', copied: 'بەستەرەکە کۆپی کرا', kicked: 'خاوەنی ژوور دەریکردیت', nowWatching: 'ئێستا تۆ بینەریت', noSlot: 'شوێنی بەتاڵ نییە: تۆ بینەریت',
+  endRace: 'پێشبڕکێکە بۆ هەمووان تەواو بکە', joinRace: 'بچۆ ناو پێشبڕکێکە', youPlace: 'تەواوت کرد', skip: 'Enter: ئەنجامەکان', rider: 'خۆی بە پێیەکانتەوە هەڵواسیوە: پاڵی پێوە بنێ', hangHint: 'باز بدە بۆ خۆبەردان',
+  menuT: 'مینیو', cont2: 'بەردەوامبوون لە ئاستی', raceLeft: 'هێشتا سەردەکەون', size: 'یاریزانان', finishAt: 'کۆتایی', backRoom: 'گەڕانەوە بۆ ژوور',
+  hostKeys: 'Enter: دەستپێکردن     Tab: هەڵبژاردنی یاریزان     V: بینەر / یاریزان     K: دەرکردن', guestKeys: 'V: بینەر / یاریزان     Esc: دەرچوون', watchKeys: 'تیرەکان: یاریزانی داهاتوو     Esc: مینیو',
+});
+
+// ---- Screen ---------------------------------------------------------------------------
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+function fit() { // fills the window at any size and pixel ratio
+  const k = Math.min(innerWidth / W, innerHeight / H), r = k * (devicePixelRatio || 1);
+  canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
+  canvas.style.width = Math.round(W * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
+  canvas.style.marginTop = Math.max(0, Math.floor((innerHeight - H * k) / 2)) + 'px';
+  ctx.setTransform(r, 0, 0, r, 0, 0);
+}
+addEventListener('resize', fit); fit();
+function text(s, x, y, size, c, align = 'center', bold = false) {
+  ctx.direction = K.dir; ctx.fillStyle = c; ctx.font = `${bold ? 'bold ' : ''}${size}px ${FONT}`; ctx.textAlign = align;
+  ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function plain(s, x, y, size, c) { ctx.direction = 'ltr'; ctx.fillStyle = c; ctx.font = `bold ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y); }
+function rr(x, y, w, h, r, fill, stroke, lw = 4) {
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+}
+function ltr(s, x, y, size, c, align = 'center', bold = true) { ctx.direction = 'ltr'; ctx.fillStyle = c; ctx.font = `${bold ? 'bold ' : ''}${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y); } // numbers, codes and addresses
+function wrap(s, maxW, size) { // breaks a long line (a room's address) wherever it has to, so it never runs off the screen
+  ctx.font = `bold ${size}px ${FONT}`; const out = []; let line = '';
+  for (const ch of s) {
+    if (line && ctx.measureText(line + ch).width > maxW) { let k = -1; for (let i = line.length - 1; i > line.length * 0.55; i--) if ('/?&'.includes(line[i])) { k = i; break; } else if ('.-'.includes(line[i])) { k = i + 1; break; } if (k > 0 && k < line.length) { out.push(line.slice(0, k)); line = line.slice(k); } else { out.push(line); line = ''; } }
+    line += ch;
+  }
+  if (line) out.push(line); return out;
+}
+function fitText(s, maxW, size, bold = true) { // a name too long for its place ends in three dots
+  ctx.font = `${bold ? 'bold ' : ''}${size}px ${FONT}`; if (ctx.measureText(s).width <= maxW) return s;
+  while (s.length > 1 && ctx.measureText(s + '...').width > maxW) s = s.slice(0, -1); return s + '...';
+}
+// The plain look of every screen: flat dark pills, white words, one gold accent.
+const UI = { bg: 'rgba(10,12,20,0.66)', soft: 'rgba(255,255,255,0.08)', dim: '#aab2c2', gold: '#ffd44f' };
+let zones = [], taps = []; // what can be tapped or clicked: every screen names its buttons as it draws them
+function zone(x, y, w, h, fn) { zones.push({ x, y, w, h, fn }); }
+function dim(a) { ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, 0, W, H); }
+function pill(x, y, w, h, fill = UI.bg) { rr(x, y, w, h, Math.min(h / 2, 26), fill); }
+function dot(x, y, r, c) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); }
+function chevron(x, y, d, c = '#ffffff', s = 9) { ctx.strokeStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - d * s * 0.5, y - s); ctx.lineTo(x + d * s * 0.5, y); ctx.lineTo(x - d * s * 0.5, y + s); ctx.stroke(); }
+function eye(x, y, s, c) { ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y, s, s * 0.6, 0, 0, 7); ctx.stroke(); dot(x, y, s * 0.3, c); }
+function button(label, x, y, w, h, on, fn, opt = {}) { // a flat button; the chosen one is white
+  rr(x, y, w, h, Math.min(h / 2, 22), on ? '#ffffff' : opt.fill || (opt.off ? 'rgba(255,255,255,0.03)' : UI.soft));
+  text(label, x + w / 2, y + h / 2 + 1, opt.size || 26, on ? '#0c0e16' : opt.off ? '#666e80' : opt.color || '#ffffff', 'center', true);
+  if (fn) zone(x, y, w, h, fn);
+}
+function seg(labels, sel, x, y, w, h, fn, colors) { // a row of choices with one picked
+  rr(x, y, w, h, h / 2, UI.soft); const cw = w / labels.length;
+  labels.forEach((l, i) => {
+    if (i === sel) rr(x + i * cw + 4, y + 4, cw - 8, h - 8, (h - 8) / 2, colors ? colors[i] : '#ffffff');
+    text(l, x + i * cw + cw / 2, y + h / 2 + 1, Math.min(24, h * 0.44), i === sel && !colors ? '#0c0e16' : '#ffffff', 'center', true); zone(x + i * cw, y, cw, h, () => fn(i));
+  });
+}
+function stepper(label, value, x, y, w, edit, dec, inc, color = '#ffffff') { // a value with its name above, and arrows when it is yours to change
+  text(label, x + w / 2, y, 17, UI.dim); rr(x, y + 16, w, 52, 18, UI.soft); text(value, x + w / 2, y + 43, 22, color, 'center', true);
+  if (edit) { chevron(x + 20, y + 42, -1, UI.dim, 8); chevron(x + w - 20, y + 42, 1, UI.dim, 8); zone(x, y + 10, w / 2, 64, dec); zone(x + w / 2, y + 10, w / 2, 64, inc); }
+}
+function backBtn() { pill(14, 14, 52, 52); chevron(38, 40, -1); zone(0, 0, 84, 84, () => hit.add('Escape')); }
+function toastLine(y) { if (!(game.msgT > 0)) return; ctx.font = `bold 21px ${FONT}`; const w = Math.min(W - 60, ctx.measureText(game.msg).width + 44); pill(W / 2 - w / 2, y - 22, w, 44, 'rgba(10,12,20,0.86)'); text(fitText(game.msg, w - 30, 21), W / 2, y + 1, 21, UI.gold, 'center', true); }
+
+// ---- Input: keys by position (event.code), OS key repeat ignored; touch buttons on a phone ---
+const down = new Set(), hit = new Set(), typed = [];
+const pressed = code => hit.has(code); // true for one step after the key goes down
+addEventListener('keydown', e => {
+  startAudio();
+  if (!e.repeat) { down.add(e.code); hit.add(e.code); }
+  if (scene === 'code' || scene === 'name' || scene === 'join') { if (e.key.length === 1 || e.key === 'Backspace') typed.push(e.key); e.preventDefault(); }
+  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e => down.delete(e.code));
+addEventListener('blur', () => down.clear());
+let touchSeen = params.get('touch') === '1';
+const BTN = [ // the phone's buttons: where they sit, the key each one holds down, and when it shows
+  { x: 104, y: H - 134, r: 76, code: 'ArrowLeft' }, { x: 272, y: H - 134, r: 76, code: 'ArrowRight' },
+  { x: W - 116, y: H - 140, r: 90, code: 'Space' }, { x: W - 268, y: H - 262, r: 58, code: 'KeyF', when: 'gun' },
+  { x: W - 80, y: H - 312, r: 54, code: 'KeyE', when: 'race' }, { x: W - 300, y: H - 112, r: 52, code: 'KeyQ', when: 'race' },
+];
+const btnShown = b => !b.when || (b.when === 'gun' ? state.gun : game.kind !== 'solo');
+const fingers = new Map();
+function fingerAt(e) { const b = canvas.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * W, y: (e.clientY - b.top) / b.height * H }; }
+function syncFingers() {
+  for (const b of BTN) {
+    let on = false;
+    for (const f of fingers.values()) if (Math.hypot(f.x - b.x, f.y - b.y) < b.r * 1.2) on = true;
+    if (on && !btnShown(b)) on = false;
+    if (on && !b.on) { down.add(b.code); hit.add(b.code); if (navigator.vibrate) navigator.vibrate(12); } else if (!on && b.on) down.delete(b.code);
+    b.on = on;
+  }
+}
+addEventListener('keydown', e => { if (e.code === 'Tab') e.preventDefault(); });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointerdown', e => {
+  startAudio();
+  if (e.pointerType === 'touch') touchSeen = true;
+  const f = fingerAt(e);
+  for (let i = zones.length - 1; i >= 0; i--) { // a button of this screen: what it does runs on the next step
+    const z = zones[i];
+    if (f.x >= z.x && f.x < z.x + z.w && f.y >= z.y && f.y < z.y + z.h) { taps.push(z.fn); if (e.pointerType === 'touch' && navigator.vibrate) navigator.vibrate(8); e.preventDefault(); return; }
+  }
+  if (scene === 'play') {
+    if (e.pointerType === 'mouse') { if (e.button === 2) hit.add('KeyQ'); else if (e.button === 0) { hit.add('KeyE'); down.add('MouseL'); } } // the mouse: left to shove (and to fire, where there is a blaster), right to hang on
+    else if (touchSeen) { fingers.set(e.pointerId, f); syncFingers(); }
+  } else if ((scene === 'name' || scene === 'join') && e.pointerType === 'touch') { // a phone has no keys here: ask with its own keyboard
+    const v = prompt(scene === 'name' ? K.nameAsk : K.roomAsk, state.entry || '');
+    if (v) { state.entry = scene === 'name' ? v.slice(0, 14) : v.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4); hit.add('Enter'); }
+  } else if (scene === 'results') hit.add('Enter');
+  e.preventDefault();
+});
+canvas.addEventListener('pointermove', e => { if (fingers.has(e.pointerId)) { fingers.set(e.pointerId, fingerAt(e)); syncFingers(); } });
+for (const n of ['pointerup', 'pointercancel', 'pointerleave']) canvas.addEventListener(n, e => { down.delete('MouseL'); if (fingers.delete(e.pointerId)) syncFingers(); });
+
+// ---- A controller (PS5, Xbox, or any standard pad): stick or d-pad to move, the face buttons for the rest ----
+const padHeld = new Set(); let padSeen = false;
+function pollPad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [], now = new Set(); let gp = null;
+  for (const p of pads) if (p && p.connected && p.buttons.length >= 10) { gp = p; break; }
+  if (gp) {
+    if (!padSeen) { padSeen = true; toast(K.pad); }
+    const b = i => !!(gp.buttons[i] && gp.buttons[i].pressed), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, play = scene === 'play';
+    if (ax < -0.4 || b(14)) now.add('ArrowLeft'); if (ax > 0.4 || b(15)) now.add('ArrowRight');
+    if (!play && (ay < -0.5 || b(12))) now.add('ArrowUp'); if (!play && (ay > 0.5 || b(13))) now.add('ArrowDown');
+    if (b(0)) now.add(play ? 'Space' : 'Enter');   // Cross / A: jump, or choose
+    if (b(1)) now.add(play ? 'KeyE' : 'Escape');   // Circle / B: shove, or back
+    if (b(2) || b(7)) now.add('KeyF');             // Square / X, or the right trigger: fire
+    if (b(3) || b(4)) now.add('KeyQ');             // Triangle / Y, or the left bumper: grab
+    if (b(5)) now.add('KeyE');                     // the right bumper: shove
+    if (b(9)) now.add('Escape');                   // Options / Menu: the menu
+  }
+  for (const c of now) if (!padHeld.has(c)) { down.add(c); hit.add(c); startAudio(); }
+  for (const c of padHeld) if (!now.has(c)) down.delete(c);
+  padHeld.clear(); for (const c of now) padHeld.add(c);
+}
+
+// ---- Audio: sounds and tunes made in code, or your own songs; mute on M -----------------------
+let audio = null, muted = false;
+function startAudio() {
+  if (!audio) {
+    const ac = window.GAME_AUDIO || new (window.AudioContext || window.webkitAudioContext)(); // a check may inject one
+    const out = ac.createGain(); out.gain.value = muted ? 0 : tune.volume;
+    out.connect(ac.destination); audio = { ac, out };
+  }
+  if (audio.ac.state === 'suspended') audio.ac.resume();
+}
+function setMuted(m) { muted = m; if (audio) audio.out.gain.value = m ? 0 : tune.volume; if (song.el) song.el.muted = m; }
+addEventListener('tune', () => setMuted(muted)); // the tweak panel (an add-on), when added, moved a value: the volume follows
+function tone(freq, dur, type = 'sine', vol = 0.2, to = 0, delay = 0) {
+  if (!audio || muted) return;
+  const t = audio.ac.currentTime + delay, o = audio.ac.createOscillator(), g = audio.ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audio.out); o.start(t); o.stop(t + dur + 0.02);
+}
+let hiss = null, rush = null;
+function hissBuf() { // one second of noise, made once from a fixed seed: the stuff of dust, thumps and wind
+  if (!hiss) { const ac = audio.ac; hiss = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = hiss.getChannelData(0), r = fixedRng(31); for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1; }
+  return hiss;
+}
+function noise(dur, vol = 0.15, freq = 1200, to = 0, delay = 0) { // a short filtered hiss
+  if (!audio || muted) return;
+  try {
+    const ac = audio.ac, t = ac.currentTime + delay, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = hissBuf(); s.loop = true; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.setValueAtTime(freq, t); if (to) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(f); f.connect(g); g.connect(audio.out); s.start(t); s.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+function fallWind(level) { // the air rushing past on a long fall: louder and higher the faster you drop
+  if (!audio || (!rush && !(level > 0))) return;
+  try {
+    const ac = audio.ac, t = ac.currentTime;
+    if (!rush) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = hissBuf(); s.loop = true; f.type = 'bandpass'; f.Q.value = 0.6; f.frequency.value = 500; g.gain.value = 0; s.connect(f); f.connect(g); g.connect(audio.out); s.start(); rush = { f, g, level: 0 }; }
+    if (muted) level = 0;
+    if (Math.abs(level - rush.level) < 0.04 && !(level === 0 && rush.level !== 0)) return;
+    rush.level = level; rush.g.gain.setTargetAtTime(level * 0.2, t, 0.07); rush.f.frequency.setTargetAtTime(500 + level * 1500, t, 0.1);
+  } catch (e) {}
+}
+const sfx = {
+  jump: () => { tone(330, 0.13, 'triangle', 0.14, 620); noise(0.07, 0.05, 900, 2400); },
+  land: () => { tone(140, 0.07, 'triangle', 0.12, 90); noise(0.08, 0.09, 700, 220); },
+  step: () => noise(0.035, 0.04, 2100, 1200),
+  thud: () => { tone(95, 0.24, 'triangle', 0.32, 45); tone(60, 0.28, 'sine', 0.28, 38); noise(0.3, 0.3, 420, 70); },
+  whistle: () => tone(1100, 0.7, 'sine', 0.09, 220),
+  bounce: () => { tone(220, 0.22, 'square', 0.09, 880); noise(0.1, 0.05, 1500, 3000); },
+  crack: () => { tone(180, 0.12, 'sawtooth', 0.08, 70); noise(0.12, 0.08, 2600, 900); },
+  bump: () => { tone(160, 0.16, 'square', 0.14, 60); tone(420, 0.1, 'sawtooth', 0.08, 120); noise(0.12, 0.14, 900, 250); },
+  rest: () => { [523, 659, 784].forEach((f, i) => tone(f, 0.4, 'sine', 0.14, 0, i * 0.09)); tone(1568, 0.5, 'sine', 0.06, 0, 0.27); noise(0.35, 0.03, 6000, 9000, 0.05); },
+  win: () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.45, 'triangle', 0.15, 0, i * 0.11)); noise(0.5, 0.05, 5000, 9000, 0.3); },
+  fin: () => [784, 1047].forEach((f, i) => tone(f, 0.22, 'triangle', 0.1, 0, i * 0.1)),
+  type: () => tone(700, 0.03, 'square', 0.04),
+  pick: () => { tone(520, 0.05, 'triangle', 0.09); tone(780, 0.08, 'triangle', 0.08, 0, 0.04); },
+  shot: () => { tone(900, 0.09, 'square', 0.07, 300); noise(0.05, 0.06, 3000, 800); },
+  hitTarget: () => { tone(880, 0.12, 'triangle', 0.14); tone(1320, 0.2, 'triangle', 0.12, 0, 0.08); },
+  zap: () => tone(500, 0.12, 'sawtooth', 0.08, 120),
+  bonk: () => tone(120, 0.14, 'square', 0.12, 80),
+  click: () => { tone(300, 0.06, 'square', 0.12); tone(600, 0.1, 'triangle', 0.1, 0, 0.05); },
+  open: () => [392, 523, 784].forEach((f, i) => tone(f, 0.25, 'triangle', 0.12, 0, i * 0.06)),
+  tick: () => tone(1000, 0.03, 'square', 0.05),
+  star: () => { tone(1047, 0.1, 'sine', 0.12); tone(1568, 0.18, 'sine', 0.12, 0, 0.07); tone(2093, 0.25, 'sine', 0.07, 0, 0.14); },
+  beep: () => tone(660, 0.13, 'square', 0.08),
+  go: () => { tone(990, 0.35, 'square', 0.09); tone(1320, 0.35, 'triangle', 0.09); },
+  swing: () => noise(0.11, 0.1, 2400, 600),
+  grab: () => { tone(260, 0.1, 'square', 0.09, 520); noise(0.06, 0.07, 1400, 500); },
+  letgo: () => tone(520, 0.1, 'triangle', 0.09, 260),
+};
+// Each world has a tune: your own song when config.js names one, otherwise a short melody the game
+// writes itself in that world's scale, over a hand-drum beat.
+const song = { world: -1, el: null, beat: 0, acc: 0, phrase: [] };
+function playWorld(w) {
+  if (song.world === w) return;
+  song.world = w; song.beat = 0; song.acc = 0;
+  if (song.el) { song.el.pause(); song.el = null; }
+  const file = (CONFIG.songs || [])[w];
+  if (file) { const el = new Audio(file); el.loop = true; el.volume = tune.music_volume; el.muted = muted; el.play().catch(() => {}); song.el = el; events.push(['song', w + 1, file]); return; }
+  const r = fixedRng(500 + w * 31), ph = []; let d = 0;
+  for (let i = 0; i < 32; i++) { // a wandering line that comes home at the end of each half
+    if (i % 16 === 15) d = 0; else if (r() < 0.72) d = clamp(d + (r() < 0.5 ? -1 : 1) * (r() < 0.8 ? 1 : 2), -2, 8);
+    ph.push(r() < 0.18 && i % 4 !== 0 ? null : d);
+  }
+  song.phrase = ph; events.push(['tune', w + 1]);
+}
+function stepMusic(dt) {
+  if (song.world < 0 || song.el || !audio || muted) return;
+  const Wd = WORLDS[song.world], len = 60 / Wd.bpm / 2, v = tune.music_volume;
+  song.acc += dt;
+  while (song.acc >= len) {
+    song.acc -= len; const i = song.beat++ % 32, d = song.phrase[i];
+    if (d !== null) { const oct = Math.floor(d / 7), semi = Wd.scale[((d % 7) + 7) % 7] + oct * 12; tone(Wd.root * Math.pow(2, semi / 12), len * 1.7, 'triangle', 0.075 * v); }
+    if (i % 8 === 0) tone(Wd.root / 2, len * 7, 'sine', 0.05 * v);                       // a low drone under the line
+    const b = i % 8; if (b === 0 || b === 5) tone(92, 0.16, 'sine', 0.2 * v, 50);          // the drum's deep stroke
+    else if (b === 2 || b === 3 || b === 6) tone(1500, 0.035, 'square', 0.035 * v, 900);   // and its sharp one
+  }
+}
+
+// ---- The tower: fifty levels, laid by one recipe per world from a fixed seed --------------------
+// Each ledge sits within one jump of the one before: the sideways gap and the rise are drawn from
+// the level's range, which runs from easy at level 1 to the limit of the jump at level 50.
+const PW = 30, PH = 38;
+let plats = [], bumpers = [], rests = [], gates = [], targets = [], turrets = [], stars = [], decor = [], route = [], SUMMIT = 0;
+function pickKind(mix, roll) { let a = 0; for (const k in mix) { a += mix[k]; if (roll < a) return k; } return 'n'; }
+function buildTower(mode) {
+  plats = []; bumpers = []; rests = []; gates = []; targets = []; turrets = []; stars = [];
+  const size = mode === 0 ? tune.easy_size : mode === 2 ? tune.hard_size : 1;
+  const add = p => { p.x0 = p.x; p.dx = 0; p.gone = 0; p.shake = 0; p.squash = 0; plats.push(p); return p; };
+  let alt = 0, cx = W / 2;
+  rests[0] = add({ x: 0, w: W, alt: 0, kind: 'r', level: 0, rest: 0 });
+  for (let L = 0; L < LEVELS; L++) {
+    const w = Math.floor(L / PER), Wd = WORLDS[w], d = L / (LEVELS - 1), rnd = fixedRng(2000 + L * 131), n = 10 + Math.floor(d * 3), inW = L % PER, main = [];
+    const timedHere = Wd.timed && inW >= 2, t0 = timedHere ? Math.floor(n * 0.3) + 1 : -9;
+    let dir = rnd() < 0.5 ? 1 : -1, nearL = cx, nearR = cx, farL = cx, farR = cx, lastDir = dir, after = false, prevKind = 'n';
+    for (let i = 0; i < n; i++) {
+      let kind = 'n';
+      if (i > 0 && !after) { kind = pickKind(Wd.mix, rnd()); if ((kind === 'b' || kind === 'f') && (i >= n - 1 || prevKind === 'b' || prevKind === 'f')) kind = 'n'; }
+      if (i >= t0 && i < t0 + 3) kind = 'g'; else if (i === t0 - 1 || i === t0 + 3) kind = 'n'; // the timed ledges and the plain ones round them
+      const pw = Math.max(56, Math.round((after ? 150 : lerp(tune.ledge_wide, tune.ledge_narrow, d) * (0.85 + rnd() * 0.3)) * size * (kind === 'b' || kind === 'f' ? 0.75 : 1)));
+      const gap = i === 0 ? 0 : after ? 50 : Math.min(104, lerp(tune.gap_small, tune.gap_big, d) * (0.8 + rnd() * 0.3)), rise = after ? 235 : 88 + rnd() * 18;
+      if (rnd() < 0.3) dir = -dir;
+      const place = dr => { const L0 = dr === lastDir ? farL : nearL, R0 = dr === lastDir ? farR : nearR; return dr > 0 ? R0 + gap : L0 - gap - pw; };
+      let x = i === 0 ? cx - pw / 2 + (rnd() - 0.5) * 240 : place(dir);
+      if (i > 0 && (x < 0 || x + pw > W)) { dir = -dir; x = place(dir); }
+      x = clamp(x, 0, W - pw); alt += rise;
+      const p = add({ x, w: pw, alt, kind, level: L + 1, a: 0, b: 0, world: w });
+      nearL = farL = x; nearR = farR = x + pw;
+      if (kind === 'm') { // a ferry: it slides on from where you board it, the way you are heading
+        const range = clamp((2 + rnd() * 2) * 40, 0, dir > 0 ? W - pw - x : x), fx = x + dir * range;
+        p.x0 = Math.min(x, fx); p.a = Math.max(20, range); p.b = 70 + rnd() * 70 + d * 40; p.flip = dir < 0; farL = fx; farR = fx + pw;
+      } else if (kind === 'v') p.a = (rnd() < 0.5 ? -1 : 1) * lerp(110, 170, d);
+      if (i === t0 - 1) p.timer = true;
+      if (Wd.bumpers && i > 1 && i % 3 === 0 && kind !== 'g') { const bx = dir > 0 ? x + pw + 38 : x - 38; if (bx > 34 && bx < W - 34) bumpers.push({ x: bx, alt: alt + 62, phase: bumpers.length * 1.7, cool: 0, off: 0 }); } // a red bumper waits just past the ledge, for the jump that goes too far
+      if (Wd.turrets && i > 0 && i % 4 === 2) { const left = x + pw / 2 > W / 2; turrets.push({ x: left ? 22 : W - 22, dir: left ? 1 : -1, alt: alt + 20, phase: turrets.length * 0.9, sleep: 0, next: 0 }); } // a turret on the far wall fires along this ledge
+      main.push(p); lastDir = dir; after = kind === 'b' || kind === 'f'; prevKind = kind;
+    }
+    stars.push({ x: main[Math.floor(n * 0.8)].x + main[Math.floor(n * 0.8)].w / 2, alt: main[Math.floor(n * 0.8)].alt + 128, taken: false, level: L + 1 }); // a star a full jump above a late ledge
+    const gk = Wd.gate && (Wd.gate !== 'btn' || inW >= 1 || w > 3) ? Wd.gate : null;
+    if (gk) { // a gate across the tower under the level's end: a button opens it, or a shot at its target, or both
+      const g = { alt: alt + 52, level: L + 1, needBtn: gk !== 'tgt', needTgt: gk !== 'btn', btn: false, tgt: false, open: false }; gates.push(g);
+      if (g.needBtn) { // the button sits on a side ledge, off the way up
+        let k = Math.floor(n * 0.55); for (let j = Math.floor(n * 0.4); j < n - 2; j++) if (j > t0 + 3 && main[j].x + main[j].w / 2 > 200 && main[j].x + main[j].w / 2 < 520) { k = j; break; }
+        if (k <= t0 + 3) k = Math.min(n - 2, t0 + 5);
+        const m = main[k], nx = main[k + 1], side = nx.x + nx.w / 2 > m.x + m.w / 2 ? -1 : 1, bw = 96, bx = clamp(side > 0 ? m.x + m.w + 46 : m.x - 46 - bw, 0, W - bw);
+        add({ x: bx, w: bw, alt: m.alt + 92, kind: 'n', level: L + 1, a: 0, b: 0, world: w, button: g, side: true });
+      }
+      if (g.needTgt) { const j = main[Math.floor(n * 0.62)], left = j.x + j.w / 2 > W / 2; targets.push({ x: left ? 30 : W - 30, alt: j.alt + 20, amp: d > 0.8 ? 46 : 0, phase: L, gate: g, hit: false }); } // the target hangs on the far wall, level with a ledge
+    }
+    const lastP = main[n - 1]; cx = lastP.x + lastP.w / 2;
+    alt += 112;
+    // a full gold floor ends every level; in hard mode only every fifth, and the others end on a gold pad
+    const full = mode !== 2 || (L + 1) % PER === 0 || L === LEVELS - 1;
+    rests[L + 1] = full ? add({ x: 0, w: W, alt, kind: 'r', level: L + 1, rest: L + 1 }) : add({ x: clamp(cx - 110, 0, W - 220), w: 220, alt, kind: 'p', level: L + 1, rest: L + 1 });
+  }
+  SUMMIT = alt; plats[plats.length - 1].summit = true; route = plats.filter(p => !p.side); // the way up, without the side ledges
+  WORLDS.forEach((Wd, w) => { Wd.base = rests[w * PER].alt; Wd.end = rests[(w + 1) * PER].alt; });
+  const r = fixedRng(7); decor = [];
+  for (let i = 0; i < 360; i++) decor.push({ x: r() * W, alt: r() * SUMMIT, s: 0.6 + r() * 1.2, k: r() });
+}
+const levelAt = alt => { let n = 0; for (let i = 1; i < rests.length; i++) if (alt >= rests[i].alt - 1) n = i; return n; };
+const metres = alt => Math.max(0, Math.round(alt / 40));
+
+// ---- What is kept between sessions, and the finish code ---------------------------------------
+const SAVE = 'long-climb-v2';
+let save = { best: [{}, {}, {}], run: null };
+try { const s = JSON.parse(localStorage.getItem(SAVE) || 'null'); if (s && Array.isArray(s.best)) save = s; } catch (e) {}
+function store() { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch (e) {} }
+const B32 = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const toB = n => { let s = ''; do { s = B32[n % 32] + s; n = Math.floor(n / 32); } while (n > 0); return s; };
+const fromB = s => { let n = 0; for (const c of s) { const i = B32.indexOf(c); if (i < 0) return NaN; n = n * 32 + i; } return n; };
+const sumOf = n => (((n % 9973) * 7919 + (Math.floor(n / 9973) % 9973) * 31 + 4201) % 1024);
+function makeCode(cs, falls, mode) { const n = (cs * 1000 + Math.min(falls, 999)) * 4 + mode; return 'LC-' + toB(n) + '-' + toB(sumOf(n)).padStart(2, '2'); }
+function readCode(s) { // the time, falls and difficulty inside a finish code, or null when it is not a real one
+  const m = /^LC-?([2-9A-Z]+)-([2-9A-Z]{2})$/.exec(s.trim().toUpperCase());
+  if (!m) return null;
+  const n = fromB(m[1]);
+  if (!Number.isFinite(n) || fromB(m[2]) !== sumOf(n) || n % 4 > 2) return null;
+  const v = Math.floor(n / 4); return { cs: Math.floor(v / 1000), falls: v % 1000, mode: n % 4 };
+}
+const clockText = (cs, fine) => {
+  const s = Math.floor(cs / 100), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0');
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + ss + (fine ? '.' + String(cs % 100).padStart(2, '0') : '');
+};
+
+// ---- Racing: bots on this machine, real players through server.js -------------------------------
+const GOALS = [3, 5, 10, 25, 50], MAXP = 25, HANG = PH + 16; // HANG: how far under the feet they hold a hanging climber's own feet are
+const colorOf = i => i < 5 ? ['#e8334a', '#3f8cff', '#3fd66a', '#ffb020', '#c77dff'][i] : `hsl(${Math.round(i * 137.5 + 20) % 360},85%,62%)`; // a colour for every seat
+const game = { kind: 'solo', goal: 5, name: '', color: colorOf(0), slot: 0, fin: null, msg: '', msgT: 0, spec: false, over: false, watch: null, size: tune.room_size, cid: '' };
+try { game.name = localStorage.getItem('long-climb-name') || ''; game.cid = localStorage.getItem('long-climb-cid') || ''; game.size = clamp(Number(localStorage.getItem('long-climb-size')) || tune.room_size, 2, MAXP); } catch (e) {}
+if (!game.cid) { // a name for this browser that the room server knows it by, so a player who drops out can come back to their place
+  const a = new Uint8Array(10); try { crypto.getRandomValues(a); } catch (e) {}
+  game.cid = Array.from(a, b => B32[b % 32]).join(''); try { localStorage.setItem('long-climb-cid', game.cid); } catch (e) {}
+}
+game.named = !!game.name; // until a name is typed, making or joining a room asks for one first
+if (!game.name) game.name = K.player + ' ' + (10 + Date.now() % 90);
+let others = new Map(), pushCool = 0, grabCool = 0, menuSel = 1, pauseSel = 0, pendingGo = -1, pendingRoom = '', lobbySel = 0;
+const meId = () => game.kind === 'net' ? net.id : 'me', hangAlt = a => Math.max(0, a - HANG); // where a hanging climber's feet are, under feet at altitude a: never below the tower's foot
+function resume() { if (song.el) song.el.play().catch(() => {}); scene = pauseFrom; }
+function toMenu() { // leave the climb, and the room if you are in one, for the main menu
+  if (song.el) { song.el.pause(); song.el = null; } song.world = -1;
+  if (net.ws) net.leave(); others = new Map(); game.kind = 'solo'; game.spec = false; game.fin = null; reset(); menuSel = 1; scene = 'title';
+}
+function toast(s) { game.msg = s; game.msgT = 3; }
+function setName(n) { n = String(n || '').trim().slice(0, 14); if (!n) return; game.name = n; game.named = true; try { localStorage.setItem('long-climb-name', n); } catch (e) {} }
+function startRace(kind, goal, opt = {}) { // opt: spec (you only watch), el (milliseconds the race has already run), from (the level a returning player had reached)
+  game.kind = kind; game.goal = goal; game.fin = null; game.over = false; game.spec = !!opt.spec; game.watch = null;
+  if (kind === 'bots') { // four computer rivals, each a little slower than the last
+    others = new Map(); game.slot = 4; game.color = colorOf(0);
+    for (let i = 0; i < 4; i++) others.set('b' + i, { id: 'b' + i, name: K.bots[i], bot: true, color: colorOf(i + 1), i: 0, prog: 0, base: 0, x: 0, sx: 0, alt: 0, face: 1, pace: 0.92 + i * 0.1, wait: 0.3 + i * 0.3, fall: -1, kx: 0, h: null, hangT: 0, vx: 0, vy: 0, fin: null, r: fixedRng(77 + i * 13) });
+  }
+  reset(opt.from ? { top: opt.from, cs: 0, falls: 0, stars: 0 } : undefined);
+  const el = (opt.el || 0) / 1000; state.t = el; state.count = Math.max(0, 3.4 - el); state.time = Math.max(0, el - 3.4); state.started = el >= 3.4; pushCool = grabCool = 0;
+  let k = 0; for (const o of others.values()) { o.fin = null; o.h = null; if (o.bot) { o.x = o.sx = 90 + [0, 1, 3, 4][k++] * 135; o.alt = 0; } else if (!el) { o.alt = o.talt = 0; } }
+  if (state.count > 0) sfx.beep();
+  scene = game.spec ? 'watch' : 'play';
+}
+function letGo(leap, quiet) { // off their feet: with a leap when you jumped, with a small hop up otherwise
+  const o = others.get(P.hang); P.hang = null; grabCool = tune.grab_cool; P.on = null; P.coy = 0; P.last = P.alt;
+  P.vx = o ? clamp(o.vx || 0, -380, 380) : 0; P.vy = leap ? tune.jump_speed * tune.hang_leap : Math.sqrt(2 * tune.gravity * (HANG + 20)); P.cut = false; P.squash = -0.25;
+  if (!quiet) { if (leap) { sfx.jump(); ring(P.x + PW / 2, P.alt + PH, '#ffffff', 44); } else sfx.letgo(); }
+  events.push(['letgo', leap ? 1 : 0]);
+}
+function hitMe(dir, from) { // another climber shoved you: off whatever feet you hold, and away
+  if (scene !== 'play' || state.count > 0 || game.fin) return;
+  if (P.hang) letGo(false, true);
+  P.vx = dir * tune.push_speed; P.vy = 300; P.on = null; P.coy = 0; P.cut = false; P.stun = 0.35; state.shake = 0.18; sfx.bump();
+  sparks(P.x + PW / 2, P.alt + 20, 14, '#ffffff'); ring(P.x + PW / 2, P.alt + 20, '#ffffff', 56); events.push(['pushed', from]);
+}
+function botDrop(o) { // a bot lets go of your feet: it lands on the ledge under it, and climbs on from there
+  o.h = null; let k = 0; for (let i = 0; i < route.length && route[i].alt <= o.alt + 1; i++) k = i;
+  o.fall = Math.max(o.base, k); o.prog = 0; o.sx = o.x;
+}
+function stepBot(o, dt, goalI) {
+  if (o.fin || state.count > 0) return;
+  const done = () => { o.fin = { cs: Math.round(state.time * 100) }; toast(o.name + ' ' + K.finished); sfx.fin(); confetti(o.x, o.alt + 30, 26); };
+  if (o.h) { // hanging on your feet: it goes where you go, until its grip gives or you shake it off
+    o.hangT -= dt; o.x = P.x + PW / 2; o.alt = hangAlt(P.alt); o.face = P.face;
+    if (o.hangT <= 0 || game.fin || scene === 'board') botDrop(o);
+    return;
+  }
+  if (o.kx) { o.x = clamp(o.x + o.kx * dt, 14, W - 14); o.kx *= Math.max(0, 1 - 4 * dt); if (Math.abs(o.kx) < 20) o.kx = 0; }
+  const a = route[o.i], b = route[o.i + 1];
+  if (!b) { done(); return; }
+  if (o.fall >= 0) { // shoved, or slipped: it drops to an earlier ledge
+    const tg = route[o.fall], tx = tg.kind === 'r' ? o.x : tg.x + tg.w / 2; o.alt -= 900 * dt; o.x += (tx - o.x) * Math.min(1, 4 * dt);
+    if (o.alt <= tg.alt) { o.alt = tg.alt; o.i = o.fall; o.fall = -1; o.prog = 0; o.wait = 0.5; o.sx = o.x; if (tg.rest) o.base = Math.max(o.base, o.i); if (o.i >= goalI) done(); }
+    return;
+  }
+  if (o.wait > 0) { o.wait -= dt; if (a.kind !== 'r') o.x = a.x + a.w / 2; o.alt = a.alt; o.sx = o.x; return; }
+  const d = a.level / LEVELS, bx = b.kind === 'r' ? o.sx : b.x + b.w / 2;
+  o.prog += dt / (tune.bot_pace * o.pace * (1 + d * 1.3) * (P.hang === o.id ? tune.carry_slow : 1)); // with you on its feet a bot climbs slower
+  const t = Math.min(1, o.prog); o.x = lerp(o.sx, bx, t); o.alt = lerp(a.alt, b.alt, t) + Math.sin(PI * t) * 70; o.face = bx >= o.sx ? 1 : -1;
+  if (o.prog >= 1) { // it has landed: maybe it shoves you, grabs your feet, slips, or has won
+    o.i++; o.prog = 0; o.x = o.sx = bx; o.alt = b.alt; o.wait = 0.12 + (b.rest ? 0.5 : 0) + (b.rest && gates.some(g => g.level === b.level) ? 2.5 : 0);
+    if (b.rest) o.base = o.i;
+    if (o.i >= goalI) { done(); return; }
+    const pcx = P.x + PW / 2, can = scene === 'play' && !game.fin, up = P.alt - o.alt;
+    if (can && P.hang === o.id) { if (o.r() < 0.3) hitMe(o.r() < 0.5 ? 1 : -1, o.name); }                                                          // it shakes you off
+    else if (can && P.on === b && !b.rest && !(P.stun > 0) && o.r() < 0.5) hitMe(Math.sign(pcx - o.x) || 1, o.name);
+    else if (can && !P.hang && !b.rest && Math.abs(pcx - o.x) < tune.grab_reach + 10 && up > 20 && up < tune.grab_up + 20 && o.r() < tune.bot_grab) { o.h = 'me'; o.hangT = tune.grab_time; }
+    else if (!b.rest && o.i > o.base + 1 && o.r() < tune.bot_slip + d * 0.1) o.fall = Math.max(o.base, o.i - 1 - Math.floor(o.r() * 3));
+  }
+}
+function stepOthers(dt) { // the bots think; real players glide to where they last said they were; anyone hanging is drawn on the feet they hold
+  const goalI = route.indexOf(rests[game.goal]), me = meId();
+  for (const o of others.values()) {
+    const px = o.x, pa = o.alt;
+    if (o.bot) stepBot(o, dt, goalI);
+    else {
+      const c = o.h ? (o.h === me && !game.spec ? { x: P.x + PW / 2, alt: P.alt } : others.get(o.h)) : null;
+      if (c) { o.x = c.x; o.alt = hangAlt(c.alt); } else { o.x += (o.tx - o.x) * Math.min(1, 14 * dt); o.alt += (o.talt - o.alt) * Math.min(1, 14 * dt); }
+    }
+    o.vx = lerp(o.vx || 0, (o.x - px) / dt, 0.3); o.vy = lerp(o.vy || 0, (o.alt - pa) / dt, 0.3);
+  }
+}
+const stillRacing = () => { for (const o of others.values()) if (!o.fin) return true; return false; };
+function raceFinish() { // you reached the finish: the race goes on for the others, and you watch them
+  const cs = Math.round(state.time * 100); let place = 1; for (const o of others.values()) if (o.fin) place++;
+  state.done = true; state.cs = cs; game.fin = { cs, place };
+  if (game.kind === 'net') { net.send({ t: 's', x: Math.round(P.x + PW / 2), a: Math.round(P.alt), f: P.face, l: state.level, h: 0 }); net.send({ t: 'fin', cs }); }
+  sfx.win(); confetti(P.x + PW / 2, P.alt + 40, 70); state.flash = 1; events.push(['race', place, cs]);
+  game.watch = null; state.t0 = state.t; scene = stillRacing() ? 'watch' : 'board';
+}
+const net = { ws: null, can: location.protocol.startsWith('http'), room: null, id: 0, host: false, tick: 0,
+  send(m) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); },
+  open(first) { // the room lives on the PC that runs server.js; this page talks to it and to nothing else
+    try {
+      const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host); this.ws = ws;
+      ws.onopen = () => this.send(first);
+      ws.onmessage = e => { let m = null; try { m = JSON.parse(e.data); } catch (x) {} if (m) onNet(m); };
+      ws.onclose = () => { if (this.ws !== ws) return; this.ws = null; const was = this.room; this.room = null; toast(K.errGone); if (was || scene === 'lobby') { game.kind = 'solo'; game.spec = false; game.fin = null; others = new Map(); reset(); scene = 'title'; } };
+    } catch (e) { toast(K.errGone); }
+  },
+  leave() { const w = this.ws; this.ws = null; this.room = null; if (w) w.close(); } };
+function onNet(m) {
+  if (m.t === 'room' || m.t === 'roster') {
+    if (m.t === 'room') { net.id = m.you; lobbySel = m.you; scene = 'lobby'; }
+    net.room = { id: m.id, players: m.players, host: m.host, mode: m.mode, goal: m.goal, size: m.size, lan: m.lan, racing: !!m.racing }; net.host = m.host === net.id;
+    const keep = new Map(); let slot = 0, mine = null;
+    for (const p of m.players) { // the climbers of the room; those who only watch have no climber
+      if (p.id === net.id) mine = p; if (p.spec) continue;
+      if (p.id === net.id) { game.slot = slot; game.color = colorOf(p.c); }
+      else { const o = others.get(p.id) || { id: p.id, x: W / 2, alt: 0, tx: W / 2, talt: 0, face: 1, fin: null, h: 0, vx: 0, vy: 0 }; o.name = p.name; o.color = colorOf(p.c); keep.set(p.id, o); }
+      slot++;
+    }
+    others = keep; game.spec = !!(mine && mine.spec);
+    if (scene === 'lobby' && m.mode !== mode) { mode = m.mode; game.kind = 'solo'; reset(); }
+    if (game.spec && game.kind === 'net' && !game.fin) { // the host moved you to the watchers in the middle of a race
+      if (scene === 'play') { scene = 'watch'; game.watch = null; toast(K.nowWatching); } else if (scene === 'pause' && pauseFrom === 'play') pauseFrom = 'watch';
+    }
+  } else if (m.t === 'err') { toast(m.msg === 'full' ? K.errFull : m.msg === 'kicked' ? K.kicked : K.errNone); net.leave(); scene = 'title'; }
+  else if (m.t === 'kicked') { net.leave(); others = new Map(); game.kind = 'solo'; game.spec = false; game.fin = null; reset(); scene = 'title'; toast(K.kicked); sfx.bonk(); }
+  else if (m.t === 'note') { toast(K.noSlot); }
+  else if (m.t === 'go') { mode = m.mode; startRace('net', m.goal, { spec: m.spec, el: m.el, from: m.from }); }
+  else if (m.t === 'lobby') { game.kind = 'solo'; game.fin = null; game.over = false; reset(); scene = 'lobby'; }
+  else if (m.t === 'ss') { for (const s of m.p) { const o = others.get(s[0]); if (o) { o.tx = s[1]; o.talt = s[2]; o.face = s[3]; o.h = s[4] || 0; } } }
+  else if (m.t === 'hit') { const o = others.get(m.from); hitMe(m.d < 0 ? -1 : 1, o ? o.name : ''); }
+  else if (m.t === 'fin') {
+    if (m.id === net.id) game.fin = { cs: m.cs, place: m.place };
+    else { const o = others.get(m.id); if (o) { o.fin = { cs: m.cs, place: m.place }; o.h = 0; toast(o.name + ' ' + K.finished); sfx.fin(); confetti(o.x, o.alt + 30, 26); } }
+  } else if (m.t === 'over') { game.over = true; if (game.kind === 'net' && (scene === 'play' || scene === 'watch' || scene === 'pause')) { state.t0 = state.t; scene = 'board'; } } // everyone is in: the results
+}
+function raceTick(dt) { // what a race does every step: tell the room where you are
+  if (game.msgT > 0) game.msgT -= dt;
+  if (game.kind !== 'net' || game.spec || game.fin) return;
+  if ((net.tick = (net.tick + 1) % 4) === 0) net.send({ t: 's', x: Math.round(P.x + PW / 2), a: Math.round(P.alt), f: P.face, l: state.level, h: P.hang || 0 });
+}
+function entries() { // everyone in the race, the finished first by time, then the rest by height
+  const list = [];
+  if (!game.spec) list.push({ id: meId(), name: game.name, color: game.color, alt: P.alt, fin: game.fin, me: true });
+  for (const o of others.values()) list.push({ id: o.id, name: o.name + (o.bot ? ' (' + K.bot + ')' : ''), color: o.color, alt: o.alt, fin: o.fin });
+  for (const e of list) e.level = Math.min(LEVELS, levelAt(e.alt) + 1);
+  return list.sort((a, b) => (a.fin ? a.fin.cs : 1e12) - (b.fin ? b.fin.cs : 1e12) || b.alt - a.alt);
+}
+function watched() { // the climber the camera follows while you watch: the one you picked, or the leader still climbing
+  const o = game.watch !== null && others.get(game.watch); if (o) return o;
+  const list = entries().filter(e => !e.me), e = list.find(x => !x.fin) || list[0];
+  game.watch = e ? e.id : null; return e ? others.get(e.id) : null;
+}
+function watchNext(d) { const ids = entries().filter(e => !e.me).map(e => e.id); if (!ids.length) return; game.watch = ids[(ids.indexOf(game.watch) + d + ids.length) % ids.length]; sfx.type(); }
+function watchStep(dt) { // watching: the race's clock runs, and the camera follows the climber you picked
+  if (state.count > 0) state.count -= dt; else state.time += dt;
+  const o = watched(); state.wind = 0; if (!o) return;
+  cam += (o.alt + tune.cam_lead - cam) * Math.min(1, tune.cam_speed * dt);
+  if (game.spec) { state.level = Math.min(LEVELS, levelAt(o.alt) + 1); state.world = Math.floor((state.level - 1) / PER) + 1; state.height = metres(o.alt); }
+}
+function roomLink() { // the address to send: on the host's own PC, the one the others on the Wi-Fi must use
+  const r = net.room; if (!r) return '';
+  const local = /^(localhost|127\.)/.test(location.host) || !location.host;
+  return (local ? 'http:' : location.protocol) + '//' + (local ? (r.lan || 'localhost:8080') : location.host) + '/?room=' + r.id;
+}
+function copyLink() {
+  const s = roomLink(), done = () => { toast(K.copied); sfx.pick(); };
+  try {
+    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(s).then(done, () => {}); return; }
+    const ta = document.createElement('textarea'); ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy'); ta.remove(); if (ok) done();
+  } catch (e) {}
+}
+function roomSet(ch) { // the host changes the room: how many may play, the level that ends the race, the difficulty
+  const r = net.room; if (!r || !net.host) return;
+  const s = Object.assign({ mode: r.mode, goal: r.goal, size: r.size }, ch); s.size = clamp(s.size, 2, MAXP); s.goal = GOALS[clamp(GOALS.indexOf(s.goal), 0, GOALS.length - 1)];
+  if (s.mode === r.mode && s.goal === r.goal && s.size === r.size) return;
+  net.send(Object.assign({ t: 'set' }, s)); game.size = s.size; try { localStorage.setItem('long-climb-size', String(s.size)); } catch (e) {} sfx.type();
+}
+const goalStep = d => GOALS[clamp(GOALS.indexOf(net.room.goal) + d, 0, GOALS.length - 1)];
+function openName(then) { // ask for the name; `then` is the menu line to go on to once it is given
+  pendingGo = then;
+  if (touchSeen) { const n = prompt(K.nameAsk, game.named ? game.name : ''); if (n) setName(n); pendingGo = -1; if (then >= 0 && game.named) menuGo(then); }
+  else { state.entry = game.named ? game.name : ''; typed.length = 0; scene = 'name'; }
+}
+function menuGo(i) {
+  if (i === 0) openName(-1);
+  else if (i === 1) { game.kind = 'solo'; others = new Map(); if (save.run && save.run.mode === mode) { save.run = null; store(); } reset(); scene = 'play'; }
+  else if (i === 2) startRace('bots', game.goal);
+  else if (i === 3 || i === 4) {
+    if (!net.can) toast(K.needServer);
+    else if (!game.named) openName(i); // a room shows your name to the others, so it is asked first
+    else if (i === 3) net.open({ t: 'create', name: game.name, mode, goal: game.goal, size: game.size, cid: game.cid });
+    else if (pendingRoom) { const id = pendingRoom; pendingRoom = ''; net.open({ t: 'join', id, name: game.name, cid: game.cid }); } // a room link: the code came with the address
+    else if (touchSeen) { const id = prompt(K.roomAsk, ''); if (id) net.open({ t: 'join', id: id.trim(), name: game.name, cid: game.cid }); }
+    else { state.entry = ''; typed.length = 0; scene = 'join'; }
+  } else { state.entry = ''; state.verdict = null; typed.length = 0; scene = 'code'; }
+}
+
+// ---- The climber ------------------------------------------------------------------------------
+let P, cam, parts, shots, orbs, scene, state = {}, mode = clamp(Number(params.get('mode') || 2) - 1, 0, 2), builtMode = -1, pauseFrom = 'play';
+function reset(from) {
+  seed = Number(params.get('seed')) || CONFIG.seed;
+  if (builtMode !== mode) { buildTower(mode); builtMode = mode; }
+  // state.gained: what this run gained or learned, the high the ending shows.
+  state = { t: 0, score: 0, gained: '', time: 0, started: false, falls: 0, stars: 0, height: 0, level: 1, world: 1, mode: mode + 1, banner: 0, bannerN: 0, holdR: 0, code: '', entry: '', verdict: null, done: false, shake: 0, flash: 0, t0: 0, wind: 0, count: 0, ghost: 0, hint: '', hintT: 0, cool: 0, gun: false };
+  for (const p of plats) { p.x = p.kind === 'm' && p.flip ? p.x0 + p.a : p.x0; p.dx = 0; p.gone = 0; p.shake = 0; p.squash = 0; p.seen = false; }
+  for (const b of bumpers) { b.cool = 0; b.off = 0; }
+  for (const g of gates) { g.btn = g.tgt = g.open = false; }
+  for (const t of targets) t.hit = false;
+  for (const t of turrets) { t.sleep = 0; t.next = 0; }
+  for (const s of stars) s.taken = false;
+  const lp = Number(params.get('level')) || 1; let n = clamp(lp - 1, 0, LEVELS - 1);
+  if (from) { n = from.top; state.time = from.cs / 100; state.falls = from.falls; state.stars = from.stars || 0; state.started = true; }
+  const start = rests[n]; for (let i = 0; i <= n; i++) rests[i].seen = true;
+  for (const g of gates) if (g.level <= n) g.open = true;
+  P = { x: clamp(start.kind === 'p' ? start.x + start.w / 2 - PW / 2 : W / 2 - PW / 2, 0, W - PW), alt: start.alt, vx: 0, vy: 0, on: start, coy: 0, buf: 0, face: 1, squash: 0, stun: 0, last: start.alt, cut: false, whistled: false, hang: null, hangT: 0, load: 0, stepT: 0 };
+  if (lp > LEVELS && !from) { P.on = null; P.alt = SUMMIT + 70; P.last = P.alt; state.started = true; state.time = 6325.4; state.falls = 88; state.stars = 37; } // a check may drop onto the summit
+  if (game.kind !== 'solo' && start.kind === 'r') P.x = clamp(W / 2 - PW / 2 + (((game.slot || 0) % 9) - 4) * 72, 0, W - PW); // a race lines its climbers up along the floor
+  cam = P.alt + tune.cam_lead; parts = []; shots = []; orbs = [];
+  state.level = Math.min(LEVELS, n + 1); state.world = Math.floor((state.level - 1) / PER) + 1;
+}
+// What you see when something happens: dust, rings, sparks, paper and small numbers. None of it changes the game.
+function puff(x, alt, n, color, speed = 120) { // dust thrown out and up
+  for (let i = 0; i < n; i++) { const a = PI * (0.1 + 0.8 * (i + 0.5) / n); parts.push({ x, alt, vx: Math.cos(a) * speed * (i % 2 ? 1 : -1), vy: Math.sin(a) * speed * 0.6, g: 500, life: 0.45, max: 0.45, color, s: 5 + (i % 3) * 2 }); }
+}
+function ring(x, alt, color, size = 60, life = 0.35) { parts.push({ k: 'ring', x, alt, vx: 0, vy: 0, g: 0, life, max: life, color, s: size }); } // a ring that opens out and fades
+function sparks(x, alt, n, color, speed = 260) { // short bright streaks flying out all round
+  for (let i = 0; i < n; i++) { const a = fxr() * PI * 2, v = speed * (0.4 + fxr() * 0.8), life = 0.28 + fxr() * 0.25; parts.push({ k: 'spark', x, alt, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 300, life, max: life, color, s: 3 }); }
+}
+function confetti(x, alt, n = 40) { // paper in every colour, for a level, a finish, a win
+  for (let i = 0; i < n; i++) { const a = PI * (0.15 + fxr() * 0.7), v = 300 + fxr() * 520, life = 1.3 + fxr() * 0.9; parts.push({ k: 'conf', x, alt, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 700, drag: 1.6, life, max: life, color: colorOf(Math.floor(fxr() * 12)), s: 6 + fxr() * 6, r: fxr() * 6, vr: (fxr() - 0.5) * 16 }); }
+}
+function popText(s, x, alt, color = '#ffffff', size = 26) { parts.push({ k: 'text', x, alt, vx: 0, vy: 80, g: 0, life: 0.9, max: 0.9, color, s: size, txt: s }); } // a small number that floats up
+function hint(s) { state.hint = s; state.hintT = 2.2; }
+function land(p) {
+  const drop = P.last - p.alt, cx = P.x + PW / 2, hard = drop > tune.fall_min * 40;
+  P.alt = p.alt; P.last = p.alt; P.whistled = false;
+  if (hard) { state.falls++; state.shake = 0.3; sfx.thud(); puff(cx, P.alt, 12, '#ffffff', 220); ring(cx, P.alt, '#ffffff', 96, 0.45); popText('-' + metres(drop), cx, P.alt + 70, '#ff8a96', 30); events.push(['fall', metres(drop)]); }
+  if (p.kind === 'b') { P.vy = tune.bounce_speed; P.cut = false; P.on = null; p.squash = 0.25; P.squash = -0.3; sfx.bounce(); puff(cx, P.alt, 6, '#ff8fd8'); ring(cx, P.alt, '#ff8fd8', 70); return; } // a bouncer throws you straight back up
+  P.on = p; P.vy = 0; P.squash = 0.22;
+  if (!hard) { sfx.land(); puff(cx, P.alt, 4, 'rgba(255,255,255,0.8)', 70); }
+  if (p.kind === 'c' && !p.shake) { p.shake = tune.crumble_delay; sfx.crack(); }
+  if (p.timer) { state.ghost = tune.ghost_time; sfx.click(); ring(cx, P.alt, '#3fdcff', 80); events.push(['timer', p.level]); }                          // a plate that makes the timed ledges solid for a while
+  if (p.button && !p.button.btn) { p.button.btn = true; sfx.click(); sparks(p.x + p.w / 2, p.alt + 8, 10, '#4fd66a', 200); events.push(['button', p.level]); openGate(p.button); } // a button that opens this level's gate
+  if (p.rest && !p.seen) { // the end of a level: a chime, a banner, and the climb is kept from here
+    p.seen = true;
+    if (game.kind !== 'solo' && p.rest >= game.goal) { raceFinish(); return; } // in a race the level that ends it is the finish line, and nothing is kept
+    if (game.kind === 'solo' && p.summit) { finish(); return; }
+    state.banner = tune.banner_time; state.bannerN = p.rest; state.flash = 0.7; sfx.rest(); ring(cx, P.alt, UI.gold, 340, 0.6); confetti(cx, P.alt + 30, 24);
+    if (game.kind !== 'solo') { events.push(['level', p.rest]); return; }
+    events.push(['level', p.rest, metres(p.alt)]);
+    const b = save.best[mode]; if (!(b.level >= p.rest)) b.level = p.rest;
+    save.run = { mode, top: p.rest, cs: Math.round(state.time * 100), falls: state.falls, stars: state.stars }; store();
+  }
+}
+function openGate(g) {
+  const was = g.open; g.open = (!g.needBtn || g.btn) && (!g.needTgt || g.tgt);
+  if (g.open && !was) { sfx.open(); for (let x = 60; x < W; x += 100) sparks(x, g.alt, 4, '#4fd66a', 160); events.push(['gate', g.level]); }
+}
+function finish() {
+  const cs = Math.round(state.time * 100), b = save.best[mode];
+  state.done = true; state.code = makeCode(cs, state.falls, mode); state.cs = cs; state.gained = K.summit; state.t = 0;
+  if (!b.cs || cs < b.cs) { b.cs = cs; b.falls = state.falls; }
+  b.level = LEVELS; save.run = null; store();
+  sfx.win(); confetti(W / 2, P.alt + 60, 90); events.push(['summit', cs, state.falls, state.code]); scene = 'results';
+}
+function knock(fromX, y) { // thrown away from what hit you, and down
+  if (P.hang) letGo(false, true);
+  P.vx = (P.x + PW / 2 >= fromX ? 1 : -1) * tune.bump_push; P.vy = -220; P.on = null; P.coy = 0; P.cut = false; P.stun = tune.bump_stun;
+  state.shake = 0.2; sfx.bump(); puff(fromX, y, 8, '#ff3b4e', 220); sparks(fromX, y, 10, '#ff3b4e'); events.push(['bump']);
+}
+function stepWorld(dt) {
+  const t = state.t;
+  for (const p of plats) {
+    p.dx = 0;
+    if (p.kind === 'm') { const ph = ((t * p.b / p.a) + (p.flip ? 1 : 0)) % 2, nx = p.x0 + (ph < 1 ? ph : 2 - ph) * p.a; p.dx = nx - p.x; p.x = nx; } // slides between its two ends
+    else if (p.kind === 'c') {
+      if (p.shake > 0) { p.shake -= dt; if (p.shake <= 0) { p.shake = 0; p.gone = tune.crumble_back; puff(p.x + p.w / 2, p.alt - 10, 8, '#e7c98a', 150); } }
+      else if (p.gone > 0) p.gone = Math.max(0, p.gone - dt);
+    }
+    if (p.squash > 0) p.squash = Math.max(0, p.squash - dt);
+  }
+  for (const b of bumpers) { if (b.cool > 0) b.cool -= dt; if (b.off > 0) b.off -= dt; }
+  if (state.ghost > 0) { const was = Math.ceil(state.ghost); state.ghost = Math.max(0, state.ghost - dt); if (Math.ceil(state.ghost) !== was) sfx.tick(); }
+  for (const tr of turrets) { // a turret near you fires an orb along its ledge every few seconds
+    if (tr.sleep > 0) { tr.sleep -= dt; continue; }
+    if (Math.abs(tr.alt - P.alt) > 620) continue;
+    tr.next -= dt; if (tr.next <= 0) { tr.next = tune.turret_period; orbs.push({ x: tr.x + tr.dir * 26, alt: tr.alt, vx: tr.dir * tune.orb_speed }); }
+  }
+  for (const o of orbs) o.x += o.vx * dt;
+  orbs = orbs.filter(o => o.x > -20 && o.x < W + 20 && !o.dead);
+  for (const s of shots) { // the blaster's shots: they open targets, and put bumpers, turrets and orbs out for a while
+    s.x += s.vx * dt;
+    for (const tg of targets) if (!tg.hit && Math.hypot(s.x - tg.x, s.alt - (tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp)) < 30) { tg.hit = true; s.dead = true; tg.gate.tgt = true; sfx.hitTarget(); puff(tg.x, tg.alt, 10, '#ffd44f', 200); events.push(['target', tg.gate.level]); openGate(tg.gate); }
+    for (const b of bumpers) if (!(b.off > 0) && Math.hypot(s.x - b.x, s.alt - (b.alt + Math.sin(t * 2 + b.phase) * 30)) < 30) { b.off = tune.off_time; s.dead = true; sfx.zap(); puff(b.x, b.alt, 8, '#ff3b4e', 180); }
+    for (const tr of turrets) if (!(tr.sleep > 0) && Math.abs(s.x - tr.x) < 26 && Math.abs(s.alt - tr.alt) < 26) { tr.sleep = tune.off_time; tr.next = tune.turret_period; s.dead = true; sfx.zap(); puff(tr.x, tr.alt, 8, '#9aa0a8', 180); }
+    for (const o of orbs) if (Math.hypot(s.x - o.x, s.alt - o.alt) < 22) { o.dead = true; s.dead = true; sfx.zap(); puff(o.x, o.alt, 6, '#c77dff', 150); }
+  }
+  shots = shots.filter(s => s.x > -20 && s.x < W + 20 && !s.dead);
+  for (const q of parts) { q.life -= dt; q.x += q.vx * dt; q.alt += q.vy * dt; q.vy -= q.g * dt; if (q.drag) { q.vx *= Math.max(0, 1 - q.drag * dt); if (q.vy < -170) q.vy = -170; } if (q.vr) q.r += q.vr * dt; }
+  parts = parts.filter(q => q.life > 0); if (parts.length > 500) parts.splice(0, parts.length - 500);
+  if (state.flash > 0) state.flash -= dt * 2.5;
+  if (state.banner > 0) state.banner -= dt;
+  if (state.shake > 0) state.shake -= dt;
+  if (state.hintT > 0) state.hintT -= dt;
+  if (state.cool > 0) state.cool -= dt;
+}
+const solid = p => !(p.gone > 0) && (p.kind !== 'g' || state.ghost > 0);
+function stepPlayer(dt, idle) { // idle: the menu is open over a room's race, so no key counts and the climber is left to gravity
+  const key = c => !idle && down.has(c), tap = c => !idle && pressed(c), me = meId();
+  const left = key('KeyA') || key('ArrowLeft'), right = key('KeyD') || key('ArrowRight');
+  const jumpHeld = key('Space') || key('KeyW') || key('ArrowUp'), jumpTap = tap('Space') || tap('KeyW') || tap('ArrowUp');
+  if (jumpTap) P.buf = tune.jump_buffer;
+  if (state.count > 0) { // a race's countdown holds everyone
+    const was = Math.ceil(state.count - 0.4); state.count -= dt; P.buf = 0; const n = Math.ceil(state.count - 0.4);
+    if (n !== was && n > 0) sfx.beep(); if (state.count <= 0) { state.started = true; sfx.go(); }
+  }
+  if (!state.started && !(state.count > 0) && (left || right || P.buf > 0)) state.started = true;
+  if (state.started) state.time += dt;
+  if (P.stun > 0) P.stun -= dt;
+  if (pushCool > 0) pushCool -= dt; if (grabCool > 0) grabCool -= dt;
+  const racing = game.kind !== 'solo' && !(state.count > 0);
+  let load = 0, rider = null; if (racing) for (const o of others.values()) if (o.h === me) { load++; rider = o; } // who hangs on your feet
+  if (load > P.load) { toast(rider.name + ' ' + K.rider); sfx.grab(); } P.load = load;
+  const tail = () => { // what every step ends with, hanging or not
+    if (P.squash > 0) P.squash = Math.max(0, P.squash - dt * 1.6); else if (P.squash < 0) P.squash = Math.min(0, P.squash + dt * 1.6);
+    if (P.alt < -400) { P.alt = 0; P.vy = 0; P.on = rests[0]; P.last = 0; } // nothing lies under the tower's foot
+    cam += (P.alt + tune.cam_lead - cam) * Math.min(1, tune.cam_speed * dt);
+    state.height = metres(P.alt); state.score = state.height;
+    state.level = Math.min(LEVELS, levelAt(P.alt) + 1); state.world = Math.floor((state.level - 1) / PER) + 1;
+    state.x = Math.round(P.x); state.onLedge = !!P.on; state.hanging = !!P.hang;
+  };
+  if (P.hang) { // holding on to someone's feet: carried wherever they go, until you leap off, let go, are shaken off or your grip gives
+    const o = others.get(P.hang); P.hangT -= dt;
+    if (!o || o.fin || o.h === me || P.hangT <= 0 || jumpTap || tap('KeyQ')) letGo(jumpTap && !!o && !o.fin);
+    else { P.x = clamp(o.x - PW / 2, 0, W - PW); P.alt = hangAlt(o.alt); P.vx = 0; P.vy = 0; P.on = null; P.last = P.alt; P.face = o.face || 1; P.buf = 0; P.whistled = false; state.wind = 0; tail(); return; }
+  }
+  const dir = P.stun > 0 || state.count > 0 ? 0 : (right ? 1 : 0) - (left ? 1 : 0);
+  if (dir) P.face = dir;
+  const acc = P.on ? (P.on.kind === 'i' ? tune.ice_accel : tune.ground_accel) : tune.air_accel;
+  const want = dir * tune.move_speed * (load ? tune.carry_run : 1), dv = want - P.vx, md = acc * dt; // with someone on your feet you run slower and jump lower
+  if (!(P.stun > 0)) P.vx += Math.abs(dv) <= md ? dv : Math.sign(dv) * md;
+  if (P.on) { P.x += P.on.dx; if (P.on.kind === 'v') P.x += P.on.a * dt; } // carried by what you stand on
+  if (P.buf > 0) P.buf -= dt;
+  if (P.coy > 0) P.coy -= dt;
+  if (P.buf > 0 && (P.on || P.coy > 0)) {
+    if (P.on) P.vx = clamp(P.vx + (P.on.kind === 'v' ? P.on.a : P.on.dx / dt), -380, 380); // a jump keeps the speed of what it leaves
+    P.vy = tune.jump_speed * (load ? Math.pow(tune.carry_jump, Math.min(load, 3)) : 1); P.on = null; P.coy = 0; P.buf = 0; P.cut = true; P.squash = -0.25; sfx.jump(); puff(P.x + PW / 2, P.alt, 4, 'rgba(255,255,255,0.7)', 80); } // late and early presses both count
+  if (P.cut && !jumpHeld && P.vy > 0) { P.vy *= tune.jump_cut; P.cut = false; } // let go early for a hop
+  const Wd = WORLDS[state.world - 1];
+  state.gun = !!Wd.gun;
+  if (state.gun && state.cool <= 0 && (key('KeyF') || key('KeyJ') || key('KeyX') || key('MouseL'))) { // the blaster fires the way you face
+    state.cool = tune.shot_cool; shots.push({ x: P.x + PW / 2 + P.face * 22, alt: P.alt + 20, vx: P.face * tune.shot_speed }); sfx.shot(); sparks(P.x + PW / 2 + P.face * 30, P.alt + 20, 3, '#ffe58a', 140);
+  }
+  if (racing) { // in a race: shove the climber beside you, or catch hold of their feet
+    const cx = P.x + PW / 2;
+    if (tap('KeyE') && pushCool <= 0) { // a shove goes to whoever hangs on your feet first, and else to the nearest climber beside you
+      pushCool = tune.push_cool; P.squash = -0.15; sfx.swing();
+      let o = rider, bd = 80; if (!o) for (const q of others.values()) { const dx = Math.abs(q.x - cx); if (!q.fin && Math.abs(q.alt - P.alt) < 52 && dx < bd) { o = q; bd = dx; } }
+      if (o) {
+        const d = o === rider ? P.face : Math.sign(o.x - cx) || P.face;
+        if (o.bot) { if (o.h) botDrop(o); o.kx = d * 320; o.fall = Math.max(o.base, (o.fall >= 0 ? o.fall : o.i) - 1 - Math.floor(o.r() * 2)); } else net.send({ t: 'hit', to: o.id, d });
+        sparks(o.x, o.alt + 20, 14, '#ffffff'); ring(o.x, o.alt + 20, '#ffffff', 56); state.shake = 0.1; sfx.bump(); events.push(['push', o.name]);
+      }
+    }
+    if (tap('KeyQ') && grabCool <= 0 && !load) { // feet within reach: beside you, or a little above
+      let o = null, bd = 1e9;
+      for (const q of others.values()) { const dx = Math.abs(q.x - cx), up = q.alt - P.alt; if (!q.fin && q.h !== me && dx < tune.grab_reach && up > -52 && up < tune.grab_up && dx + Math.abs(up) < bd) { o = q; bd = dx + Math.abs(up); } }
+      if (o) { P.hang = o.id; P.hangT = tune.grab_time; P.on = null; P.vx = 0; P.vy = 0; sfx.grab(); ring(o.x, o.alt, o.color, 50); toast(K.hangHint); events.push(['grab', o.name]); }
+      else { grabCool = 0.35; sfx.swing(); }
+    }
+  }
+  state.wind = 0;
+  if (Wd.wind && (state.world < 10 || state.level % PER === 0 || state.level % PER >= 3)) { // the wind turns every few seconds and carries you while you are in the air
+    state.wind = (state.t / tune.wind_period) % 2 < 1 ? 1 : -1;
+    if (!P.on) P.x += state.wind * tune.wind_speed * dt;
+  }
+  P.x += P.vx * dt;
+  if (P.x < 0) { P.x = 0; P.vx = Math.max(0, P.vx); } else if (P.x > W - PW) { P.x = W - PW; P.vx = Math.min(0, P.vx); }
+  const prev = P.alt;
+  if (P.on) {
+    const p = P.on;
+    if (!solid(p) || P.x + PW < p.x + tune.edge || P.x > p.x + p.w - tune.edge) { P.on = null; P.coy = tune.coyote; P.cut = false; }
+    else if (Math.abs(P.vx) > 120) { P.stepT -= dt; if (P.stepT <= 0) { P.stepT = 0.21; sfx.step(); parts.push({ x: P.x + PW / 2 - P.face * 10, alt: P.alt + 2, vx: -P.face * 40, vy: 50, g: 200, life: 0.3, max: 0.3, color: 'rgba(255,255,255,0.7)', s: 4 }); } } // footsteps, and the dust they kick up
+    if (load && Math.floor(state.t * 3) !== Math.floor((state.t - dt) * 3)) { parts.push({ x: P.x + PW / 2 + P.face * 16, alt: P.alt + 44, vx: P.face * 60, vy: 120, g: 600, life: 0.4, max: 0.4, color: '#8fd6ff', s: 4 }); } // sweat, under the weight
+  } else {
+    P.vy -= (P.vy > 0 ? tune.gravity : tune.gravity * tune.fall_mult) * (jumpHeld && Math.abs(P.vy) < tune.hang_speed ? tune.hang_mult : 1) * dt; // a held jump hangs a moment at its top
+    for (const p of plats) if (p.kind === 'f' && P.alt > p.alt && P.alt - p.alt < tune.fan_height && P.x + PW > p.x && P.x < p.x + p.w) { if (P.vy < tune.fan_speed) P.vy = Math.min(tune.fan_speed, P.vy + 5200 * dt); P.cut = false; break; } // a fan's column carries you up
+    if (P.vy < -tune.max_fall) P.vy = -tune.max_fall;
+    P.alt += P.vy * dt;
+    if (P.vy > 0) { // rising: a shut gate stops your head
+      for (const g of gates) if (!g.open && prev + PH <= g.alt && P.alt + PH > g.alt) { P.alt = g.alt - PH; P.vy = -140; P.cut = false; sfx.bonk(); hint(g.needBtn && !g.btn ? K.needBtn : K.needTgt); break; }
+    } else { // falling: the highest ledge your feet pass through catches you
+      let hitP = null;
+      for (const p of plats) if (solid(p) && prev >= p.alt - 0.01 && P.alt <= p.alt && P.x + PW > p.x + tune.edge && P.x < p.x + p.w - tune.edge && (!hitP || p.alt > hitP.alt)) hitP = p;
+      if (hitP) land(hitP);
+      else if (!P.whistled && P.last - P.alt > tune.fall_min * 40) { P.whistled = true; sfx.whistle(); }
+    }
+  }
+  const pcx = P.x + PW / 2, pcy = P.alt + PH / 2;
+  for (const b of bumpers) { // red bumpers knock you away and down
+    if (b.cool > 0 || b.off > 0 || Math.abs(b.alt - P.alt) > 200) continue;
+    const by = b.alt + Math.sin(state.t * 2 + b.phase) * 30;
+    if (Math.hypot(pcx - b.x, pcy - by) < 36) { b.cool = 0.5; knock(b.x, by); }
+  }
+  for (const o of orbs) if (!o.dead && Math.abs(pcx - o.x) < 26 && Math.abs(pcy - o.alt) < 28) { o.dead = true; knock(o.x, o.alt); } // so do a turret's orbs
+  for (const s of stars) if (!s.taken && Math.abs(s.alt - pcy) < 44 && Math.abs(s.x - pcx) < 36) { s.taken = true; state.stars++; sfx.star(); sparks(s.x, s.alt, 14, UI.gold, 240); ring(s.x, s.alt, UI.gold, 60); popText('+1', s.x, s.alt + 30, UI.gold); events.push(['star', s.level]); }
+  tail();
+}
+
+// ---- Drawing ----------------------------------------------------------------------------------
+const sy = alt => H * 0.6 - (alt - cam); // where an altitude lands on the screen
+const worldAt = alt => clamp(Math.floor(levelAt(alt) / PER), 0, WORLDS.length - 1);
+function mix(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), ch = s => Math.round(lerp((pa >> s) & 255, (pb >> s) & 255, t));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+function drawSky() {
+  const z = worldAt(cam), Z = WORLDS[z], N = WORLDS[Math.min(z + 1, WORLDS.length - 1)], t = clamp((cam - Z.base) / (Z.end - Z.base), 0, 1), k = Math.max(0, t * 5 - 4);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, mix(Z.sky[0], N.sky[0], k)); g.addColorStop(1, mix(Z.sky[1], N.sky[1], k));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const d of decor) { // clouds low down, stars high up, drifting slower than the tower
+    const y = H * 0.6 - (d.alt - cam) * 0.55; if (y < -80 || y > H + 80) continue;
+    const high = d.alt / SUMMIT;
+    if (high > 0.62) { ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.5 * d.k})`; const s = 2 + d.s * 2.2; ctx.beginPath(); ctx.moveTo(d.x, y - s); ctx.lineTo(d.x + s * 0.35, y - s * 0.35); ctx.lineTo(d.x + s, y); ctx.lineTo(d.x + s * 0.35, y + s * 0.35); ctx.lineTo(d.x, y + s); ctx.lineTo(d.x - s * 0.35, y + s * 0.35); ctx.lineTo(d.x - s, y); ctx.lineTo(d.x - s * 0.35, y - s * 0.35); ctx.fill(); }
+    else { ctx.fillStyle = `rgba(255,255,255,${0.42 - high * 0.2})`; const s = 34 * d.s; ctx.beginPath(); ctx.ellipse(d.x, y, s * 1.5, s * 0.5, 0, 0, 7); ctx.ellipse(d.x - s * 0.6, y - s * 0.3, s * 0.7, s * 0.5, 0, 0, 7); ctx.ellipse(d.x + s * 0.5, y - s * 0.36, s * 0.8, s * 0.56, 0, 0, 7); ctx.fill(); }
+  }
+  if (cam < 900) { // the garden's hills at the foot of the tower
+    const y = sy(0); ctx.fillStyle = '#5fbf5a'; ctx.beginPath(); ctx.ellipse(120, y, 260, 150, 0, PI, 0); ctx.ellipse(560, y, 300, 110, 0, PI, 0); ctx.fill();
+    ctx.fillStyle = '#4aa650'; ctx.fillRect(0, y, W, H - y + 40);
+  }
+}
+const OUT = '#2a1c14';
+function drawLedge(p, x, y, t) {
+  const w = p.w, h = 26;
+  if (p.kind === 'r') { // a gold rest floor, right across the tower
+    rr(-6, y, W + 12, 24, 8, '#ffd44f', '#a06a00', 4); ctx.fillStyle = '#fff3b0'; ctx.fillRect(0, y + 3, W, 5);
+    ctx.fillStyle = '#e0a520'; for (let i = 0; i < 18; i++) ctx.fillRect(i * 40 + 14, y + 13, 12, 6);
+    if (p.summit) { ctx.fillStyle = OUT; ctx.fillRect(W / 2 - 3, y - 120, 6, 120); ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.moveTo(W / 2 + 3, y - 118); ctx.lineTo(W / 2 + 70, y - 96 + Math.sin(t * 4) * 5); ctx.lineTo(W / 2 + 3, y - 72); ctx.fill(); }
+    return;
+  }
+  if (p.kind === 'c' && p.gone > 0) { ctx.setLineDash([8, 8]); rr(x, y, w, h, 8, null, 'rgba(120,90,40,0.45)', 3); ctx.setLineDash([]); return; }
+  if (p.kind === 'g') { // a timed ledge: a dashed outline until its plate is pressed, then solid, blinking as time runs out
+    const on = state.ghost > 0, blink = on && state.ghost < 2 && Math.floor(t * 8) % 2;
+    if (!on || blink) { ctx.setLineDash([10, 8]); rr(x, y, w, h, 8, 'rgba(60,220,255,0.10)', 'rgba(60,220,255,0.75)', 3); ctx.setLineDash([]); }
+    else { rr(x, y, w, h, 8, '#3fdcff', '#0d6a8a'); ctx.fillStyle = '#d6f8ff'; ctx.fillRect(x + 6, y + 4, w - 12, 5); }
+    return;
+  }
+  const jx = p.shake > 0 ? Math.sin(t * 70) * 3 : 0, sq = p.squash > 0 ? p.squash * 30 : 0;
+  x += jx; y += sq;
+  if (p.kind === 'p') { rr(x, y, w, h, 9, '#ffd44f', '#a06a00'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x + 8, y + 4, w - 16, 5); }
+  else if (p.kind === 'n') { rr(x, y, w, h, 9, '#b9814e', OUT); rr(x + 2, y + 2, w - 4, 9, 6, WORLDS[p.world || 0].cap); }
+  else if (p.kind === 'm') {
+    rr(x, y, w, h, 9, '#4f9cf0', '#16407e'); ctx.fillStyle = '#d6ebff'; ctx.fillRect(x + 6, y + 4, w - 12, 5);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { const cx = x + w / 2 + s * 16; ctx.beginPath(); ctx.moveTo(cx - s * 6, y + 12); ctx.lineTo(cx + s * 2, y + 17); ctx.lineTo(cx - s * 6, y + 22); ctx.stroke(); }
+  } else if (p.kind === 'c') {
+    rr(x, y, w, h, 7, '#e7c98a', '#7a5a22'); ctx.strokeStyle = '#7a5a22'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 1; i < w / 30; i++) { const cx = x + i * 30; ctx.beginPath(); ctx.moveTo(cx - 5, y + 3); ctx.lineTo(cx + 2, y + 12); ctx.lineTo(cx - 4, y + 23); ctx.stroke(); }
+  } else if (p.kind === 'i') {
+    rr(x, y, w, h - 4, 8, '#c9f1ff', '#3f8fb5'); ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 8, y + 4, w * 0.45, 4);
+    ctx.fillStyle = '#9fdcf5'; for (let i = 0; i < w / 26; i++) { const cx = x + 13 + i * 26; ctx.beginPath(); ctx.moveTo(cx - 6, y + h - 5); ctx.lineTo(cx + 6, y + h - 5); ctx.lineTo(cx, y + h + 9); ctx.fill(); }
+  } else if (p.kind === 'b') {
+    rr(x + 4, y + 12, w - 8, h - 10, 6, '#7a45c2', '#3d1f78'); ctx.strokeStyle = '#3d1f78'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); for (let i = 0; i <= 6; i++) ctx.lineTo(x + 10 + (w - 20) * i / 6, y + (i % 2 ? 9 : 14)); ctx.stroke();
+    rr(x, y - 2, w, 11, 6, '#ff7ad1', '#8a1f6a');
+  } else if (p.kind === 'v') {
+    rr(x, y, w, h, 12, '#565e6c', '#1c2028'); const d = Math.sign(p.a) || 1, off = ((t * Math.abs(p.a) * 0.5) % 24) * d;
+    ctx.save(); ctx.beginPath(); ctx.rect(x + 6, y + 2, w - 12, h - 4); ctx.clip(); ctx.strokeStyle = '#ffd44f'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (let cx = x - 24 + off; cx < x + w + 24; cx += 24) { ctx.beginPath(); ctx.moveTo(cx - d * 5, y + 6); ctx.lineTo(cx + d * 3, y + 13); ctx.lineTo(cx - d * 5, y + 20); ctx.stroke(); }
+    ctx.restore();
+  }
+  if (p.kind === 'f') { // a fan: a grey housing with turning blades, and a faint column of air above it
+    rr(x, y, w, h, 8, '#8a93a3', '#2a303a'); const cx = x + w / 2; ctx.save(); ctx.beginPath(); ctx.rect(x + 6, y + 3, w - 12, h - 6); ctx.clip(); ctx.fillStyle = '#e8f6ff';
+    for (let i = 0; i < 4; i++) { const a = t * 14 + i * PI / 2; ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * w * 0.22, y + h / 2, Math.abs(Math.cos(a)) * w * 0.2 + 3, 6, 0, 0, 7); ctx.fill(); } ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.32)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) { const lx = x + 10 + (w - 20) * i / 4, o = (t * 260 + i * 53) % 90; for (let yy = o; yy < tune.fan_height - 20; yy += 90) { ctx.beginPath(); ctx.moveTo(lx, y - yy); ctx.lineTo(lx, y - yy - 26); ctx.stroke(); } }
+  }
+  if (p.button) { // the gate's button: red until pressed, then green and flat
+    const on = p.button.btn; rr(x + w / 2 - 26, y - (on ? 6 : 16), 52, on ? 8 : 18, 8, on ? '#4fd66a' : '#ff3b4e', on ? '#1f7a34' : '#8a0f1e'); rr(x + w / 2 - 34, y - 3, 68, 8, 4, '#565e6c', '#1c2028', 3);
+  }
+  if (p.timer) { // the plate that starts the timed ledges: a clock face set in the ledge
+    const cx = x + w / 2; ctx.beginPath(); ctx.arc(cx, y - 2, 17, PI, 0); ctx.fillStyle = '#3fdcff'; ctx.fill(); ctx.strokeStyle = '#0d6a8a'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.strokeStyle = '#0d6a8a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, y - 3); ctx.lineTo(cx, y - 14); ctx.moveTo(cx, y - 3); ctx.lineTo(cx + 8, y - 8); ctx.stroke();
+  }
+}
+function drawGate(g, y, t) { // red beams across the tower while shut, a faint green trace once open
+  for (const s of [0, 1]) rr(s ? W - 22 : -6, y - 16, 28, 32, 6, '#565e6c', '#1c2028');
+  if (g.open) { ctx.setLineDash([6, 14]); ctx.strokeStyle = 'rgba(79,214,106,0.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(22, y); ctx.lineTo(W - 22, y); ctx.stroke(); ctx.setLineDash([]); return; }
+  ctx.strokeStyle = 'rgba(255,59,78,0.35)'; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(22, y); ctx.lineTo(W - 22, y); ctx.stroke();
+  ctx.strokeStyle = '#ff3b4e'; ctx.lineWidth = 5; ctx.beginPath(); for (let x = 22; x <= W - 22; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.2 + t * 14) * 3); ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(22, y - 1, W - 44, 2);
+}
+function drawTarget(x, y, hit) { // a bullseye on the wall
+  rr(x < W / 2 ? -4 : x + 10, y - 8, 30, 16, 4, '#565e6c', '#1c2028', 3);
+  for (const [r, c] of [[26, hit ? '#1f7a34' : '#8a0f1e'], [20, '#ffffff'], [13, hit ? '#4fd66a' : '#ff3b4e'], [6, '#ffffff']]) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); }
+}
+function drawTurret(x, y, dir, asleep, t) { // a wall gun with one red eye
+  rr(x - 22, y - 22, 44, 44, 8, asleep ? '#7a808c' : '#565e6c', '#1c2028'); rr(dir > 0 ? x + 14 : x - 40, y - 7, 26, 14, 4, '#3a404c', '#1c2028', 3);
+  ctx.beginPath(); ctx.arc(x, y - 2, 8, 0, 7); ctx.fillStyle = asleep ? '#3a404c' : (Math.floor(t * 4) % 2 ? '#ff3b4e' : '#ff8a96'); ctx.fill();
+  if (asleep) { ctx.strokeStyle = '#1c2028'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 8, y - 2); ctx.lineTo(x + 8, y - 2); ctx.stroke(); }
+}
+function drawOrb(x, y, t) { ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fillStyle = '#c77dff'; ctx.fill(); ctx.strokeStyle = '#4a1a8a'; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x - 4 + Math.sin(t * 9) * 2, y - 4, 4, 0, 7); ctx.fill(); }
+function drawStar(x, y, t, s = 1) {
+  ctx.save(); ctx.translate(x, y + Math.sin(t * 3 + x) * 4); ctx.scale(s, s); ctx.rotate(Math.sin(t * 2) * 0.2); ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -PI / 2 + i * PI / 5, r = i % 2 ? 9 : 20; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+  ctx.closePath(); ctx.fillStyle = '#ffd44f'; ctx.fill(); ctx.strokeStyle = '#a06a00'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+}
+function drawBumper(x, y, t, s = 1, off = false) { // a red spiked ball with a scowl; grey while a shot keeps it out
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha = off ? 0.35 : 1; ctx.rotate(t * 1.5);
+  ctx.fillStyle = off ? '#565e6c' : '#8a0f1e'; for (let i = 0; i < 8; i++) { const a = i * PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a - 0.22) * 20, Math.sin(a - 0.22) * 20); ctx.lineTo(Math.cos(a) * 34, Math.sin(a) * 34); ctx.lineTo(Math.cos(a + 0.22) * 20, Math.sin(a + 0.22) * 20); ctx.fill(); }
+  ctx.rotate(-t * 1.5); ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fillStyle = off ? '#9aa0a8' : '#ff3b4e'; ctx.fill(); ctx.strokeStyle = off ? '#565e6c' : '#8a0f1e'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(-8, -2, 5, 6, 0, 0, 7); ctx.ellipse(8, -2, 5, 6, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(-7, -1, 2.5, 0, 7); ctx.arc(7, -1, 2.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, -11); ctx.lineTo(-4, -7); ctx.moveTo(14, -11); ctx.lineTo(4, -7); ctx.stroke();
+  ctx.restore();
+}
+function drawClimber(cx, footY, face, squash, vx, vy, t, s = 1, gun = false, col = '#e8334a', hang = false) { // a small round climber with a scarf, a blaster where the world gives one, and arms up when it hangs from someone's feet
+  ctx.save(); ctx.translate(cx, footY);
+  if (hang) { ctx.translate(0, -HANG); ctx.rotate(Math.sin(t * 6 + cx * 0.05) * 0.14); ctx.translate(0, HANG); } // swinging from the feet above
+  ctx.scale(s * (1 + squash * 0.7), s * (1 - squash * 0.7));
+  if (hang) { // two arms up to the feet it holds
+    ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.lineCap = 'round'; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * 13, -30); ctx.lineTo(d * 7, -HANG + 4); ctx.stroke(); }
+    for (const d of [-1, 1]) { ctx.beginPath(); ctx.arc(d * 7, -HANG + 3, 5, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); }
+  }
+  const run = !hang && Math.abs(vx) > 30 && vy === 0 ? Math.sin(t * 22) * 5 : 0, sway = hang ? Math.sin(t * 6) * 3 : 0;
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(-8 + run + sway, -3, 8, 5, 0, 0, 7); ctx.ellipse(8 - run + sway, -3, 8, 5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -22, 18, 19, 0, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
+  const flap = clamp(-vx / 260, -1, 1) || -face * 0.5, lift = clamp(-vy / 900, -0.6, 0.9);
+  ctx.fillStyle = col; ctx.strokeStyle = '#3a1218'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(flap * 10, -15); ctx.quadraticCurveTo(flap * 26, -18 - lift * 18, flap * 40, -10 - lift * 26 + Math.sin(t * 12) * 3); ctx.lineTo(flap * 34, -4 - lift * 20); ctx.quadraticCurveTo(flap * 22, -8, flap * 10, -9); ctx.fill(); ctx.stroke();
+  rr(-18, -17, 36, 9, 4, col, '#3a1218', 3);
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(face * 5 - 5, -28, 3, 4.5, 0, 0, 7); ctx.ellipse(face * 5 + 6, -28, 3, 4.5, 0, 0, 7); ctx.fill();
+  if (gun) { rr(face > 0 ? 12 : -34, -24, 22, 9, 3, '#3a404c', '#1c2028', 3); rr(face > 0 ? 12 : -20, -18, 8, 11, 2, '#3a404c', '#1c2028', 3); ctx.fillStyle = '#ffd44f'; ctx.fillRect(face > 0 ? 30 : -34, -22, 4, 5); }
+  ctx.restore();
+}
+function nameTag(s, x, y, mark) { // a climber's name over its head; a small arrow marks you, or the one you watch
+  s = fitText(s, 150, 17); ctx.font = `bold 17px ${FONT}`; const tw = ctx.measureText(s).width + 18;
+  pill(x - tw / 2, y - 13, tw, 26, 'rgba(10,12,20,0.6)'); text(s, x, y + 1, 17, '#ffffff', 'center', true);
+  if (mark) { ctx.fillStyle = mark; ctx.beginPath(); ctx.moveTo(x - 9, y + 17); ctx.lineTo(x + 9, y + 17); ctx.lineTo(x, y + 28); ctx.fill(); }
+}
+function drawWorld() {
+  const t = state.t, vis = y => y > -70 && y < H + 70, live = scene === 'play' || scene === 'pause' || scene === 'board' || scene === 'watch';
+  ctx.save();
+  if (state.shake > 0) ctx.translate(Math.sin(t * 90) * state.shake * 14, Math.cos(t * 70) * state.shake * 14);
+  drawSky();
+  if (state.wind && scene !== 'title') { // streaks show which way the wind blows
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 14; i++) { const y = (i * 97 + 40) % H, x = ((i * 173 + t * 420 * state.wind) % (W + 200) + W + 200) % (W + 200) - 100; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - state.wind * (40 + (i % 3) * 20), y); ctx.stroke(); }
+  }
+  for (const g of gates) { const y = sy(g.alt); if (vis(y)) drawGate(g, y, t); }
+  for (const p of plats) { const y = sy(p.alt); if (vis(y)) drawLedge(p, p.x, y, t); }
+  for (const tg of targets) { const y = sy(tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp); if (vis(y)) drawTarget(tg.x, y, tg.hit); }
+  for (const tr of turrets) { const y = sy(tr.alt); if (vis(y)) drawTurret(tr.x, y, tr.dir, tr.sleep > 0, t); }
+  for (const s of stars) { const y = sy(s.alt); if (!s.taken && vis(y)) drawStar(s.x, y, t); }
+  for (const b of bumpers) { const y = sy(b.alt + Math.sin(t * 2 + b.phase) * 30); if (vis(y)) drawBumper(b.x, y, t, 1, b.off > 0); }
+  for (const o of orbs) drawOrb(o.x, sy(o.alt), t);
+  for (const s of shots) { // the blaster's shot, with a short tail of light
+    const y = sy(s.alt), d = Math.sign(s.vx), g = ctx.createLinearGradient(s.x - d * 80, 0, s.x, 0); g.addColorStop(0, 'rgba(255,229,138,0)'); g.addColorStop(1, 'rgba(255,229,138,0.75)');
+    ctx.fillStyle = g; ctx.fillRect(Math.min(s.x - d * 80, s.x), y - 3, 80, 6); rr(s.x - 12, y - 4, 24, 8, 4, '#ffe58a', '#b98a00', 2);
+  }
+  const mine = !(live && game.spec), racing = live && game.kind !== 'solo';
+  if (live) for (const o of others.values()) { // the other climbers, each with a name over its head
+    const y = sy(o.alt); if (!vis(y)) continue;
+    drawClimber(o.x, y, o.face || 1, 0, o.vx || 0, Math.abs(o.vy || 0) < 60 ? 0 : o.vy, t, 1, false, o.color, !!o.h);
+    nameTag(o.name + (o.bot ? ' (' + K.bot + ')' : ''), o.x, o.h ? y + 20 : y - 66, !o.h && scene === 'watch' && game.watch === o.id ? UI.gold : null);
+  }
+  if (mine) {
+    const px = P.x + PW / 2, py = sy(P.alt), col = game.kind === 'solo' ? '#e8334a' : game.color;
+    if (!P.on && !P.hang && P.vy < -700) { // a long fall: lines of air streaming up past you
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) { const lx = px + (i - 2) * 12, o = (t * 900 + i * 37) % 60, len = 30 + (-P.vy - 700) * 0.09; ctx.beginPath(); ctx.moveTo(lx, py - 52 - o); ctx.lineTo(lx, py - 52 - o - len); ctx.stroke(); }
+    }
+    if (!P.on && !P.hang && Math.abs(P.vy) > 820) for (let k = 3; k >= 1; k--) { ctx.globalAlpha = 0.2 - k * 0.04; dot(px - P.vx * 0.012 * k, py - 22 + P.vy * 0.012 * k, 17, col); } // thrown fast: an after-image behind you
+    ctx.globalAlpha = 1;
+    drawClimber(px, py, P.face, P.squash, P.vx, P.on ? 0 : P.vy, t, 1, state.gun && scene !== 'title', col, !!P.hang);
+    if (racing && !game.fin && scene !== 'board') { ctx.fillStyle = UI.gold; ctx.beginPath(); ctx.moveTo(px - 9, py - 62); ctx.lineTo(px + 9, py - 62); ctx.lineTo(px, py - 50); ctx.fill(); } // among many climbers, a gold arrow marks you
+  }
+  for (const q of parts) { // dust, rings, sparks, paper and small numbers
+    const a = clamp(q.life / q.max, 0, 1), y = sy(q.alt); ctx.globalAlpha = a;
+    if (q.k === 'ring') { const r = q.s * (1.12 - a); ctx.globalAlpha = a * 0.8; ctx.strokeStyle = q.color; ctx.lineWidth = 2 + 6 * a; ctx.beginPath(); ctx.ellipse(q.x, y, r, r * 0.42, 0, 0, 7); ctx.stroke(); }
+    else if (q.k === 'spark') { ctx.strokeStyle = q.color; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(q.x, y); ctx.lineTo(q.x - q.vx * 0.045, y + q.vy * 0.045); ctx.stroke(); }
+    else if (q.k === 'conf') { ctx.save(); ctx.translate(q.x, y); ctx.rotate(q.r); ctx.fillStyle = q.color; ctx.fillRect(-q.s / 2, -q.s * 0.3 * Math.cos(q.r * 1.7), q.s, q.s * 0.6 * Math.cos(q.r * 1.7)); ctx.restore(); }
+    else if (q.k === 'text') { ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(10,12,20,0.8)'; ctx.direction = 'ltr'; ctx.font = `bold ${q.s}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.strokeText(q.txt, q.x, y); ctx.fillStyle = q.color; ctx.fillText(q.txt, q.x, y); }
+    else { ctx.fillStyle = q.color; ctx.beginPath(); ctx.ellipse(q.x, y, q.s, q.s * 0.8, 0, 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  if (state.flash > 0) { ctx.fillStyle = `rgba(255,236,170,${clamp(state.flash, 0, 1) * 0.28})`; ctx.fillRect(0, 0, W, H); } // a short warm flash for a level, a finish
+}
+
+// ---- What is on the screen over the tower: as little as the climb needs ------------------------
+function menuBtn() { pill(14, 14, 52, 52); ctx.fillStyle = '#ffffff'; for (const yy of [31, 39, 47]) ctx.fillRect(29, yy, 22, 3); zone(0, 0, 84, 84, () => hit.add('Escape')); } // the menu button: Esc, or a tap
+function clockPill(sub) { pill(W / 2 - 116, 14, 232, 76); ltr(clockText(Math.floor(state.time * 100)), W / 2, 42, 32, '#ffffff'); text(sub, W / 2, 72, 17, UI.dim); }
+function heightBar(alt, color) { // the whole tower by world, with every level marked, where you are and your best
+  const bx = 6, by = 100, bh = H - by - 70, yOf = a => by + bh - clamp(a / SUMMIT, 0, 1) * bh, race = game.kind !== 'solo';
+  rr(bx - 3, by - 4, 16, bh + 8, 8, 'rgba(10,12,20,0.6)');
+  WORLDS.forEach(Z => { ctx.fillStyle = Z.sky[0]; ctx.fillRect(bx, yOf(Z.end), 10, yOf(Z.base) - yOf(Z.end)); });
+  ctx.fillStyle = 'rgba(255,212,79,0.9)'; for (let i = 1; i <= LEVELS; i++) ctx.fillRect(bx, yOf(rests[i].alt) - 1, i % PER ? 4 : 10, 2);
+  if (race) { ctx.fillStyle = '#ffffff'; ctx.fillRect(bx - 3, yOf(rests[game.goal].alt) - 2, 22, 4); for (const o of others.values()) { dot(bx + 5, yOf(o.alt), 5, o.color); ctx.strokeStyle = '#0c0e16'; ctx.lineWidth = 2; ctx.stroke(); } } // the finish line, and everyone on the bar
+  else { const bl = save.best[mode].level; if (bl) { const y = yOf(rests[bl].alt); ctx.fillStyle = UI.gold; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx + 13, y); ctx.lineTo(bx + 27, y - 8); ctx.lineTo(bx + 27, y + 8); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  if (alt !== null) { dot(bx + 5, yOf(alt), 8, color); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke(); }
+}
+function standings() { // the first three of the race, and you
+  const list = entries(), meI = list.findIndex(e => e.me), show = list.slice(0, 3); if (meI > 2) show.push(list[meI]); else if (list[3]) show.push(list[3]);
+  rr(W - 240, 14, 226, 14 + show.length * 30 + (list.length > show.length ? 22 : 0), 18, UI.bg);
+  show.forEach((e, k) => {
+    const y = 36 + k * 30; ltr(String(list.indexOf(e) + 1), W - 222, y, 17, e.me ? UI.gold : UI.dim); dot(W - 200, y, 7, e.color);
+    text(fitText(e.name, 104, 17), W - 186, y + 1, 17, e.me ? UI.gold : '#ffffff', 'left', true); ltr(e.fin ? clockText(e.fin.cs) : String(e.level), W - 26, y, 17, e.fin ? '#7be08a' : UI.dim, 'right');
+  });
+  if (list.length > show.length) ltr('+' + (list.length - show.length), W - 127, 36 + show.length * 30 + 2, 16, UI.dim);
+}
+function farArrows(ref) { // the nearest climbers out of sight, above and below, each with its distance
+  const up = [], dn = []; for (const o of others.values()) { if (o.fin) continue; const y = sy(o.alt); if (y < 96) up.push(o); else if (y > H - 60) dn.push(o); }
+  up.sort((a, b) => a.alt - b.alt); dn.sort((a, b) => b.alt - a.alt);
+  const chip = (o, k, d) => { const ax = clamp(o.x, 90, W - 310), ay = d > 0 ? 122 + k * 38 : H - (touchSeen ? 420 : 150) - k * 38;
+    pill(ax - 52, ay - 16, 104, 32, 'rgba(10,12,20,0.78)'); ctx.fillStyle = o.color; ctx.beginPath(); ctx.moveTo(ax - 34, ay - d * 8); ctx.lineTo(ax - 43, ay + d * 6); ctx.lineTo(ax - 25, ay + d * 6); ctx.fill();
+    text(`${Math.abs(metres(o.alt) - metres(ref))} ${K.metre}`, ax + 12, ay + 1, 17, '#ffffff', 'center', true); };
+  up.slice(0, 2).forEach((o, k) => chip(o, k, 1)); dn.slice(0, 2).forEach((o, k) => chip(o, k, -1));
+}
+function countdown() {
+  if (!(state.count > 0)) return;
+  const c = state.count - 0.4, n = Math.ceil(c), since = n - c, pop = 1 + Math.max(0, 0.22 - since) * 2.4;
+  ctx.fillStyle = 'rgba(10,12,20,0.62)'; ctx.fillRect(0, 440, W, 250);
+  ctx.save(); ctx.translate(W / 2, 545); ctx.scale(pop, pop); if (n > 0) ltr(String(n), 0, 0, 130, UI.gold); else text(K.go, 0, 0, 88, UI.gold, 'center', true); ctx.restore();
+  text(`${K.goal} ${game.goal}`, W / 2, 652, 24, '#ffffff', 'center', true);
+}
+function hud() {
+  const t = state.t, race = game.kind !== 'solo';
+  menuBtn(); clockPill(`${K.level} ${state.level} · ${state.height} ${K.metre}`);
+  if (race) standings();
+  else { // alone: the stars you hold and the falls you took, with no words
+    pill(W - 190, 14, 176, 52); drawStar(W - 162, 40, 0, 0.6); ltr(String(state.stars), W - 128, 41, 22, '#ffffff');
+    ctx.strokeStyle = '#ff8a96'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(W - 84, 30); ctx.lineTo(W - 84, 50); ctx.moveTo(W - 92, 43); ctx.lineTo(W - 84, 51); ctx.lineTo(W - 76, 43); ctx.stroke(); ltr(String(state.falls), W - 46, 41, 22, '#ffffff');
+  }
+  heightBar(P.alt, race ? game.color : '#e8334a');
+  if (P.hang) { ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(W / 2 - 100, 96, 200, 6); ctx.fillStyle = UI.gold; ctx.fillRect(W / 2 - 100, 96, 200 * clamp(P.hangT / tune.grab_time, 0, 1), 6); } // how long your grip still holds
+  let row = race ? 190 : 112;
+  if (race && scene === 'play' && !(state.count > 0) && game.msgT > 0) { toastLine(row + 22); row += 54; }
+  if (state.wind) { // which way the wind blows now
+    pill(W / 2 - 62, row, 124, 42); text(K.wind, W / 2 + 20, row + 22, 21, '#ffffff', 'center', true);
+    ctx.fillStyle = UI.gold; const ax = W / 2 - 28, d = state.wind; ctx.beginPath(); ctx.moveTo(ax + d * 13, row + 21); ctx.lineTo(ax - d * 8, row + 10); ctx.lineTo(ax - d * 8, row + 32); ctx.fill(); row += 52;
+  }
+  if (state.ghost > 0) { // how long the timed ledges will hold
+    pill(W / 2 - 130, row, 260, 42); ctx.fillStyle = '#3fdcff'; ctx.fillRect(W / 2 - 104, row + 33, 208 * state.ghost / tune.ghost_time, 4); text(`${K.hurry} ${Math.ceil(state.ghost)}`, W / 2, row + 18, 21, '#ffffff', 'center', true); row += 52;
+  }
+  if (state.hintT > 0) { pill(W / 2 - 280, row, 560, 44, 'rgba(120,16,28,0.88)'); text(state.hint, W / 2, row + 23, 21, '#ffffff', 'center', true); }
+  if (state.banner > 0) { // a level is done: its number, its height, and the next world when there is one
+    const a = clamp(Math.min(state.banner, tune.banner_time - state.banner) * 4, 0, 1), n = state.bannerN, nw = n % PER === 0 && WORLDS[n / PER];
+    ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fillRect(0, 300, W, nw ? (nw.hint ? 196 : 158) : 116);
+    text(`${K.level} ${n} / ${LEVELS}`, W / 2, 342, 44, '#ffffff', 'center', true); text(`${metres(rests[n].alt)} ${K.metre}`, W / 2, 388, 24, UI.gold, 'center', true);
+    if (nw) { text(`${K.next}: ${K.worlds[n / PER]}`, W / 2, 428, 24, '#ffffff'); if (nw.hint) text(K.hints[n / PER], W / 2, 466, 22, UI.gold, 'center', true); }
+    ctx.globalAlpha = 1;
+  }
+  if (state.holdR > 0) { pill(W / 2 - 200, 560, 400, 50); ctx.fillStyle = '#e8334a'; ctx.fillRect(W / 2 - 170, 600, 340 * clamp(state.holdR / 0.8, 0, 1), 4); text(K.holdR, W / 2, 582, 21, '#ffffff'); }
+  if (state.t < 5 && !race && !touchSeen) { pill(W / 2 - 290, H - 140, 580, 42); text(K.controls[0], W / 2, H - 118, 19, '#ffffff'); } // the keys, for the first seconds of a climb
+  if (race) {
+    farArrows(P.alt); countdown();
+    if (!touchSeen && !(state.count > 0)) for (const [k, x] of [['E', W / 2 - 34], ['Q', W / 2 + 34]]) { // shove and grab, and how soon each is ready again
+      const cool = k === 'E' ? pushCool / tune.push_cool : grabCool / tune.grab_cool, y = H - 52;
+      dot(x, y, 24, 'rgba(10,12,20,0.6)'); ltr(k, x, y + 1, 20, cool > 0 ? '#666e80' : '#ffffff');
+      if (cool > 0) { ctx.strokeStyle = UI.gold; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, 22, -PI / 2, -PI / 2 + (1 - clamp(cool, 0, 1)) * PI * 2); ctx.stroke(); }
+    }
+  }
+  if (touchSeen) for (const b of BTN) { // the phone's buttons: two arrows, a jump, and fire, shove and grab where they apply
+    if (!btnShown(b)) continue;
+    const act = b.code === 'KeyF' ? '#ffb020' : b.code === 'KeyE' ? '#3f8cff' : b.code === 'KeyQ' ? '#c77dff' : '#ffffff';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fillStyle = b.on ? 'rgba(255,255,255,0.4)' : 'rgba(10,12,20,0.38)'; ctx.fill(); ctx.strokeStyle = act; ctx.globalAlpha = 0.85; ctx.lineWidth = 4; ctx.stroke(); ctx.globalAlpha = 1;
+    const cool = b.code === 'KeyE' ? pushCool / tune.push_cool : b.code === 'KeyQ' ? grabCool / tune.grab_cool : 0; // a ring empties while a shove or a grab is not ready
+    if (cool > 0) { ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.arc(b.x, b.y, b.r - 4, -PI / 2, -PI / 2 + clamp(cool, 0, 1) * PI * 2); ctx.closePath(); ctx.fillStyle = 'rgba(10,12,20,0.6)'; ctx.fill(); }
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#ffffff'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+    if (b.code === 'Space') { ctx.moveTo(b.x, b.y - 38); ctx.lineTo(b.x + 36, b.y + 6); ctx.lineTo(b.x + 14, b.y + 6); ctx.lineTo(b.x + 14, b.y + 38); ctx.lineTo(b.x - 14, b.y + 38); ctx.lineTo(b.x - 14, b.y + 6); ctx.lineTo(b.x - 36, b.y + 6); ctx.fill(); }
+    else if (b.code === 'KeyF') { for (const [r, c] of [[30, '#ffffff'], [20, '#ff3b4e'], [9, '#ffffff']]) dot(b.x, b.y, r, c); }
+    else if (b.code === 'KeyE') { ctx.lineWidth = 8; for (const o of [-12, 10]) { ctx.beginPath(); ctx.moveTo(b.x + o - 9, b.y - 18); ctx.lineTo(b.x + o + 9, b.y); ctx.lineTo(b.x + o - 9, b.y + 18); ctx.stroke(); } }
+    else if (b.code === 'KeyQ') { ctx.lineWidth = 7; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(b.x + d * 12, b.y + 20); ctx.lineTo(b.x + d * 8, b.y - 8); ctx.stroke(); } ctx.beginPath(); ctx.ellipse(b.x - 9, b.y - 16, 9, 6, 0, 0, 7); ctx.ellipse(b.x + 9, b.y - 16, 9, 6, 0, 0, 7); ctx.fill(); } // two arms up to a pair of feet
+    else { const d = b.code === 'ArrowLeft' ? -1 : 1; ctx.moveTo(b.x + d * 32, b.y); ctx.lineTo(b.x - d * 18, b.y - 32); ctx.lineTo(b.x - d * 18, b.y + 32); ctx.fill(); }
+  }
+}
+function watchHud() { // watching a race: whose climb you see, the standings, and the arrows to change climber
+  const o = watched(), bots = game.kind === 'bots';
+  menuBtn(); clockPill(game.fin ? `${K.youPlace}  #${game.fin.place}  ·  ${clockText(game.fin.cs, true)}` : `${K.goal} ${game.goal}`);
+  standings(); heightBar(o ? o.alt : null, o ? o.color : '#ffffff'); if (o) farArrows(o.alt); countdown();
+  if (scene === 'watch' && game.msgT > 0 && !(state.count > 0)) toastLine(212);
+  const y = H - 170; pill(W / 2 - 230, y, 460, 92, 'rgba(10,12,20,0.8)');
+  eye(W / 2 - 4 - 60, y + 26, 11, UI.dim); text(K.watching, W / 2 + 14, y + 27, 17, UI.dim);
+  if (o) { dot(W / 2 - 120, y + 62, 9, o.color); text(fitText(o.name, 200, 26), W / 2, y + 63, 26, '#ffffff', 'center', true); }
+  chevron(W / 2 - 196, y + 46, -1, '#ffffff', 13); chevron(W / 2 + 196, y + 46, 1, '#ffffff', 13);
+  zone(W / 2 - 230, y - 10, 230, 112, () => watchNext(-1)); zone(W / 2, y - 10, 230, 112, () => watchNext(1));
+  if (bots) button(K.board, W / 2 - 110, H - 64, 220, 46, false, () => hit.add('Enter'), { size: 19 });
+  else if (!touchSeen) text(K.watchKeys, W / 2, H - 46, 17, '#ffffff');
+}
+
+// ---- Scenes ---------------------------------------------------------------------------------
+const scenes = {
+  figures: {
+    update(dt) { state.t += dt; },
+    draw() {
+      const t = state.t; cam = 0; drawSky(); ctx.fillStyle = 'rgba(12,14,22,0.4)'; ctx.fillRect(0, 0, W, H);
+      const cell = (i, f) => { const cx = 124 + (i % 3) * 236, cy = 110 + Math.floor(i / 3) * 250; rr(cx - 108, cy - 86, 216, 206, 18, 'rgba(255,255,255,0.2)'); f(cx, cy); rr(cx - 100, cy + 70, 200, 42, 10, 'rgba(12,14,22,0.85)'); text(K.figures[i], cx, cy + 92, 22, '#ffffff', 'center', true); };
+      const led = (k, extra = {}) => (x, y) => drawLedge(Object.assign({ kind: k, w: 150, world: 0, a: 120, shake: 0, squash: 0, gone: 0 }, extra), x - 75, y, t);
+      cell(0, (x, y) => drawClimber(x, y + 40, 1, 0, 0, 0, t, 2, true));
+      cell(1, led('n')); cell(2, led('m')); cell(3, led('c')); cell(4, led('i')); cell(5, led('b')); cell(6, led('v'));
+      cell(7, (x, y) => { const g = state.ghost; state.ghost = 9; led('g')(x, y); state.ghost = g; });
+      cell(8, led('n', { button: { btn: false } }));
+      cell(9, (x, y) => { ctx.save(); ctx.beginPath(); ctx.rect(x - 100, y - 40, 200, 80); ctx.clip(); ctx.translate(x - 100, 0); ctx.scale(200 / W, 1); drawGate({ open: false }, y, t); ctx.restore(); });
+      cell(10, (x, y) => drawTarget(x, y, false)); cell(11, (x, y) => drawTurret(x, y, 1, false, t));
+      cell(12, (x, y) => drawBumper(x, y, t, 1.3)); cell(13, (x, y) => drawStar(x, y, t, 1.8)); cell(14, led('f'));
+    },
+  },
+  title: { // the main menu: the language, your name, four buttons and the difficulty
+    update(dt) {
+      state.t += dt; stepWorld(dt); if (game.msgT > 0) game.msgT -= dt;
+      if (pressed('ArrowUp') || pressed('KeyW')) { menuSel = (menuSel + 4) % 5; sfx.type(); }
+      if (pressed('ArrowDown') || pressed('KeyS')) { menuSel = (menuSel + 1) % 5; sfx.type(); }
+      const m0 = mode, side = (pressed('ArrowRight') ? 1 : 0) - (pressed('ArrowLeft') ? 1 : 0); if (side) mode = clamp(mode + side * (K.dir === 'rtl' ? -1 : 1), 0, 2);
+      for (let i = 0; i < 3; i++) if (pressed('Digit' + (i + 1))) mode = i;
+      if (mode !== m0) { const t = state.t; sfx.type(); game.kind = 'solo'; reset(); state.t = t; }
+      if (pressed('KeyG')) { game.goal = GOALS[(GOALS.indexOf(game.goal) + 1) % GOALS.length]; sfx.type(); }
+      if (pressed('KeyL')) { setLang(lang === 'en' ? 'ckb' : 'en'); sfx.type(); }
+      if (pressed('KeyN')) { hit.clear(); menuGo(0); return; }
+      if (pressed('KeyC')) { hit.clear(); menuGo(5); return; }
+      if (pressed('KeyB') && save.run && save.run.mode === mode) { game.kind = 'solo'; others = new Map(); reset(save.run); hit.clear(); scene = 'play'; return; }
+      if (pressed('Enter') || pressed('Space')) { hit.clear(); sfx.pick(); menuGo(menuSel); }
+    },
+    draw() {
+      drawWorld(); dim(0.8);
+      seg([EN.langName, CKB.langName], lang === 'en' ? 0 : 1, W - 246, 26, 220, 46, i => { if ((i === 0) !== (lang === 'en')) hit.add('KeyL'); }); // the language: tap one, or press L
+      text(K.title, W / 2, 232, 70, '#ffffff', 'center', true); ctx.fillStyle = UI.gold; ctx.fillRect(W / 2 - 36, 288, 72, 5);
+      text(K.menu[4], W / 2, 340, 18, UI.dim); rr(110, 358, W - 220, 70, 22, UI.soft, menuSel === 0 ? '#ffffff' : null, 3); text(game.name, W / 2, 394, 32, '#ffffff', 'center', true); // your name, in its own box at the top
+      zone(110, 358, W - 220, 70, () => { menuSel = 0; hit.add('Enter'); });
+      K.simple.forEach((m, k) => { // four big buttons
+        const i = k + 1, y = 462 + k * 88; button(m, 110, y, W - 220, 72, i === menuSel, () => { menuSel = i; hit.add('Enter'); }, { off: k >= 2 && !net.can, size: 28 });
+        if (k === 1) { const on = i === menuSel; rr(W - 198, y + 16, 72, 40, 20, on ? 'rgba(12,14,22,0.12)' : 'rgba(10,12,20,0.4)'); ltr(String(game.goal), W - 152, y + 37, 20, on ? '#0c0e16' : '#ffffff'); // the level the bots race to: tap it, or press G
+          ctx.strokeStyle = ctx.fillStyle = on ? '#0c0e16' : UI.gold; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(W - 182, y + 26); ctx.lineTo(W - 182, y + 48); ctx.stroke(); ctx.beginPath(); ctx.moveTo(W - 181, y + 26); ctx.lineTo(W - 168, y + 31); ctx.lineTo(W - 181, y + 36); ctx.fill(); zone(W - 204, y + 6, 88, 60, () => hit.add('KeyG')); }
+      });
+      if (save.run && save.run.mode === mode) button(`${K.cont2} ${save.run.top + 1}`, 180, 822, W - 360, 52, false, () => hit.add('KeyB'), { size: 21, color: '#7be08a' });
+      const ord = K.dir === 'rtl' ? [2, 1, 0] : [0, 1, 2];
+      text(K.diff, W / 2, 906, 18, UI.dim); seg(ord.map(i => K.modes[i]), ord.indexOf(mode), 110, 924, W - 220, 58, v => hit.add('Digit' + (ord[v] + 1)), ord.map(i => ['#1f8a3a', '#b98a00', '#b3202e'][i]));
+      const b = save.best[mode]; if (b.level) text(`${K.best}: ${K.level} ${b.level}` + (b.cs ? `  ·  ${clockText(b.cs)}` : ''), W / 2, 1022, 18, UI.dim);
+      text(K.menu[5], W / 2, 1066, 19, '#ffffff'); zone(160, 1042, W - 320, 48, () => hit.add('KeyC'));
+      toastLine(1130);
+    },
+  },
+  name: { // type the name the others will see; then on to the room, when that was asked
+    update(dt) {
+      state.t += dt; if (pressed('Escape')) { pendingGo = -1; scene = 'title'; return; }
+      while (typed.length) { const k = typed.shift(); if (k === 'Backspace') state.entry = state.entry.slice(0, -1); else if (state.entry.length < 14) { state.entry += k; sfx.type(); } }
+      if (pressed('Enter') && state.entry.trim()) { setName(state.entry); hit.clear(); sfx.pick(); const g = pendingGo; pendingGo = -1; scene = 'title'; if (g >= 0) menuGo(g); }
+    },
+    draw() {
+      drawWorld(); dim(0.78); backBtn(); text(K.nameTitle, W / 2, 420, 46, '#ffffff', 'center', true);
+      rr(W / 2 - 250, 482, 500, 88, 24, UI.soft, '#ffffff', 3); text((state.entry || '') + (Math.floor(state.t * 2) % 2 ? '_' : ''), W / 2, 527, 40, '#ffffff', 'center', true); text(touchSeen ? K.tapType : K.nameAsk, W / 2, 612, 20, UI.dim);
+    },
+  },
+  join: { // type the room's code
+    update(dt) {
+      state.t += dt; if (game.msgT > 0) game.msgT -= dt; if (pressed('Escape')) { scene = 'title'; return; }
+      while (typed.length) { const k = typed.shift(); if (k === 'Backspace') state.entry = state.entry.slice(0, -1); else if (/^[a-zA-Z0-9]$/.test(k) && state.entry.length < 4) { state.entry += k.toUpperCase(); sfx.type(); } }
+      if (pressed('Enter') && state.entry.length === 4) { hit.clear(); sfx.pick(); net.open({ t: 'join', id: state.entry, name: game.name, cid: game.cid }); }
+    },
+    draw() {
+      drawWorld(); dim(0.78); backBtn(); text(K.menu[3], W / 2, 420, 46, '#ffffff', 'center', true);
+      rr(W / 2 - 180, 482, 360, 100, 24, UI.soft, '#ffffff', 3); ltr(state.entry + (Math.floor(state.t * 2) % 2 ? '_' : ' '), W / 2, 534, 60, '#ffffff'); text(touchSeen ? K.tapType : K.roomAsk, W / 2, 624, 20, UI.dim); toastLine(700);
+    },
+  },
+  lobby: { // the room: its code and link to share, every seat taken or empty, who watches, and the host's controls
+    update(dt) {
+      state.t += dt; stepWorld(dt); if (game.msgT > 0) game.msgT -= dt; const r = net.room;
+      if (!r) { scene = 'title'; return; }
+      if (pressed('Escape')) { net.leave(); others = new Map(); game.spec = false; scene = 'title'; return; }
+      if (pressed('KeyC')) copyLink();
+      const me = r.players.find(p => p.id === net.id);
+      if (!net.host) { lobbySel = net.id; if (pressed('KeyV') && me) net.send({ t: 'spec', on: !me.spec }); return; } // a guest may only choose to watch or to play
+      if (!r.players.some(p => p.id === lobbySel)) lobbySel = net.id;
+      if (pressed('ArrowLeft')) roomSet({ goal: goalStep(-1) }); if (pressed('ArrowRight')) roomSet({ goal: goalStep(1) });
+      if (pressed('ArrowUp')) roomSet({ size: r.size + 1 }); if (pressed('ArrowDown')) roomSet({ size: r.size - 1 });
+      for (let i = 0; i < 3; i++) if (pressed('Digit' + (i + 1))) roomSet({ mode: i });
+      if (pressed('Tab')) { lobbySel = r.players[(r.players.findIndex(p => p.id === lobbySel) + 1) % r.players.length].id; sfx.type(); } // the host picks a player, then moves them or removes them
+      const sel = r.players.find(p => p.id === lobbySel);
+      if (pressed('KeyV') && sel) { net.send({ t: 'spec', id: sel.id, on: !sel.spec }); sfx.pick(); }
+      if ((pressed('KeyK') || pressed('Delete')) && sel && sel.id !== net.id) { net.send({ t: 'kick', id: sel.id }); sfx.bonk(); }
+      if (pressed('Enter')) net.send({ t: 'go' });
+    },
+    draw() {
+      const r = net.room; drawWorld(); if (!r) return; dim(0.86); backBtn();
+      const host = net.host, racers = r.players.filter(p => !p.spec), specs = r.players.filter(p => p.spec), sel = r.players.find(p => p.id === lobbySel) || r.players.find(p => p.id === net.id);
+      text(K.room, W / 2, 46, 19, UI.dim); ltr(r.id, W / 2, 104, 76, '#ffffff');
+      const lines = wrap(roomLink(), W - 150, 21).slice(0, 3); lines.forEach((l, i) => ltr(l, W / 2, 168 + i * 27, 21, UI.gold)); // the link, broken over as many lines as it needs
+      const ly = 168 + lines.length * 27; text(K.copy, W / 2, ly, 15, UI.dim); zone(60, 150, W - 120, ly - 138, () => hit.add('KeyC'));
+      const sy0 = ly + 34; // the room's three settings: the host's to change
+      stepper(K.size, `${racers.length} / ${r.size}`, 50, sy0, 196, host, () => roomSet({ size: r.size - 1 }), () => roomSet({ size: r.size + 1 }));
+      stepper(K.finishAt, `${K.level} ${r.goal}`, 262, sy0, 196, host, () => roomSet({ goal: goalStep(-1) }), () => roomSet({ goal: goalStep(1) }));
+      stepper(K.diff, K.modes[r.mode], 474, sy0, 196, host, () => roomSet({ mode: (r.mode + 2) % 3 }), () => roomSet({ mode: (r.mode + 1) % 3 }), ['#7be08a', '#ffe58a', '#ff6a78'][r.mode]);
+      const top = sy0 + 88, cols = r.size > 8 ? 2 : 1, rows = Math.ceil(r.size / cols), rowH = clamp(Math.floor((930 - top) / rows), 36, 62), cw = (W - 100 - (cols - 1) * 12) / cols, fs = clamp(rowH * 0.42, 16, 24);
+      for (let i = 0; i < r.size; i++) { // every seat: taken, or empty
+        const p = racers[i], x = 50 + (i % cols) * (cw + 12), y = top + Math.floor(i / cols) * rowH, h = rowH - 7, cy = y + h / 2;
+        if (!p) { ctx.setLineDash([6, 7]); rr(x + 1, y + 1, cw - 2, h - 2, Math.min(16, h / 2), null, 'rgba(255,255,255,0.2)', 2); ctx.setLineDash([]); continue; }
+        rr(x, y, cw, h, Math.min(16, h / 2), UI.soft, host && sel && p.id === sel.id ? '#ffffff' : null, 3); dot(x + 24, cy, Math.min(10, h * 0.26), colorOf(p.c));
+        text(fitText(p.name, cw - 96, fs), x + 44, cy + 1, fs, p.id === net.id ? UI.gold : '#ffffff', 'left', true); if (p.id === r.host) drawStar(x + cw - 26, cy - Math.sin(x + cw - 26) * 4, 0, 0.55);
+        if (host) zone(x, y, cw, rowH, () => { lobbySel = p.id; sfx.type(); });
+      }
+      let wy = top + rows * rowH + 22, wx = 50; // those who only watch
+      eye(64, wy, 10, UI.dim); ltr(String(specs.length), 92, wy + 1, 18, UI.dim, 'left'); text(K.spectators, 116, wy + 1, 18, UI.dim, 'left'); wy += 26;
+      for (const p of specs.slice(0, 8)) {
+        const nm = fitText(p.name, 130, 17); ctx.font = `bold 17px ${FONT}`; const tw = ctx.measureText(nm).width + 28; if (wx + tw > W - 50) { wx = 50; wy += 40; }
+        rr(wx, wy, tw, 34, 17, UI.soft, host && sel && p.id === sel.id ? '#ffffff' : null, 3); text(nm, wx + tw / 2, wy + 18, 17, p.id === net.id ? UI.gold : '#ffffff', 'center', true); if (host) { const id = p.id; zone(wx, wy - 3, tw, 40, () => { lobbySel = id; sfx.type(); }); } wx += tw + 8;
+      }
+      if (specs.length > 8) ltr('+' + (specs.length - 8), Math.min(wx + 24, W - 60), wy + 18, 17, UI.dim);
+      const ay = 1052; // what can be done with the player picked: the host moves or removes anyone, a guest only chooses for themselves
+      if (sel && host && sel.id !== net.id) {
+        button(sel.spec ? K.toPlay : K.toWatch, 50, ay, 400, 56, false, () => hit.add('KeyV'), { size: 21 }); button(K.kick, 462, ay, 208, 56, false, () => hit.add('KeyK'), { size: 21, color: '#ff8a96', fill: 'rgba(255,90,110,0.14)' });
+      } else if (sel) button(sel.spec ? K.play : K.watch, 190, ay, W - 380, 56, false, () => hit.add('KeyV'), { size: 21 });
+      if (host) button(K.startRace, 110, 1126, W - 220, 78, true, () => hit.add('Enter'), { size: 30 }); else text(K.waitHost, W / 2, 1166, 26, '#ffffff', 'center', true);
+      if (game.msgT > 0) toastLine(1244); else if (!touchSeen) text(host ? K.hostKeys : K.guestKeys, W / 2, 1244, 16, UI.dim);
+    },
+  },
+  board: { // the race's results: everyone who is in, by time, then the rest by height
+    update(dt) {
+      state.t += dt; if (!game.over) state.time += dt; stepWorld(dt); stepOthers(dt); raceTick(dt);
+      if (pressed('Escape') || pressed('KeyP')) { pauseSel = 0; pauseFrom = 'board'; scene = 'pause'; return; }
+      if (pressed('Enter') && state.t - state.t0 > 0.6) { if (game.kind === 'bots') toMenu(); else if (net.host) net.send({ t: 'end' }); }
+    },
+    draw() {
+      drawWorld(); dim(0.76); menuBtn();
+      const list = entries(), n = Math.max(1, list.length), rowH = clamp(Math.floor(790 / n), 30, 76), fs = clamp(rowH * 0.42, 15, 27), left = list.filter(e => !e.fin).length;
+      text(K.board, W / 2, 104, 50, '#ffffff', 'center', true); text(left && !game.over ? `${left} ${K.raceLeft}` : `${K.goal} ${game.goal}`, W / 2, 156, 20, UI.dim);
+      list.forEach((e, i) => {
+        const y = 196 + i * rowH, h = rowH - 6, cy = y + h / 2 + 1; rr(70, y, W - 140, h, Math.min(18, h / 2), e.me ? 'rgba(255,212,79,0.16)' : 'rgba(255,255,255,0.06)');
+        ltr(String(i + 1), 106, cy, fs, e.fin ? UI.gold : UI.dim); dot(142, cy - 1, Math.min(9, h * 0.26), e.color); text(fitText(e.name, 300, fs), 164, cy, fs, '#ffffff', 'left', true);
+        if (e.fin) ltr(clockText(e.fin.cs, true), W - 96, cy, fs, '#7be08a', 'right'); else text(`${K.level} ${e.level}`, W - 96, cy, fs * 0.85, UI.dim, 'right');
+      });
+      if (game.kind === 'bots') button(K.pauseMenu[3], 190, 1060, W - 380, 70, true, () => hit.add('Enter')); else if (net.host) button(K.backRoom, 190, 1060, W - 380, 70, true, () => hit.add('Enter')); else text(K.hostEnds, W / 2, 1096, 22, UI.dim);
+    },
+  },
+  play: {
+    update(dt) {
+      if (pressed('KeyP') || pressed('Escape')) { if (song.el) song.el.pause(); pauseSel = 0; pauseFrom = 'play'; scene = 'pause'; return; }
+      state.t += dt;
+      state.holdR = down.has('KeyR') ? state.holdR + dt : 0; // held, so a slip of the finger never ends a climb
+      if (state.holdR >= 0.8 && game.kind === 'solo') { events.push(['restart']); save.run = null; store(); reset(); return; }
+      stepWorld(dt); stepPlayer(dt); stepOthers(dt); raceTick(dt); if (scene === 'play') { playWorld(state.world - 1); stepMusic(dt); }
+    },
+    draw() { drawWorld(); hud(); },
+  },
+  watch: { // watching the race: as a spectator, or once you have finished while the others still climb
+    update(dt) {
+      if (pressed('KeyP') || pressed('Escape')) { pauseSel = 0; pauseFrom = 'watch'; scene = 'pause'; return; }
+      state.t += dt; stepWorld(dt); watchStep(dt); stepOthers(dt); raceTick(dt);
+      if (pressed('ArrowLeft') || pressed('KeyA')) watchNext(-1); if (pressed('ArrowRight') || pressed('KeyD') || pressed('Space')) watchNext(1);
+      if (game.kind === 'bots' && (pressed('Enter') || !stillRacing())) { state.t0 = state.t; scene = 'board'; return; } // with bots the results are yours to call up; a room's come when everyone is in
+      playWorld(state.world - 1); stepMusic(dt);
+    },
+    draw() { drawWorld(); watchHud(); },
+  },
+  pause: { // the menu on Esc: go on, sound, the room's code and link, and the ways out
+    items() {
+      const list = [[K.pauseMenu[0], resume]], inRoom = game.kind === 'net';
+      if (game.kind === 'solo') list.push([K.pauseMenu[1], () => { save.run = null; store(); reset(); scene = 'play'; }]);
+      list.push([`${K.pauseMenu[2]}: ${muted ? K.off : K.on}`, () => setMuted(!muted)]);
+      if (inRoom && !game.fin && !game.over) list.push([game.spec ? K.joinRace : K.watch, () => { net.send({ t: 'spec', on: !game.spec }); resume(); }]);
+      if (inRoom && net.host) list.push([game.over ? K.backRoom : K.endRace, () => net.send({ t: 'end' })]);
+      list.push([inRoom ? K.leaveRoom : K.pauseMenu[3], toMenu]);
+      return list;
+    },
+    update(dt) {
+      if (game.kind === 'net') { // a room's race does not wait for you
+        state.t += dt; stepWorld(dt); if (pauseFrom === 'play') stepPlayer(dt, true); else if (pauseFrom === 'watch') watchStep(dt); stepOthers(dt); raceTick(dt);
+        if (scene !== 'pause') return; if (game.fin && pauseFrom === 'play') pauseFrom = 'watch';
+      }
+      const list = this.items(), n = list.length; pauseSel = clamp(pauseSel, 0, n - 1);
+      if (pressed('KeyC') && net.room) copyLink();
+      if (pressed('ArrowUp') || pressed('KeyW')) { pauseSel = (pauseSel + n - 1) % n; sfx.type(); }
+      if (pressed('ArrowDown') || pressed('KeyS')) { pauseSel = (pauseSel + 1) % n; sfx.type(); }
+      if (pressed('KeyP') || pressed('Escape')) { resume(); return; }
+      if (!pressed('Enter') && !pressed('Space')) return;
+      hit.clear(); sfx.pick(); list[pauseSel][1]();
+    },
+    draw() {
+      scenes[pauseFrom].draw(); zones = []; dim(0.78);
+      const r = net.room, list = this.items(); let y = r ? 150 : 330;
+      text(r ? K.menuT : K.paused, W / 2, y, 46, '#ffffff', 'center', true); y += 62;
+      if (r) { // the room's code and link, to send to whoever wants to come in or come back
+        text(K.room, W / 2, y, 19, UI.dim); ltr(r.id, W / 2, y + 52, 64, '#ffffff'); y += 106;
+        const lines = wrap(roomLink(), W - 150, 20).slice(0, 3); lines.forEach((l, i) => ltr(l, W / 2, y + i * 26, 20, UI.gold)); zone(60, y - 80, W - 120, 80 + lines.length * 26, () => hit.add('KeyC')); y += lines.length * 26;
+        const racers = r.players.filter(p => !p.spec).length; text(`${K.players}: ${racers} / ${r.size}     ${K.spectators}: ${r.players.length - racers}`, W / 2, y + 8, 18, UI.dim); y += 50;
+      }
+      list.forEach((m, i) => { button(m[0], 150, y + i * 76, W - 300, 62, i === pauseSel, () => { pauseSel = i; hit.add('Enter'); }, { size: 24 }); });
+      y += list.length * 76 + 40; if (!touchSeen) K.controls.forEach((c, i) => text(c, W / 2, y + i * 30, 17, UI.dim));
+      toastLine(H - 60);
+    },
+  },
+  results: {
+    update(dt) { state.t += dt; stepWorld(dt); if (state.t > 1 && pressed('Enter')) { reset(); scene = 'play'; } },
+    draw() {
+      drawWorld(); dim(0.76);
+      text(K.summit, W / 2, 286, 56, UI.gold, 'center', true); text(K.modes[mode], W / 2, 348, 24, ['#7be08a', '#ffe58a', '#ff6a78'][mode], 'center', true);
+      text(K.time, W / 2 + 200, 430, 20, UI.dim); text(clockText(state.cs || 0, true), W / 2 + 200, 480, 42, '#ffffff', 'center', true);
+      text(K.falls, W / 2 - 30, 430, 20, UI.dim); text(String(state.falls), W / 2 - 30, 480, 42, '#ffffff', 'center', true);
+      text(K.stars, W / 2 - 210, 430, 20, UI.dim); ltr(state.stars + ' / ' + LEVELS, W / 2 - 210, 480, 42, '#ffffff');
+      text(K.yourCode, W / 2, 590, 20, UI.dim); rr(W / 2 - 270, 618, 540, 90, 24, UI.soft, '#ffffff', 3); ltr(state.code, W / 2, 665, 46, '#ffffff');
+      text(K.sendCode, W / 2, 750, 21, UI.gold);
+      if (save.best[mode].cs) text(`${K.bestTime}: ${clockText(save.best[mode].cs, true)}`, W / 2, 812, 22, '#ffffff');
+      text(K.again, W / 2, 916, 26, '#ffffff', 'center', true);
+    },
+  },
+  code: { // the streamer types a viewer's code to see their time against their own
+    update(dt) {
+      state.t += dt;
+      if (pressed('Escape')) { scene = 'title'; return; }
+      while (typed.length) { const k = typed.shift(); if (k === 'Backspace') state.entry = state.entry.slice(0, -1); else if (/^[a-zA-Z0-9-]$/.test(k) && state.entry.length < 18) { state.entry += k.toUpperCase(); sfx.type(); } state.verdict = null; }
+      if (pressed('Enter') && state.entry) { const c = readCode(state.entry); state.verdict = c ? { ok: true, cs: c.cs, falls: c.falls, mode: c.mode } : { ok: false }; events.push(['code', !!c]); }
+    },
+    draw() {
+      drawWorld(); dim(0.78); backBtn();
+      text(K.codeTitle, W / 2, 290, 44, '#ffffff', 'center', true); text(K.codeAsk, W / 2, 350, 20, UI.dim);
+      rr(W / 2 - 270, 400, 540, 96, 24, UI.soft, '#ffffff', 3); ltr(state.entry + (Math.floor(state.t * 2) % 2 ? '_' : ' '), W / 2, 450, 46, '#ffffff');
+      const v = state.verdict;
+      if (v && !v.ok) text(K.codeBad, W / 2, 570, 36, '#ff6a78', 'center', true);
+      if (v && v.ok) {
+        const mine = save.best[v.mode].cs;
+        text(`${K.codeOk}: ${K.modes[v.mode]}`, W / 2, 560, 30, '#7be08a', 'center', true);
+        text(K.viewerTime, W / 2 + 150, 630, 20, UI.dim); text(clockText(v.cs, true), W / 2 + 150, 680, 42, '#ffffff', 'center', true);
+        text(K.yourTime, W / 2 - 150, 630, 20, UI.dim); text(mine ? clockText(mine, true) : '-', W / 2 - 150, 680, 42, '#ffffff', 'center', true);
+        text(`${K.falls}: ${v.falls}`, W / 2, 744, 22, UI.dim);
+        text(!mine ? K.noTime : v.cs < mine ? K.viewerWins : K.youWin, W / 2, 812, mine ? 38 : 24, UI.gold, 'center', true);
+      }
+    },
+  },
+};
+
+// ---- Loop: fixed step, frame time clamped ---------------------------------------------
+function step() {
+  while (taps.length) taps.shift()(); // what was tapped or clicked since the last step
+  if (pressed('KeyM') && scene !== 'code' && scene !== 'name' && scene !== 'join') { setMuted(!muted); hit.delete('KeyM'); }
+  scenes[scene].update(STEP); hit.clear();
+  fallWind(scene === 'play' && !P.on && !P.hang && P.vy < -520 ? clamp((-P.vy - 520) / 630, 0, 1) : 0);
+}
+let last, acc = 0, ALPHA = 1; // ALPHA: how far the frame is between the last two steps
+function tick() {
+  pollPad();
+  const now = clock.now();
+  acc += Math.min(now - last, 0.25); last = now; // a stall never fast-forwards the game
+  while (acc >= STEP) { step(); acc -= STEP; }
+  ALPHA = acc / STEP; // draw between steps, so the view never judders
+  drawFrame();
+}
+function drawFrame() { zones = []; scenes[scene].draw(); }
+function frame() { tick(); requestAnimationFrame(frame); }
+// A headless browser on a time budget runs timers but almost no animation frames: a timer
+// ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
+function timer() { if (document.visibilityState === 'visible' && clock.now() - last > 0.1) tick(); }
+
+// ---- What a check can read and drive (?manual=1 stops the loop; players never see it) ----
+window.game = {
+  get scene() { return scene; },
+  get state() { return state; },
+  press(code) { hit.add(code); },
+  hold(code, on) { on ? down.add(code) : down.delete(code); },
+  get events() { return events; }, // the loop steps; a check empties it
+  step(n = 1, draw = true, alpha = 1) {
+    for (let i = 0; i < n; i++) step();
+    if (draw) { ALPHA = alpha; drawFrame(); }
+  },
+};
+
+reset();
+scene = params.get('scene') || 'title';
+if (params.get('race') === 'bots') { startRace('bots', 5); state.count = Number(params.get('count') || 3.4); } // a check may start a race with the bots
+if (params.get('auto') === 'create') net.open({ t: 'create', name: game.name, mode, goal: 5, size: game.size, cid: game.cid }); else if (params.get('auto') === 'join') net.open({ t: 'join', id: params.get('room') || '', name: game.name, cid: game.cid }); // a check may make or join a room without a key press
+if (params.get('room') && !params.get('auto') && net.can) { pendingRoom = params.get('room').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4); if (pendingRoom.length === 4) menuGo(4); else pendingRoom = ''; } // opened from a room link: ask the name if need be, then join
+if (params.get('demo')) { // a check may show a room with made-up players: ?demo=1 a small one, ?demo=25 a full one with a long address
+  const n = clamp(Number(params.get('demo')) || 1, 1, MAXP), big = n > 1, players = [{ id: 1, name: game.name, spec: 0, c: 0 }];
+  for (let i = 1; i < (big ? n : 3); i++) players.push({ id: i + 1, name: K.bots[(i - 1) % 4] + (i > 4 ? ' ' + i : ''), spec: 0, c: i });
+  players.push({ id: 90, name: K.bots[2], spec: 1, c: 30 }, { id: 91, name: K.bots[3], spec: 1, c: 31 });
+  net.id = 1; net.host = true; lobbySel = 2; net.room = { id: 'K7QM', players, host: 1, mode, goal: 5, size: big ? MAXP : 8, lan: big ? 'long-climb-rooms-example-tunnel.trycloudflare.com' : '192.168.1.20:8080', racing: false };
+}
+if (params.get('paused') === '1') { pauseSel = 0; pauseFrom = 'play'; scene = 'pause'; } // a check may open the Esc menu
+if (params.get('watch') === '1') { startRace('bots', 5); state.count = 0; state.started = true; game.fin = { cs: 4210, place: 1 }; scene = 'watch'; } // and may watch a race it has already finished
+if (params.get('race') && params.get('scene')) scene = params.get('scene'); // a check may open a race on another of its screens
+last = clock.now();
+if (params.get('manual') === '1') drawFrame();
+else { requestAnimationFrame(frame); setInterval(timer, 50); }
+</script>
+</body>
+</html>

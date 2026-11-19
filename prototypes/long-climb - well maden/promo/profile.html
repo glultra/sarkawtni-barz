@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Long Climb's TikTok profile picture, drawn in the game's own style. Open it with ?text=en, ?text=ckb or
+     ?text=none (and &circle=1 to see it as TikTok crops it), then save the 1080 x 1080 canvas as a picture. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Long Climb Profile</title>
+<style>
+  :root { --bg: #111318; }
+  html, body { margin: 0; background: var(--bg); }
+  canvas { display: block; width: 1080px; height: 1080px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1080"></canvas>
+<script>
+const q = new URLSearchParams(location.search), TEXT = q.get('text') || 'en', CIRCLE = q.get('circle') === '1';
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), S = 1080, OUT = '#2a1c14';
+const FONT = '"Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif';
+function rr(x, y, w, h, r, fill, stroke, lw = 6) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+function glow(x, y, r, c0, c1) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+function ball(x, y, r, light, dark) { const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r); g.addColorStop(0, light); g.addColorStop(1, dark); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+// the sky: day at the foot, sunset, then space at the top
+const g = ctx.createLinearGradient(0, 0, 0, S);
+g.addColorStop(0, '#07051a'); g.addColorStop(0.3, '#2a1650'); g.addColorStop(0.55, '#e0607a'); g.addColorStop(0.72, '#ffb070'); g.addColorStop(1, '#9ad8ff');
+ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+for (let i = 0; i < 140; i++) { const x = rnd() * S, y = rnd() * S * 0.45, s = 1 + rnd() * 3; ctx.globalAlpha = 0.4 + rnd() * 0.6 * (1 - y / (S * 0.5)); ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, s, s); }
+ctx.globalAlpha = 1;
+// far off: Saturn up in space, the Moon, and the sun going down
+(function saturn(x, y, r) {
+  const ring = (a0, a1) => { ctx.save(); ctx.translate(x, y); ctx.rotate(-0.35); ctx.scale(1, 0.3); ctx.strokeStyle = 'rgba(226,206,160,0.9)'; ctx.lineWidth = r * 0.36; ctx.beginPath(); ctx.arc(0, 0, r * 1.75, a0, a1); ctx.stroke(); ctx.restore(); };
+  ring(Math.PI, 2 * Math.PI); ball(x, y, r, '#f6e6b8', '#b8925a'); ring(0, Math.PI);
+})(800, 230, 62);
+glow(250, 200, 90, 'rgba(230,235,255,0.35)', 'rgba(230,235,255,0)'); ball(250, 200, 46, '#f4f5f8', '#aab0bd');
+for (const [cx, cy, cr] of [[-0.3, -0.2, 0.18], [0.25, 0.12, 0.13], [-0.05, 0.38, 0.1]]) { ctx.fillStyle = 'rgba(110,116,132,0.35)'; ctx.beginPath(); ctx.arc(250 + cx * 46, 200 + cy * 46, cr * 46, 0, 7); ctx.fill(); }
+glow(860, 640, 260, 'rgba(255,220,140,0.55)', 'rgba(255,200,120,0)'); ball(860, 640, 70, '#fff3c0', '#ffb347');
+// clouds low down
+ctx.fillStyle = 'rgba(255,255,255,0.75)';
+for (const [x, y, s] of [[180, 880, 1.2], [880, 930, 1.4], [520, 990, 1]]) { ctx.beginPath(); ctx.ellipse(x, y, 90 * s, 30 * s, 0, 0, 7); ctx.ellipse(x - 50 * s, y - 20 * s, 45 * s, 32 * s, 0, 0, 7); ctx.ellipse(x + 40 * s, y - 24 * s, 52 * s, 36 * s, 0, 0, 7); ctx.fill(); }
+
+// the tower: ledges zigzagging up, a gold floor at the foot
+function ledge(x, y, w, cap) { rr(x, y, w, 34, 12, '#b9814e', OUT); rr(x + 4, y + 4, w - 8, 12, 8, cap); }
+ledge(160, 300, 190, '#ff8fb8'); ledge(700, 430, 200, '#9a8cff'); ledge(250, 560, 210, '#ffb347'); ledge(640, 720, 220, '#6fcf5a');
+rr(-10, 860, S + 20, 40, 12, '#ffd44f', '#a06a00', 6); ctx.fillStyle = '#fff3b0'; ctx.fillRect(0, 866, S, 8);
+ctx.fillStyle = '#e0a520'; for (let i = 0; i < 18; i++) ctx.fillRect(i * 64 + 20, 882, 20, 9);
+
+// the climber, big, in the middle of a jump: round, red scarf flying, arms up
+(function climber(cx, footY, s) {
+  ctx.save(); ctx.translate(cx, footY); ctx.scale(s, s); ctx.rotate(-0.08);
+  // a trail of dust under the jump
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(-10, -2, 8, 5, 0.4, 0, 7); ctx.ellipse(9, 2, 8, 5, -0.3, 0, 7); ctx.fill(); // feet, tucked
+  ctx.lineCap = 'round'; for (const [w, c] of [[9, OUT], [4.5, '#fff3da']]) { ctx.strokeStyle = c; ctx.lineWidth = w; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * 14, -30); ctx.quadraticCurveTo(d * 24, -36, d * 25, -46); ctx.stroke(); } } // arms up, skin with an outline
+  for (const d of [-1, 1]) { ctx.beginPath(); ctx.arc(d * 25, -48, 5, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); }
+  ctx.beginPath(); ctx.ellipse(0, -22, 18, 19, 0, 0, 7); ctx.fillStyle = '#fff3da'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
+  ctx.fillStyle = '#e8334a'; ctx.strokeStyle = '#3a1218'; ctx.lineWidth = 3; // the scarf, streaming down behind the leap
+  ctx.beginPath(); ctx.moveTo(-10, -15); ctx.quadraticCurveTo(-28, -8, -40, 10); ctx.lineTo(-32, 14); ctx.quadraticCurveTo(-22, -2, -10, -9); ctx.fill(); ctx.stroke();
+  rr(-18, -17, 36, 9, 4, '#e8334a', '#3a1218', 3);
+  ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(1, -29, 3, 4.5, 0, 0, 7); ctx.ellipse(12, -29, 3, 4.5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,120,120,0.45)'; ctx.beginPath(); ctx.ellipse(-6, -20, 4, 2.5, 0, 0, 7); ctx.ellipse(16, -20, 3.5, 2.2, 0, 0, 7); ctx.fill(); // a happy flush
+  ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(7, -21, 4, 0.2, Math.PI - 0.2); ctx.stroke(); // a grin
+  ctx.restore();
+})(540, 560, 8.2);
+// a gold star just above the climber's reach
+(function star(x, y, r) { ctx.save(); ctx.translate(x, y); ctx.rotate(0.2); ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr2 = i % 2 ? r * 0.45 : r; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); } ctx.closePath(); ctx.fillStyle = '#ffd44f'; ctx.fill(); ctx.strokeStyle = '#a06a00'; ctx.lineWidth = 7; ctx.stroke(); ctx.restore(); glow(x, y, r * 1.8, 'rgba(255,230,120,0.35)', 'rgba(255,230,120,0)'); })(700, 170, 46);
+
+// the name, inside the circle TikTok shows
+if (TEXT !== 'none') {
+  const s = TEXT === 'ckb' ? 'سەرکەوتنی درێژ' : 'LONG CLIMB', size = TEXT === 'ckb' ? 106 : 132;
+  ctx.font = `900 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = TEXT === 'ckb' ? 'rtl' : 'ltr';
+  ctx.lineJoin = 'round'; ctx.lineWidth = 26; ctx.strokeStyle = '#1a0f2e'; ctx.strokeText(s, 540, 760);
+  ctx.fillStyle = '#ffd44f'; ctx.fillText(s, 540, 760);
+  ctx.globalAlpha = 0.35; ctx.fillStyle = '#ffffff'; ctx.fillText(s, 540, 754); ctx.globalAlpha = 1; ctx.fillStyle = '#ffd44f'; ctx.fillText(s, 540, 760);
+}
+if (CIRCLE) { ctx.globalCompositeOperation = 'destination-in'; ctx.beginPath(); ctx.arc(540, 540, 540, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+</script>
+</body>
+</html>

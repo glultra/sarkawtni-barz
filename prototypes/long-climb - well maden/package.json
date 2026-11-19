@@ -1,0 +1,8 @@
+{
+  "name": "long-climb",
+  "private": true,
+  "description": "PROTOTYPE - NOT FOR PRODUCTION. Long Climb's room server needs only Node; this one package lets it hear TikTok LIVE gifts (start-live.bat installs it).",
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0"
+  }
+}

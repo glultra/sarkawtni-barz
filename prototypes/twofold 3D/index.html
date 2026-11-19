@@ -1,0 +1,718 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: Is crossing between two overlaid worlds to solve a room satisfying for ten minutes? -->
+<!-- Date: 2026-11-15 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twofold</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { font-variant-numeric: tabular-nums; }
+  #stage { position: relative; margin: 0 auto; }
+  canvas { display: block; position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="gl"></canvas><canvas id="game"></canvas></div>
+<script src="vendor/three.js"></script>
+<script src="config.js"></script>
+<script>
+'use strict';
+
+// ---- Built to be checked ----------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
+const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
+const W = 1280, H = 720;        // logical size of the HUD canvas; the 3D canvas sits under it
+const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
+const TITLE = 'Twofold';
+const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
+const CHEAP = params.get('render') === 'cheap'; // a headless shot or check: 3D draws cheap; players never see it
+let seed;
+function rng() { // mulberry32; every gameplay random call reads this, never Math.random
+  seed = (seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), seed | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const events = []; // window.game.events: anything the game wants a run to see
+
+// ---- Screen: a WebGL canvas for the world, a 2D canvas over it for the HUD ------------------
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: !CHEAP, stencil: true });
+renderer.autoClear = false;
+renderer.shadowMap.enabled = false; // figures carry their own soft blob shadows
+function fit() { // fills the window at any size and pixel ratio
+  const s = Math.min(innerWidth / W, innerHeight / H), r = s * (devicePixelRatio || 1);
+  const cw = Math.round(W * s), ch = Math.round(H * s);
+  stage.style.width = cw + 'px'; stage.style.height = ch + 'px';
+  stage.style.marginTop = Math.max(0, Math.floor((innerHeight - ch) / 2)) + 'px';
+  canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
+  canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+  ctx.setTransform(r, 0, 0, r, 0, 0);
+  renderer.setPixelRatio(CHEAP ? 0.5 : (devicePixelRatio || 1)); renderer.setSize(cw, ch, true);
+}
+function text(s, x, y, size, c, align = 'center', weight = '') {
+  ctx.fillStyle = c; ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align;
+  ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function rr(x, y, w, h, r) { // rounded rectangle path
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+// ---- Input: keys by position (event.code), OS key repeat ignored ------------------------
+const down = new Set(), hit = new Set();
+const pressed = code => hit.has(code); // true for one step after the key goes down
+addEventListener('keydown', e => {
+  startAudio();
+  if (!e.repeat) { down.add(e.code); hit.add(e.code); }
+  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e => down.delete(e.code));
+addEventListener('pointerdown', () => { startAudio(); if (scene === 'play' && stage.requestPointerLock) stage.requestPointerLock(); });
+addEventListener('mousemove', e => { // look around with the mouse, once the game is clicked
+  if (document.pointerLockElement !== stage || scene !== 'play') return;
+  state.yaw -= e.movementX * tune.look_sens;
+  state.pitch = Math.max(0.05, Math.min(1.3, state.pitch + e.movementY * tune.look_sens));
+});
+addEventListener('blur', () => down.clear());
+
+// ---- Audio: started on first input, mute on M --------------------------------------------
+let audio = null, muted = false;
+function startAudio() {
+  if (!audio) {
+    const ac = window.GAME_AUDIO || new (window.AudioContext || window.webkitAudioContext)(); // a check may inject one
+    const out = ac.createGain(); out.gain.value = muted ? 0 : tune.volume;
+    out.connect(ac.destination); audio = { ac, out };
+  }
+  if (audio.ac.state === 'suspended') audio.ac.resume();
+}
+function setMuted(m) { muted = m; if (audio) audio.out.gain.value = m ? 0 : tune.volume; }
+addEventListener('tune', () => setMuted(muted));
+function tone(freq, dur, type = 'square', vol = 0.3) {
+  if (!audio || muted) return;
+  const t = audio.ac.currentTime, o = audio.ac.createOscillator(), g = audio.ac.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audio.out); o.start(t); o.stop(t + dur);
+}
+// Sounds are short note lists, played on the step clock: [delay s, Hz, length s, wave, volume]
+const SFX = {
+  cross: [[0, 330, 0.18, 'sine', 0.3], [0.07, 495, 0.22, 'sine', 0.25], [0.14, 660, 0.3, 'sine', 0.2]],
+  bonk: [[0, 110, 0.12, 'square', 0.15]],
+  pick: [[0, 520, 0.08, 'triangle', 0.25], [0.05, 700, 0.08, 'triangle', 0.2]],
+  put: [[0, 300, 0.08, 'triangle', 0.25], [0.05, 200, 0.1, 'triangle', 0.25]],
+  splash: [[0, 240, 0.1, 'sine', 0.25], [0.06, 160, 0.16, 'sine', 0.25], [0.14, 420, 0.12, 'triangle', 0.15]],
+  press: [[0, 180, 0.07, 'square', 0.15], [0.06, 880, 0.2, 'sine', 0.2]],
+  release: [[0, 440, 0.12, 'sine', 0.12]],
+  lit: [[0, 523, 0.25, 'sine', 0.3], [0.1, 659, 0.25, 'sine', 0.3], [0.2, 784, 0.25, 'sine', 0.3], [0.3, 1047, 0.5, 'sine', 0.3]],
+  done: [[0, 784, 0.2, 'triangle', 0.25], [0.12, 1047, 0.4, 'triangle', 0.25]],
+  undo: [[0, 400, 0.08, 'sine', 0.2], [0.05, 300, 0.1, 'sine', 0.2]],
+};
+function sfx(name) { for (const n of SFX[name]) state.sq.push({ at: state.t + n[0], n }); }
+
+// ---- The rooms -------------------------------------------------------------------------------
+// Each room is drawn twice, once per life, on the same grid. # wall  . floor  ~ water (red life: lava)
+// S start  X exit  O portal (stands in both lives)  c crate  r crate born red
+// y u g switch  Y U G its door.  Rows run north to south; the camera looks from the south.
+const LEVELS = [
+  { name: 'A wall here, none there',
+    a: ['###########', '#....#....#', '#....#....#', '#.O..#..O.#', '#....#....#', '#.S..#..X.#', '###########'],
+    b: ['###########', '#.........#', '#.........#', '#.O.....O.#', '#....#....#', '#....#....#', '###########'] },
+  { name: 'Something to carry',
+    a: ['###########', '#.....#...#', '#.O...Y.X.#', '#.....#...#', '#.S.y.#...#', '#.....#...#', '###########'],
+    b: ['###########', '#.....#...#', '#.O.c.#...#', '#.....#...#', '#.....#...#', '#.....#...#', '###########'] },
+  { name: 'The long way round',
+    a: ['#############', '#X..Y.......#', '####........#', '#.y.....O...#', '#~~~~~~~~~~~#', '#...........#', '#.O.........#', '#.S.........#', '#############'],
+    b: ['#############', '#...#.......#', '#####.......#', '#.......O...#', '#########.###', '#...........#', '#.O..c......#', '#...........#', '#############'] },
+  { name: 'A bridge of your own',
+    a: ['#############', '#.....~...#X#', '#.O...~...#U#', '#.....~.....#', '#.S.c.~.....#', '#.....~.u...#', '#.....~..O..#', '#.....~.....#', '#############'],
+    b: ['#############', '#...~.....#.#', '#.O.~.....#.#', '#...~.......#', '#...~...c...#', '#...~.......#', '#...~....O..#', '#...~.......#', '#############'] },
+  { name: 'Both lives at once',
+    a: ['#############', '#.....#...#X#', '#.y...#...#G#', '#.....#.....#', '#.S...#..c..#', '#.....#.....#', '#..O..#..O..#', '#.....#.....#', '#############'],
+    b: ['#############', '#.....#...#.#', '#..c..#...#.#', '#.....#.....#', '#.....Y.g...#', '#.....#.....#', '#..O..#..O..#', '#.....#.....#', '#############'] },
+];
+const FIGURES = { name: 'Figures', // every figure side by side, for the outline check
+  a: ['###########', '#.S.c.r...#', '#.........#', '#.........#', '#.y.Y.O.X.#', '#.........#', '###########'],
+  b: ['###########', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '###########'] };
+
+function parseLevel(def) {
+  const L = { def, w: def.a[0].length, d: def.a.length, grid: [[], []], portals: [], crates: [], switches: [], doors: [], exit: null, start: null };
+  [def.a, def.b].forEach((rows, life) => rows.forEach((row, z) => {
+    if (row.length !== L.w) console.error('room row width', def.name, life, z);
+    L.grid[life][z] = [];
+    [...row].forEach((ch, x) => {
+      let cell = '.';
+      if (ch === '#' || ch === '~') cell = ch;
+      else if (ch === 'S') L.start = { x, z, life };
+      else if (ch === 'X') L.exit = { x, z, life };
+      else if (ch === 'O') { if (!L.portals.some(p => p.x === x && p.z === z)) L.portals.push({ x, z, zc: z + 0.5 }); }
+      else if (ch === 'c' || ch === 'r') L.crates.push({ x, z, life, origin: ch === 'r' ? 1 : life });
+      else if ('yug'.includes(ch)) L.switches.push({ x, z, life, c: ch });
+      else if ('YUG'.includes(ch)) L.doors.push({ x, z, life, c: ch.toLowerCase() });
+      L.grid[life][z][x] = cell;
+    });
+  }));
+  return L;
+}
+
+// ---- Scenes ---------------------------------------------------------------------------------
+let scene, state;
+function reset() {
+  seed = Number(params.get('seed')) || CONFIG.seed;
+  state = { t: 0, score: 0, gained: '', crossings: 0, undos: 0, sq: [] };
+  loadLevel(Math.max(0, Math.min(LEVELS.length - 1, (Number(params.get('level')) || 1) - 1)));
+}
+function loadLevel(i, def) {
+  const L = parseLevel(def || LEVELS[i]);
+  state.li = i; state.L = L; state.score = i;
+  state.p = { x: L.start.x + 0.5, z: L.start.z + 0.5, life: L.start.life, fx: 0, fz: -1, ang: Math.PI, carry: -1, walk: 0, moving: false };
+  state.crates = L.crates.map(c => ({ x: c.x, z: c.z, life: c.life, origin: c.origin, carried: false, sunk: false }));
+  state.switches = L.switches.map(s => ({ x: s.x, z: s.z, life: s.life, c: s.c, on: false }));
+  state.doors = L.doors.map(d => ({ x: d.x, z: d.z, life: d.life, c: d.c, o: 0 }));
+  state.bridges = [];
+  state.undo = []; state.first = snap(); state.flash = 0; state.doneT = 0; state.idle = 0;
+  state.lit = false; state.bonkT = 0;
+  state.cam = null; state.yaw = 0; state.pitch = tune.cam_pitch; // the camera starts behind the walker, looking north
+  updateSwitches(true); buildView(); updateCam(true);
+}
+function snap() {
+  const p = state.p;
+  return { p: { x: p.x, z: p.z, life: p.life, fx: p.fx, fz: p.fz, ang: p.ang, carry: p.carry },
+    c: state.crates.map(c => ({ x: c.x, z: c.z, life: c.life, carried: c.carried, sunk: c.sunk })), b: state.bridges.slice() };
+}
+function pushUndo(s) {
+  state.undo.push(s || snap()); state.idle = 0;
+  while (state.undo.length > tune.undo_cap) state.undo.shift();
+}
+function restore(s) {
+  Object.assign(state.p, s.p);
+  state.crates.forEach((c, i) => Object.assign(c, s.c[i]));
+  state.bridges = s.b.slice(); state.flash = 0; state.idle = 0;
+  view.camLife = state.p.life; view.camPrev = null;
+  updateSwitches(true);
+}
+
+// What stops the walker in one life: its walls, its water, its closed doors, its crates.
+const R = 0.28; // the walker's half width, in tiles
+const WALL_H = 1.5; // taller than the walker: the rooms are places you stand in
+function bridged(life, x, z) { return state.bridges.includes(life + ':' + x + ',' + z); }
+function solidCell(life, x, z, doorAt = 0.9) {
+  const L = state.L;
+  if (x < 0 || z < 0 || x >= L.w || z >= L.d) return true;
+  const ch = L.grid[life][z][x];
+  if (ch === '#' || (ch === '~' && !bridged(life, x, z))) return true;
+  for (const d of state.doors) if (d.life === life && d.x === x && d.z === z && d.o < doorAt) return true;
+  for (const c of state.crates) if (c.life === life && !c.carried && !c.sunk && c.x === x && c.z === z) return true;
+  return false;
+}
+function blocked(life, x, z) {
+  return solidCell(life, Math.floor(x - R), Math.floor(z - R)) || solidCell(life, Math.floor(x + R), Math.floor(z - R)) ||
+    solidCell(life, Math.floor(x - R), Math.floor(z + R)) || solidCell(life, Math.floor(x + R), Math.floor(z + R));
+}
+
+function updateSwitches(instant) {
+  const p = state.p, px = Math.floor(p.x), pz = Math.floor(p.z);
+  for (const s of state.switches) {
+    let on = p.life === s.life && px === s.x && pz === s.z;
+    for (const c of state.crates) if (c.life === s.life && !c.carried && !c.sunk && c.x === s.x && c.z === s.z) on = true;
+    if (on !== s.on && !instant) sfx(on ? 'press' : 'release');
+    s.on = on;
+  }
+  for (const d of state.doors) {
+    let want = state.switches.some(s => s.c === d.c && s.on) ? 1 : 0;
+    if (!want && d.o > 0 && p.life === d.life && // never closes on the walker
+      p.x + R > d.x && p.x - R < d.x + 1 && p.z + R > d.z && p.z - R < d.z + 1) want = d.o;
+    if (instant) d.o = want;
+    else if (d.o < want) d.o = Math.min(want, d.o + tune.door_open_speed * STEP);
+    else if (d.o > want) d.o = Math.max(want, d.o - tune.door_close_speed * STEP);
+  }
+}
+
+// The exit lights when the walker could walk to it in this life.
+function exitReachable() {
+  const p = state.p, e = state.L.exit, L = state.L;
+  if (p.life !== e.life) return false;
+  const sx = Math.floor(p.x), sz = Math.floor(p.z), seen = new Set([sx + sz * L.w]), q = [[sx, sz]];
+  while (q.length) {
+    const [x, z] = q.pop();
+    if (x === e.x && z === e.z) return true;
+    for (const [ax, az] of [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]])
+      if (!seen.has(ax + az * L.w) && !solidCell(e.life, ax, az, 0.5)) { seen.add(ax + az * L.w); q.push([ax, az]); }
+  }
+  return false;
+}
+
+function reachable() { // the crate the walker could pick up now, or -1: the one faced first, then one beside
+  const p = state.p, px = Math.floor(p.x), pz = Math.floor(p.z);
+  if (p.carry >= 0) return -1;
+  for (const [dx, dz] of [[p.fx, p.fz], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const i = state.crates.findIndex(c => c.life === p.life && !c.carried && !c.sunk && c.x === px + dx && c.z === pz + dz);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+function tryCarry() {
+  const p = state.p, L = state.L, px = Math.floor(p.x), pz = Math.floor(p.z);
+  if (p.carry < 0) {
+    const i = reachable();
+    if (i >= 0) { pushUndo(); state.crates[i].carried = true; p.carry = i; sfx('pick'); }
+    return;
+  }
+  const c = state.crates[p.carry], tx = px + p.fx, tz = pz + p.fz; // put down in the tile ahead
+  let ok = tx >= 0 && tz >= 0 && tx < L.w && tz < L.d && L.grid[p.life][tz][tx] !== '#';
+  if (ok && state.crates.some(o => o !== c && o.life === p.life && !o.sunk && !o.carried && o.x === tx && o.z === tz)) ok = false;
+  if (ok && state.doors.some(d => d.life === p.life && d.x === tx && d.z === tz)) ok = false;   // never in a doorway
+  if (ok && L.portals.some(o => o.x === tx && o.z === tz)) ok = false;                          // never under an arch
+  if (ok && L.exit.life === p.life && L.exit.x === tx && L.exit.z === tz) ok = false;
+  let nx = p.x, nz = p.z; // step back so the crate has room
+  if (p.fx > 0) nx = Math.min(nx, tx - R - 0.001); if (p.fx < 0) nx = Math.max(nx, tx + 1 + R + 0.001);
+  if (p.fz > 0) nz = Math.min(nz, tz - R - 0.001); if (p.fz < 0) nz = Math.max(nz, tz + 1 + R + 0.001);
+  if (ok && blocked(p.life, nx, nz)) ok = false;
+  if (!ok) { sfx('bonk'); return; }
+  pushUndo(); p.x = nx; p.z = nz;
+  c.carried = false; c.x = tx; c.z = tz; c.life = p.life; p.carry = -1;
+  if (L.grid[p.life][tz][tx] === '~' && !bridged(p.life, tx, tz)) { // into the water: it becomes a bridge
+    c.sunk = true; state.bridges.push(p.life + ':' + tx + ',' + tz); sfx('splash'); events.push({ type: 'bridge', t: state.t });
+  } else sfx('put');
+}
+
+function updateCam(snapTo) {
+  const p = state.p, L = state.L, k = tune.cam_follow;
+  const tx = L.w / 2 + (p.x - L.w / 2) * k, tz = L.d / 2 + (p.z - L.d / 2) * k;
+  if (snapTo || !state.cam) state.cam = { x: tx, z: tz };
+  else { state.cam.x += (tx - state.cam.x) * 0.08; state.cam.z += (tz - state.cam.z) * 0.08; }
+}
+
+function updatePlay(dt) {
+  const p = state.p, L = state.L;
+  state.t += dt;
+  for (let i = state.sq.length - 1; i >= 0; i--)
+    if (state.sq[i].at <= state.t) { const n = state.sq[i].n; tone(n[1], n[2], n[3], n[4]); state.sq.splice(i, 1); }
+  state.flash = Math.max(0, state.flash - dt);
+  state.bonkT = Math.max(0, state.bonkT - dt);
+  if (state.doneT > 0) { // on the lit exit: a beat, then the next room
+    state.doneT -= dt;
+    if (state.doneT <= 0) {
+      if (state.li + 1 < LEVELS.length) loadLevel(state.li + 1);
+      else { state.score = LEVELS.length; state.gained = 'You walked both lives'; scene = 'results'; }
+    }
+    return;
+  }
+  state.idle += dt;
+
+  if (pressed('KeyZ') && state.undo.length) { restore(state.undo.pop()); state.undos++; sfx('undo'); return; }
+  if (pressed('KeyR')) { pushUndo(); restore(state.first); sfx('undo'); return; }
+  if (pressed('KeyE') || pressed('Space')) tryCarry();
+
+  // Look and walk: forward is where the camera faces
+  state.yaw += ((down.has('ArrowLeft') ? 1 : 0) - (down.has('ArrowRight') ? 1 : 0)) * tune.turn_rate * dt;
+  const iF = (down.has('ArrowUp') || down.has('KeyW') ? 1 : 0) - (down.has('ArrowDown') || down.has('KeyS') ? 1 : 0);
+  const iR = (down.has('KeyD') ? 1 : 0) - (down.has('KeyA') ? 1 : 0);
+  const ix = -Math.sin(state.yaw) * iF + Math.cos(state.yaw) * iR, iz = -Math.cos(state.yaw) * iF - Math.sin(state.yaw) * iR;
+  p.moving = iF !== 0 || iR !== 0;
+  if (p.moving) {
+    const n = Math.hypot(ix, iz), dx = ix / n * tune.move_speed * dt, dz = iz / n * tune.move_speed * dt;
+    const want = Math.atan2(ix, iz); let da = want - p.ang;
+    while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    p.ang += da * Math.min(1, tune.turn_speed * dt); p.walk += dt * 13;
+    const fs = Math.sin(p.ang), fc = Math.cos(p.ang); // the tile ahead is the one the walker mostly faces
+    if (Math.abs(fs) > Math.abs(fc)) { p.fx = Math.sign(fs); p.fz = 0; } else { p.fx = 0; p.fz = Math.sign(fc); }
+    if (dx && !blocked(p.life, p.x + dx, p.z)) p.x += dx;
+    if (dz && !blocked(p.life, p.x, p.z + dz)) {
+      const oz = p.z; let nz = p.z + dz;
+      // Through an arch: the walker's middle passes the portal's line, and the life swaps
+      const pt = L.portals.find(o => Math.floor(p.x) === o.x && ((oz < o.zc && nz >= o.zc) || (oz > o.zc && nz <= o.zc)));
+      if (!pt) p.z = nz;
+      else {
+        nz = pt.zc + Math.sign(dz) * Math.max(Math.abs(nz - pt.zc), 0.02);
+        const other = 1 - p.life;
+        if (blocked(other, p.x, nz)) { if (!state.bonkT) { sfx('bonk'); state.bonkT = 0.4; } } // the other life is solid here
+        else {
+          pushUndo(); p.z = nz; p.life = other; if (p.carry >= 0) state.crates[p.carry].life = other;
+          state.crossings++; sfx('cross'); events.push({ type: 'cross', life: other, t: state.t });
+        }
+      }
+    }
+  }
+
+  updateSwitches(false);
+  const lit = exitReachable();
+  if (lit && !state.lit) { sfx('lit'); events.push({ type: 'lit', t: state.t }); }
+  state.lit = lit;
+  if (p.life === L.exit.life && Math.floor(p.x) === L.exit.x && Math.floor(p.z) === L.exit.z) {
+    state.doneT = tune.level_done_s; state.lit = true; sfx('done'); events.push({ type: 'solved', level: state.li + 1, t: state.t });
+  }
+  updateCam(false);
+}
+
+// ---- The 3D view: one scene per life, the other one seen through each portal ---------------
+const LOOK = [ // the colourful life, the red life
+  { name: 'Colourful life', bg: 0xbfe9ff, floor: [0x9be07a, 0x8ed56d], out: 0x84cc66, wall: 0xf6e2c3, cap: 0xffb3c7, water: 0x62c9f2, waterGlow: 0x0a3a55,
+    hemi: [0xffffff, 0x9ad68a, 2.3], sun: [0xfff4e0, 2.1], hud: '#35e0cf', ground: '#58c04a' },
+  { name: 'Red life', bg: 0x1d070c, floor: [0xb02a3c, 0x8a1c2b], out: 0x3a0b14, wall: 0x5a1626, cap: 0xff5c72, water: 0xff6a2a, waterGlow: 0xb02a00,
+    hemi: [0xffd0d0, 0x2a050b, 1.15], sun: [0xffb0a0, 1.5], hud: '#ff3b4a', ground: '#b3202a' },
+];
+const KEYCOL = { y: 0xffd23f, u: 0x4f8cff, g: 0x5fd068 };
+const GEO = {
+  box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(0.5, 18, 14), ico: new THREE.IcosahedronGeometry(0.5, 1),
+  cone: new THREE.ConeGeometry(0.5, 1, 7), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 22), cyl4: new THREE.CylinderGeometry(0.5, 0.5, 1, 4),
+  cyl3: new THREE.CylinderGeometry(0.5, 0.5, 1, 3), oct: new THREE.OctahedronGeometry(0.5), disc: new THREE.CircleGeometry(0.5, 20),
+  arch: new THREE.TorusGeometry(0.47, 0.07, 8, 20, Math.PI), ring: new THREE.TorusGeometry(0.5, 0.12, 8, 20),
+};
+const SHAPE = { y: GEO.cyl, u: GEO.cyl4, g: GEO.cyl3 }; // a switch and its door share a colour and a shape
+const maskShape = new THREE.Shape();
+maskShape.moveTo(-0.41, 0); maskShape.lineTo(-0.41, 1.9); maskShape.absarc(0, 1.9, 0.41, Math.PI, 0, true); maskShape.lineTo(0.41, 0); maskShape.closePath();
+GEO.mask = new THREE.ShapeGeometry(maskShape, 12);
+const matCache = {};
+function M(color, opts) { // shared, lit, flat-coloured
+  const k = color + JSON.stringify(opts || 0);
+  return matCache[k] || (matCache[k] = new THREE.MeshLambertMaterial(Object.assign({ color }, opts)));
+}
+const own = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts)); // for figures that show through a portal
+const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false });
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
+function add(parent, geo, mat, x, y, z, sx = 1, sy = sx, sz = sx) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m;
+}
+const camera = new THREE.PerspectiveCamera(44, W / H, 0.05, 140);
+const scenes = LOOK.map(P => {
+  const s = new THREE.Scene(); s.fog = new THREE.Fog(P.bg, 20, 46);
+  s.add(new THREE.HemisphereLight(P.hemi[0], P.hemi[1], P.hemi[2]));
+  const sun = new THREE.DirectionalLight(P.sun[0], P.sun[1]); sun.position.set(-4, 10, 6); s.add(sun);
+  add(s, GEO.sph, new THREE.MeshBasicMaterial({ color: P.bg, side: THREE.BackSide, fog: false }), 6, 0, 4, 120); // the sky, so a portal has one to show
+  return s;
+});
+const maskScene = new THREE.Scene();
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0), NOCLIP = [];
+const view = { worlds: [null, null], masks: [], crates: [], doors: [], switches: [], walker: null, exit: null, marker: null, camLife: 0, camPrev: null };
+const hash = (x, z, k) => { let h = (x * 374761393 + z * 668265263 + k * 2246822519) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+
+function decor(g, life, x, z, y, r, tall) { // small things that make each life its own place
+  if (life === 0) {
+    if (tall && r < 0.4) { // a round tree, some in blossom
+      add(g, GEO.cyl, M(0x9a6b4a), x, y + 0.3, z, 0.16, 0.6, 0.16);
+      add(g, GEO.ico, M(r < 0.13 ? 0xffa6c9 : 0x5fc46a, { flatShading: true }), x, y + 0.95, z, 0.95);
+      add(g, GEO.ico, M(r < 0.13 ? 0xffc4dc : 0x7ad67c, { flatShading: true }), x + 0.12, y + 1.45, z - 0.05, 0.6);
+    } else if (r < 0.75) add(g, GEO.ico, M(0x6fcf72, { flatShading: true }), x, y + 0.14, z, 0.55, 0.36, 0.55); // a bush
+    else for (let i = 0; i < 3; i++) add(g, GEO.sph, M([0xfff06a, 0xff9ac1, 0xffffff][i]), x - 0.25 + i * 0.25, y + 0.08, z + (i % 2) * 0.2 - 0.1, 0.16); // flowers
+  } else {
+    if (tall && r < 0.4) { // a crystal spire
+      add(g, GEO.oct, M(0xff4d6d, { emissive: 0x7a0f24, flatShading: true }), x, y + 0.7, z, 0.5, 1.5, 0.5);
+      add(g, GEO.oct, M(0xff8a9c, { emissive: 0x7a0f24, flatShading: true }), x + 0.28, y + 0.3, z + 0.1, 0.28, 0.7, 0.28);
+    } else if (r < 0.75) { // a mushroom
+      add(g, GEO.cyl, M(0xffe3d6), x, y + 0.14, z, 0.14, 0.28, 0.14);
+      add(g, GEO.sph, M(0xff5066), x, y + 0.3, z, 0.5, 0.3, 0.5);
+    } else add(g, GEO.cone, M(0x7a1a2a, { flatShading: true }), x, y + 0.2, z, 0.3, 0.4, 0.3); // a thorn
+  }
+}
+function buildWorld(life) {
+  const L = state.L, P = LOOK[life], g = new THREE.Group();
+  add(g, GEO.box, M(P.out), L.w / 2, -0.75, L.d / 2, 90, 0.4, 90); // the land around the room
+  for (let z = 0; z < L.d; z++) for (let x = 0; x < L.w; x++) {
+    const ch = L.grid[life][z][x], cx = x + 0.5, cz = z + 0.5, r = hash(x, z, life + state.li * 7);
+    if (ch === '~') { add(g, GEO.box, M(P.water, { emissive: P.waterGlow }), cx, -0.42, cz, 1, 0.2, 1); continue; }
+    add(g, GEO.box, M(P.floor[(x + z) % 2]), cx, -0.2, cz, 1, 0.4, 1);
+    if (ch === '#') {
+      const front = false, h = WALL_H;
+      add(g, GEO.box, M(P.wall), cx, h / 2, cz, 1, h, 1); add(g, GEO.box, M(P.cap), cx, h + 0.05, cz, 1.04, 0.1, 1.04);
+      const edge = x === 0 || z === 0 || x === L.w - 1;
+      if (!front && r < 0.6) decor(g, life, cx, cz, h + 0.1, hash(x, z, 9 + life), edge);
+    } else if (r < 0.1 && !L.portals.some(o => o.x === x && o.z === z)) decor(g, life, cx, cz, 0, 0.8 + r, false);
+  }
+  for (let i = 0; i < 46; i++) { // scenery beyond the walls, never in the way
+    const a = hash(i, life, 31) * Math.PI * 2, d = 2 + hash(i, life, 47) * 9;
+    const x = L.w / 2 + Math.cos(a) * (L.w / 2 + d), z = L.d / 2 + Math.sin(a) * (L.d / 2 + d) - 3;
+    if (x > -1.5 && x < L.w + 1.5 && z > -1.5 && z < L.d + 1.5) continue;
+    decor(g, life, x, z, -0.55, hash(i, life, 5) * 0.75, true);
+  }
+  for (let i = 0; i < 14; i++) { // clouds, or their red cousins
+    const a = hash(i, life, 71) * Math.PI * 2, d = 12 + hash(i, life, 73) * 22;
+    add(g, GEO.sph, M(life ? 0x5c1322 : 0xffffff), L.w / 2 + Math.cos(a) * d, 8 + hash(i, life, 77) * 6, L.d / 2 + Math.sin(a) * d, 5 + hash(i, life, 79) * 4, 1.4, 3);
+  }
+  for (const o of L.portals) { // the arch stands in both lives
+    const m = M(0xfff3c4, { emissive: 0x6b5a2a });
+    add(g, GEO.box, m, o.x + 0.03, 0.95, o.zc, 0.12, 1.9, 0.14); add(g, GEO.box, m, o.x + 0.97, 0.95, o.zc, 0.12, 1.9, 0.14);
+    add(g, GEO.arch, m, o.x + 0.5, 1.9, o.zc, 1);
+    add(g, GEO.box, M(P.cap), o.x + 0.03, 0.06, o.zc, 0.26, 0.12, 0.3); add(g, GEO.box, M(P.cap), o.x + 0.97, 0.06, o.zc, 0.26, 0.12, 0.3);
+  }
+  return g;
+}
+function heroic(obj) { obj.traverse(o => { if (o.isMesh && o.material !== shadowMat) o.userData.hero = true; }); return obj; }
+function buildWalker() {
+  const g = new THREE.Group(), body = [own(0xffffff), own(0xffd6d6)], scarf = [own(0xff5a3c), own(0x3fd0c0)], dark = own(0x2b2233), leaf = own(0x6fcf72);
+  const part = (geo, m, x, y, z, sx, sy, sz) => { const o = add(g, geo, Array.isArray(m) ? m[0] : m, x, y, z, sx, sy, sz); if (Array.isArray(m)) o.userData.m = m; return o; };
+  part(GEO.sph, body, 0, 0.44, 0, 0.6, 0.66, 0.6);
+  part(GEO.sph, dark, -0.11, 0.52, 0.26, 0.09, 0.12, 0.06); part(GEO.sph, dark, 0.11, 0.52, 0.26, 0.09, 0.12, 0.06); // eyes
+  g.userData.feet = [part(GEO.sph, dark, -0.14, 0.07, 0.03, 0.2, 0.14, 0.26), part(GEO.sph, dark, 0.14, 0.07, 0.03, 0.2, 0.14, 0.26)];
+  const wrap = part(GEO.ring, scarf, 0, 0.3, 0, 0.5, 0.5, 0.5); wrap.rotation.x = Math.PI / 2;
+  g.userData.tail = part(GEO.box, scarf, 0.12, 0.3, -0.36, 0.12, 0.07, 0.34);
+  part(GEO.cone, leaf, 0, 0.84, 0, 0.12, 0.22, 0.12); // a sprout on its head
+  heroic(g);
+  const sh = add(g, GEO.disc, shadowMat, 0, 0.02, 0, 0.62); sh.rotation.x = -Math.PI / 2;
+  return g;
+}
+function buildCrate(origin) {
+  const g = new THREE.Group(), col = origin ? 0xe0455a : 0xffa94d, lite = origin ? 0xffa3ad : 0xffd9a0;
+  add(g, GEO.box, own(col), 0, 0.36, 0, 0.72); add(g, GEO.box, own(lite), 0, 0.73, 0, 0.5, 0.05, 0.5);
+  if (origin) add(g, GEO.oct, own(lite), 0, 0.86, 0, 0.22);                         // born red: a gem on top
+  else add(g, GEO.box, own(col), 0, 0.78, 0, 0.2, 0.08, 0.2).rotation.y = Math.PI / 4; // born colourful: a stud on top
+  heroic(g);
+  const sh = add(g, GEO.disc, shadowMat, 0, 0.02, 0, 0.95); sh.rotation.x = -Math.PI / 2;
+  return g;
+}
+function buildView() {
+  view.worlds.forEach((w, i) => { if (w) scenes[i].remove(w); view.worlds[i] = buildWorld(i); scenes[i].add(view.worlds[i]); });
+  view.masks.forEach(m => maskScene.remove(m));
+  view.masks = state.L.portals.map((o, i) => add(maskScene, GEO.mask, new THREE.MeshBasicMaterial({
+    colorWrite: false, depthWrite: false, side: THREE.DoubleSide, stencilWrite: true, stencilRef: i + 1,
+    stencilFunc: THREE.EqualStencilFunc, stencilFuncMask: 0x80, stencilZPass: THREE.ReplaceStencilOp }), o.x + 0.5, 0, o.zc));
+  view.walker = buildWalker(); view.camLife = state.p.life; view.camPrev = null;
+  view.marker = new THREE.Mesh(GEO.box, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false }));
+  view.marker.scale.set(0.86, 0.04, 0.86);
+  view.crates = state.crates.map(c => ({ g: buildCrate(c.origin), ghost: new THREE.Mesh(GEO.box, ghostMat) }));
+  view.crates.forEach(v => v.ghost.scale.setScalar(0.72));
+  view.doors = state.doors.map(d => {
+    const g = new THREE.Group(), w = view.worlds[d.life];
+    add(g, GEO.box, M(KEYCOL[d.c]), 0, 0.6, 0, 0.9, 1.2, 0.9); add(g, GEO.box, M(0xffffff), 0, 0.6, 0, 0.94, 0.1, 0.94);
+    add(g, SHAPE[d.c], M(KEYCOL[d.c]), 0, 1.3, 0, 0.5, 0.2, 0.5);
+    g.position.set(d.x + 0.5, 0, d.z + 0.5); w.add(g);
+    add(w, GEO.box, M(0x3a3340), d.x + 0.5, 0.01, d.z + 0.5, 1, 0.04, 1); // the slot it sinks into
+    const ghost = add(view.worlds[1 - d.life], GEO.box, ghostMat, d.x + 0.5, 0.6, d.z + 0.5, 0.9, 1.2, 0.9);
+    return { g, ghost };
+  });
+  view.switches = state.switches.map(s => {
+    const w = view.worlds[s.life];
+    add(w, GEO.cyl, M(0x3a3340), s.x + 0.5, 0.03, s.z + 0.5, 0.92, 0.06, 0.92);
+    const plate = add(w, SHAPE[s.c], M(KEYCOL[s.c]), s.x + 0.5, 0.1, s.z + 0.5, 0.74, 0.12, 0.74);
+    add(view.worlds[1 - s.life], SHAPE[s.c], ghostMat, s.x + 0.5, 0.08, s.z + 0.5, 0.74, 0.1, 0.74);
+    return { plate };
+  });
+  const e = state.L.exit, w = view.worlds[e.life];
+  add(w, GEO.cyl, M(0xf3ead8), e.x + 0.5, 0.08, e.z + 0.5, 0.8, 0.16, 0.8);
+  view.exit = { star: add(w, GEO.oct, new THREE.MeshBasicMaterial({ color: 0x8a8fa0 }), e.x + 0.5, 0.85, e.z + 0.5, 0.5, 0.75, 0.5),
+    halo: add(w, GEO.ring, new THREE.MeshBasicMaterial({ color: 0xfff6a8 }), e.x + 0.5, 0.2, e.z + 0.5, 0.75, 0.75, 0.3) };
+  view.exit.halo.rotation.x = Math.PI / 2;
+  add(view.worlds[1 - e.life], GEO.oct, ghostMat, e.x + 0.5, 0.85, e.z + 0.5, 0.5, 0.75, 0.5);
+}
+function syncView() { // put every figure where the state says it is
+  const p = state.p, t = state.t, wk = view.walker;
+  view.worlds[p.life].add(wk);
+  const hop = p.moving ? Math.abs(Math.sin(p.walk)) * 0.09 : Math.sin(t * 3) * 0.012;
+  wk.position.set(p.x, hop, p.z); wk.rotation.y = p.ang;
+  wk.traverse(o => { if (o.userData.m) o.material = o.userData.m[p.life]; });
+  wk.userData.feet.forEach((f, i) => { f.position.z = 0.03 + (p.moving ? Math.sin(p.walk + i * Math.PI) * 0.1 : 0); });
+  wk.userData.tail.rotation.x = p.moving ? -0.5 + Math.sin(t * 16) * 0.15 : Math.sin(t * 2) * 0.08;
+  state.crates.forEach((c, i) => {
+    const v = view.crates[i];
+    view.worlds[c.life].add(v.g); view.worlds[1 - c.life].add(v.ghost);
+    if (c.carried) v.g.position.set(p.x, 0.98 + hop, p.z);
+    else v.g.position.set(c.x + 0.5, c.sunk ? -0.8 : 0, c.z + 0.5);
+    v.g.rotation.y = c.carried ? p.ang : 0;
+    v.g.children[v.g.children.length - 1].visible = !c.carried && !c.sunk; // its shadow
+    v.ghost.visible = !c.carried && !c.sunk; v.ghost.position.set(c.x + 0.5, 0.36, c.z + 0.5);
+  });
+  state.doors.forEach((d, i) => { const v = view.doors[i]; v.g.position.y = -d.o * 1.42; v.ghost.position.y = 0.6 - d.o * 1.42; v.ghost.visible = d.o < 0.9; });
+  state.switches.forEach((s, i) => { view.switches[i].plate.position.y = s.on ? 0.05 : 0.1; });
+  const ex = view.exit, lit = state.lit;
+  ex.star.material.color.setHex(lit ? 0xfff06a : 0x8a8fa0); ex.star.rotation.y = t * (lit ? 2.4 : 0.5);
+  ex.star.position.y = 0.85 + (lit ? Math.sin(t * 4) * 0.1 : 0); ex.halo.visible = lit; ex.halo.scale.setScalar(0.75 + Math.sin(t * 5) * 0.06);
+  view.worlds[p.life].add(view.marker); view.marker.visible = p.carry >= 0 && scene === 'play'; // where a carried crate would go
+  view.marker.position.set(Math.floor(p.x) + p.fx + 0.5, 0.04, Math.floor(p.z) + p.fz + 0.5);
+  placeCamera();
+}
+function camSolid(life, x, z) {
+  const L = state.L, cx = Math.floor(x), cz = Math.floor(z);
+  if (cx < 0 || cz < 0 || cx >= L.w || cz >= L.d) return false; // beyond the room is open air
+  return L.grid[life][cz][cx] === '#' || state.doors.some(d => d.life === life && d.x === cx && d.z === cz && d.o < 0.5);
+}
+function placeCamera() {
+  const p = state.p, c = camera.position;
+  camera.fov = tune.cam_fov; camera.updateProjectionMatrix();
+  if (scene === 'title' || scene === 'figures') { // the whole room from above
+    const o = state.cam; c.set(o.x, tune.cam_height, o.z + tune.cam_back); camera.lookAt(o.x, 0.3, o.z - 0.4);
+    view.camLife = p.life; view.camPrev = null; return;
+  }
+  // Behind the walker, pulled in when a wall is in the way
+  const ty = 1.0, cp = Math.cos(state.pitch), dx = Math.sin(state.yaw) * cp, dy = Math.sin(state.pitch), dz = Math.cos(state.yaw) * cp;
+  let d = 0.4;
+  for (let s = 0.4; s <= tune.cam_dist; s += 0.08) {
+    if (view.camLife === p.life && ty + dy * s < WALL_H + 0.3 && camSolid(p.life, p.x + dx * (s + 0.25), p.z + dz * (s + 0.25))) break;
+    d = s;
+  }
+  c.set(p.x + dx * d, ty + dy * d, p.z + dz * d); camera.lookAt(p.x, ty + 0.1, p.z);
+  // The camera has a life of its own: it changes when the camera itself passes through an arch
+  const prev = view.camPrev;
+  if (prev) for (const o of state.L.portals) if ((prev.z - o.zc) * (c.z - o.zc) < 0) {
+    const k = (o.zc - prev.z) / (c.z - prev.z), hx = prev.x + (c.x - prev.x) * k, hy = prev.y + (c.y - prev.y) * k;
+    if (hx > o.x && hx < o.x + 1 && hy < 2.4) view.camLife = 1 - view.camLife;
+  }
+  view.camPrev = { x: c.x, y: c.y, z: c.z };
+  if (view.camLife !== p.life) { // walker and camera in different lives: right only while it is seen through an arch
+    const through = state.L.portals.some(o => {
+      if ((c.z - o.zc) * (p.z - o.zc) >= 0) return false;
+      const k = (o.zc - c.z) / (p.z - c.z), hx = c.x + (p.x - c.x) * k, hy = c.y + (0.6 - c.y) * k;
+      return hx > o.x && hx < o.x + 1 && hy < 2.4;
+    });
+    if (!through) { view.camLife = p.life; state.flash = tune.flash_s; }
+  }
+}
+function setStencil(sc, ref) {
+  sc.traverse(o => {
+    const m = o.material; if (!m) return;
+    if (ref) { m.stencilWrite = true; m.stencilFunc = THREE.EqualStencilFunc; m.stencilRef = ref; m.stencilFuncMask = 0xff; m.stencilZPass = THREE.KeepStencilOp; } // only inside a portal
+    else if (o.userData.hero) { m.stencilWrite = true; m.stencilFunc = THREE.AlwaysStencilFunc; m.stencilRef = 0x80; m.stencilFuncMask = 0xff; m.stencilZPass = THREE.ReplaceStencilOp; } // never hidden by a portal
+    else m.stencilWrite = false;
+  });
+}
+function render3d() {
+  syncView();
+  const cur = view.camLife, oth = 1 - cur;
+  renderer.clippingPlanes = NOCLIP; setStencil(scenes[cur], 0);
+  renderer.setClearColor(LOOK[cur].bg, 1); renderer.clear(true, true, true);
+  renderer.render(scenes[cur], camera);                                   // this life
+  view.masks.forEach((m, i) => { view.masks.forEach((k, j) => { k.visible = i === j; }); renderer.render(maskScene, camera); }); // mark each arch's opening
+  renderer.clearDepth();
+  const hidden = []; view.worlds[oth].traverse(o => { if (o.material === ghostMat && o.visible) { o.visible = false; hidden.push(o); } });
+  state.L.portals.forEach((o, i) => {                                     // the other life, only inside the arch and only beyond it
+    const s = camera.position.z >= o.zc ? 1 : -1;
+    clip.normal.set(0, 0, -s); clip.constant = s * o.zc; renderer.clippingPlanes = [clip];
+    setStencil(scenes[oth], i + 1); renderer.render(scenes[oth], camera);
+  });
+  hidden.forEach(o => { o.visible = true; }); renderer.clippingPlanes = NOCLIP;
+}
+const v3 = new THREE.Vector3();
+function toScreen(x, y, z) { v3.set(x, y, z).project(camera); return [(v3.x + 1) / 2 * W, (1 - v3.y) / 2 * H]; }
+
+// ---- The HUD, over the world ------------------------------------------------------------------
+function keycap(label, x, y) {
+  ctx.fillStyle = '#12161c'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; rr(x - 16, y - 16, 32, 32, 7); ctx.fill(); ctx.stroke();
+  text(label, x, y + 1, 21, '#ffffff', 'center', 'bold');
+}
+function pill(s, x, y, size) {
+  ctx.font = ` ${size}px ${FONT}`; const w = ctx.measureText(s).width + 40;
+  ctx.fillStyle = 'rgba(12,14,18,0.92)'; rr(x - w / 2, y - size, w, size * 2, size); ctx.fill();
+  text(s, x, y + 1, size, '#ffffff');
+}
+function drawHud() {
+  const P = LOOK[state.p.life], y = H - 32;
+  ctx.fillStyle = '#0c0e12'; ctx.fillRect(0, H - 64, W, 64);
+  ctx.fillStyle = P.hud; ctx.fillRect(0, H - 64, W, 4);
+  text(`Room ${state.li + 1} of ${LEVELS.length}: ${state.L.def.name}`, 28, y + 2, 20, '#ffffff', 'left');
+  ctx.save(); ctx.translate(470, y + 2); ctx.rotate(Math.PI / 4); ctx.fillStyle = P.ground; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  ctx.fillRect(-10, -10, 20, 20); ctx.strokeRect(-10, -10, 20, 20); ctx.restore();
+  text(P.name, 492, y + 2, 20, '#ffffff', 'left', 'bold');
+  text('Mouse or Left/Right look   E carry   Z undo   R restart   P pause', W - 28, y + 2, 18, '#c9d2dc', 'right');
+}
+function drawPlay() {
+  render3d();
+  ctx.clearRect(0, 0, W, H);
+  if (state.flash > 0) { // the crossing: the life just entered blooms over the screen and clears
+    ctx.fillStyle = LOOK[state.p.life].hud; ctx.globalAlpha = 0.55 * (state.flash / tune.flash_s) ** 2; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+  }
+  const r = reachable();
+  if (r >= 0 && !state.doneT) { const c = state.crates[r], [sx, sy] = toScreen(c.x + 0.5, 1.25, c.z + 0.5); keycap('E', sx, sy); }
+  if (state.crates.filter(c => !c.sunk).length < state.switches.length) pill('That crate was needed for a switch: Z takes a move back', W / 2, 44, 20);
+  else if (state.idle > tune.stuck_prompt_s) pill('Stuck? Z takes a move back, R restarts the room', W / 2, 44, 20);
+  if (state.doneT > 0) { ctx.fillStyle = '#fff6a8'; ctx.globalAlpha = 0.6 * (1 - state.doneT / tune.level_done_s); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  drawHud();
+}
+
+const scenes2d = {
+  figures: { // everything that acts in the game, side by side, each with its name
+    update(dt) { state.t += dt; },
+    draw() {
+      render3d(); ctx.clearRect(0, 0, W, H);
+      const row = [[2, 2.4, 'Walker'], [4, 2.4, 'Crate, born colourful'], [6.4, 2.4, 'Crate, born red'], [2, 5.5, 'Switch'], [4, 5.5, 'Door'], [6, 5.5, 'Portal'], [8, 5.5, 'Exit']];
+      row.forEach(([x, z, name]) => { const [sx, sy] = toScreen(x + 0.5, 0, z); pill(name, sx, sy, 18); });
+      pill('Colourful life; the red life shows through the portal', W / 2, 40, 22);
+    },
+  },
+  title: {
+    update(dt) { state.t += dt; if (pressed('Enter') || pressed('Space')) { reset(); scene = 'play'; } },
+    draw() {
+      render3d(); ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(12,14,18,0.84)'; rr(W / 2 - 440, 70, 880, 580, 28); ctx.fill();
+      ctx.fillStyle = '#35e0cf'; ctx.fillRect(W / 2 - 150, 222, 150, 5); ctx.fillStyle = '#ff3b4a'; ctx.fillRect(W / 2, 222, 150, 5);
+      text(TITLE, W / 2, 150, 104, '#ffffff', 'center', 'bold');
+      text('one room, two lives: walk through an arch to change life', W / 2, 262, 24, '#fff3c4');
+      ['W A S D: walk     Mouse (click the game) or Left / Right: look around', 'E or Space: pick up a crate, or put it down on the marked tile', 'Z: undo, as often as you like',
+        'R: restart the room (Z brings it back)', 'P: pause     M: mute     Esc: free the mouse'].forEach((c, i) => text(c, W / 2, 330 + i * 42, 24, '#ffffff'));
+      text('Enter to start', W / 2, 590, 30, '#fff06a', 'center', 'bold');
+    },
+  },
+  play: {
+    update(dt) {
+      if (pressed('KeyP') || pressed('Escape')) { scene = 'pause'; return; }
+      updatePlay(dt);
+    },
+    draw: drawPlay,
+  },
+  pause: {
+    update() { if (pressed('KeyP') || pressed('Escape')) scene = 'play'; },
+    draw() {
+      drawPlay(); ctx.fillStyle = 'rgba(12,14,18,0.8)'; ctx.fillRect(0, 0, W, H - 64);
+      text('Paused', W / 2, H / 2 - 50, 56, '#ffffff', 'center', 'bold'); text('P to carry on', W / 2, H / 2 + 10, 26, '#c9d2dc');
+    },
+  },
+  results: {
+    update(dt) { state.t += dt; if (pressed('Enter')) { params.delete('level'); reset(); scene = 'play'; } },
+    draw() {
+      render3d(); ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(12,14,18,0.86)'; ctx.fillRect(0, 0, W, H);
+      text(state.gained || 'You walked both lives', W / 2, 250, 56, '#ffffff', 'center', 'bold');
+      text(`All ${LEVELS.length} rooms solved`, W / 2, 330, 28, '#fff06a');
+      text(`${state.crossings} crossings between lives, ${state.undos} moves taken back`, W / 2, 380, 24, '#c9d2dc');
+      text('Enter to play again', W / 2, 480, 28, '#ffffff', 'center', 'bold');
+    },
+  },
+};
+
+// ---- Loop: fixed step, frame time clamped ---------------------------------------------
+function step() {
+  if (pressed('KeyM')) { setMuted(!muted); hit.delete('KeyM'); }
+  scenes2d[scene].update(STEP); hit.clear();
+}
+let last, acc = 0, ALPHA = 1;
+function tick() {
+  const now = clock.now();
+  acc += Math.min(now - last, 0.25); last = now; // a stall never fast-forwards the game
+  while (acc >= STEP) { step(); acc -= STEP; }
+  ALPHA = acc / STEP;
+  drawFrame();
+}
+function drawFrame() { scenes2d[scene].draw(); }
+function frame() { tick(); requestAnimationFrame(frame); }
+// A headless browser on a time budget runs timers but almost no animation frames: a timer
+// ticks when no frame has come for 100 ms on a visible page; a hidden tab stays paused.
+function timer() { if (document.visibilityState === 'visible' && clock.now() - last > 0.1) tick(); }
+
+// ---- What a check can read and drive (?manual=1 stops the loop; players never see it) ----
+window.game = {
+  get scene() { return scene; },
+  get state() { return state; },
+  press(code) { hit.add(code); },
+  hold(code, on) { on ? down.add(code) : down.delete(code); },
+  get events() { return events; },
+  step(n = 1, draw = true, alpha = 1) {
+    for (let i = 0; i < n; i++) step();
+    if (draw) { ALPHA = alpha; drawFrame(); }
+  },
+};
+
+addEventListener('resize', fit); fit();
+reset();
+scene = params.get('scene') || 'title';
+if (scene === 'figures') loadLevel(0, FIGURES);
+last = clock.now();
+if (params.get('manual') === '1') drawFrame();
+else { requestAnimationFrame(frame); setInterval(timer, 50); }
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+# The one-shot's small check (check-run/1).
+# Written by one-shot-check.sh --record: the results are /prototype's reading of
+# evidence/self-check.tsv; never edited by hand.
+kind: check-run/1
+engine: web
+browser: "HeadlessChrome/157.0.0.0"
+time: "2026-11-15 19:04:06"
+checks:
+  - id: boots
+    result: pass
+    evidence:
+      - "evidence/self-check.tsv"
+  - id: shot
+    result: pass
+    evidence:
+      - "evidence/play.png"
+  - id: outlines
+    result: pass
+    evidence:
+      - "evidence/figures.png"
+  - id: brief-words
+    result: pass
+    why: "missed; that orr just: not a look, view or reference word; it is part of a sentence about solo play; that what do: not a look, view or reference word; it is part of a question"
+    evidence:
+      - "evidence/brief-words.tsv"
+  - id: emoji
+    result: pass
+    evidence:
+      - "evidence/self-check.tsv"
+  - id: nearest-game
+    result: pass
+    evidence:
+      - "evidence/nearest-game.txt"
+brief_checklist:
+  - id: L1
+    result: pass
+    evidence: "evidence/z3.png"
+    item: "Look: *(provisional)*"
+  - id: L2
+    result: pass
+    evidence: "evidence/play.png"
+    item: "References: none named."
+  - id: L3
+    result: pass
+    evidence: "evidence/play.png"
+    item: "View: 2D · Camera: side view, follows the climber upward."
+  - id: L4
+    result: pass
+    evidence: "evidence/title.png"
+    item: "Text: Sorani Kurdish, right to left, with Western digits. *(the digits are guessed)*"
+  - id: F1
+    result: pass
+    evidence: "index.html:159"
+    item: "A tall hand-made tower of ten zones, one new idea each"
+  - id: F2
+    result: pass
+    evidence: "index.html:315"
+    item: "Falls that drop you to what is below, with gold rest floors that catch long falls"
+  - id: F3
+    result: pass
+    evidence: "index.html:295"
+    item: "Forgiving jump: late jumps, early presses and hold-to-jump-higher"
+  - id: F4
+    result: pass
+    evidence: "evidence/z3.png"
+    item: "Height, timer and fall counter always on screen, with a side height bar"
+  - id: F5
+    result: pass
+    evidence: "index.html:199"
+    item: "Your best height and best time kept between sessions"
+  - id: F6
+    result: pass
+    evidence: "evidence/results.png"
+    item: "A finish code with the time in it, and a screen to check a viewer's code against yours"
+  - id: F7
+    result: pass
+    evidence: "evidence/z6.png"
+    item: "Phone touch buttons"
+  - id: F8
+    result: not_run
+    mark: not assessed
+    why: "the sounds are made in code and called on jump, landing, a long fall and each rest floor; the check cannot hear them"
+    evidence: "index.html:141"
+    item: "Sound for jump, landing, a long fall and each rest floor"
+  - id: S1
+    result: pass
+    evidence: "evidence/z9.png"
+    item: "parkour · in the slice"
+  - id: S2
+    result: pass
+    evidence: "evidence/results.png"
+    item: "who wins against me i give a gift · thin stand-in *(guessed)*"
+  - id: M1
+    result: pass
+    evidence: "evidence/play.png"
+    item: "You stand in a garden at the foot of the tower with the height bar at zero."
+  - id: M2
+    result: pass
+    evidence: "index.html:298"
+    item: "Wide, easy ledges teach the jump: tap for a hop, hold for a full jump."
+  - id: M3
+    result: pass
+    evidence: "index.html:160"
+    item: "At about 15 metres the ledges narrow and you miss one, fall, and land a few ledges down instead of dying."
+  - id: M4
+    result: not_run
+    mark: not assessed
+    why: "the first gold floor is at 30 m with a chime and a banner in the code; no run climbed that far to see it"
+    evidence: "index.html:252"
+    item: "You climb back past it, reach the first gold rest floor at 30 metres, a chime plays and a banner shows the height."
+  - id: M5
+    result: pass
+    evidence: "evidence/z2.png"
+    item: "Above it the first moving platform slides into view."
+  - id: C1
+    result: pass
+    evidence: "evidence/z2.png"
+    item: "*(provisional)* Real trouble starts in the second zone, around minute three: narrow ledges, then moving platforms."
+  - id: C2
+    result: pass
+    evidence: "index.html:239"
+    item: "Nothing kills you; a miss costs height, from a few metres to a whole zone, and gold rest floors every 30 metres or so catch long falls."
+  - id: C3
+    result: pass
+    evidence: "evidence/z9.png"
+    item: "Each of the ten zones adds one thing: crumbling ledges, ice, wind, bouncers, conveyor belts, red bumpers that knock you off, and a final zone that mixes them."
+  - id: C4
+    result: not_run
+    mark: not assessed
+    why: "nobody has climbed it yet, so how long a first clear or a practised run takes is unknown"
+    evidence: "index.html:159"
+    item: "A first clear should take most players an hour or more; a practised run about ten minutes."
+measures:
+  - id: step-time
+    value: 0.800
+    unit: ms
+    by: browser
+    detail: "mean 0.015 ms, slowest 0.800 ms, 172 steps"

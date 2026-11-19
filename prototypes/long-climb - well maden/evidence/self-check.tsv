@@ -1,0 +1,46 @@
+time	2026-11-15 19:04:06
+keep	lines	0	pinned	0
+briefword	that orr just	missed	not a look, view or reference word; it is part of a sentence about solo play
+briefword	that what do	missed	not a look, view or reference word; it is part of a question
+checklist	L1	unlisted	-	Look: *(provisional)*	
+checklist	L2	unlisted	-	References: none named.	
+checklist	L3	unlisted	-	View: 2D · Camera: side view, follows the climber upward.	
+checklist	L4	unlisted	-	Text: Sorani Kurdish, right to left, with Western digits. *(the digits are guessed)*	
+checklist	F1	unlisted	-	A tall hand-made tower of ten zones, one new idea each	
+checklist	F2	unlisted	-	Falls that drop you to what is below, with gold rest floors that catch long falls	
+checklist	F3	unlisted	-	Forgiving jump: late jumps, early presses and hold-to-jump-higher	
+checklist	F4	unlisted	-	Height, timer and fall counter always on screen, with a side height bar	
+checklist	F5	unlisted	-	Your best height and best time kept between sessions	
+checklist	F6	unlisted	-	A finish code with the time in it, and a screen to check a viewer's code against yours	
+checklist	F7	unlisted	-	Phone touch buttons	
+checklist	F8	unlisted	-	Sound for jump, landing, a long fall and each rest floor	
+checklist	S1	unlisted	-	parkour · in the slice	
+checklist	S2	unlisted	-	who wins against me i give a gift · thin stand-in *(guessed)*	
+checklist	M1	unlisted	-	You stand in a garden at the foot of the tower with the height bar at zero.	
+checklist	M2	unlisted	-	Wide, easy ledges teach the jump: tap for a hop, hold for a full jump.	
+checklist	M3	unlisted	-	At about 15 metres the ledges narrow and you miss one, fall, and land a few ledges down instead of dying.	
+checklist	M4	unlisted	-	You climb back past it, reach the first gold rest floor at 30 metres, a chime plays and a banner shows the height.	
+checklist	M5	unlisted	-	Above it the first moving platform slides into view.	
+checklist	C1	unlisted	-	*(provisional)* Real trouble starts in the second zone, around minute three: narrow ledges, then moving platforms.	
+checklist	C2	unlisted	-	Nothing kills you; a miss costs height, from a few metres to a whole zone, and gold rest floors every 30 metres or so catch long falls.	
+checklist	C3	unlisted	-	Each of the ten zones adds one thing: crumbling ledges, ice, wind, bouncers, conveyor belts, red bumpers that knock you off, and a final zone that mixes them.	
+checklist	C4	unlisted	-	A first clear should take most players an hour or more; a practised run about ten minutes.	
+browser	HeadlessChrome/157.0.0.0
+console	play	6359	[ProtocolLaunch] handler constructed; wiring port events.
+scene	play	0	title
+scene	play	1	play
+digits	log	bold 38px "Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif	tabular	0
+digits	log	bold 23px "Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif	tabular	0
+measure	step-time	play	0.015	0.800	172
+lane	play	stop	2.9	57
+uncaught	play	0
+text	play	canvas	755,14,783,24	17.7	9.95	inside	بەرزی
+text	play	canvas	754,29,784,50	30.4	14.57	inside	5 م
+text	play	canvas	630,11,650,20	17.7	9.95	inside	کات
+text	play	canvas	619,29,660,44	30.4	14.57	inside	0:02
+text	play	canvas	495,11,526,24	17.7	9.95	inside	کەوتن
+text	play	canvas	505,29,516,44	30.4	14.57	inside	0
+text	play	canvas	712,72,796,85	17.7	9.77	inside	ناوچەی 1: باخچە
+screen	play	drawn
+shot	play	prototypes/long-climb/evidence/play.png
+responds	changed	4

@@ -1,0 +1,68 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Long Climb's TikTok profile picture, the bold one: a freerunner's silhouette leaping between two ledges in
+     front of a big gold moon, a red scarf the only colour. ?text=none | en | ckb, &circle=1 for TikTok's crop. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Long Climb Bold</title>
+<style>
+  :root { --bg: #111318; }
+  html, body { margin: 0; background: var(--bg); }
+  canvas { display: block; width: 1080px; height: 1080px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1080"></canvas>
+<script>
+const q = new URLSearchParams(location.search), TEXT = q.get('text') || 'none', CIRCLE = q.get('circle') === '1';
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), S = 1080, INK = '#07090e';
+const FONT = '"Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif', lift = TEXT === 'none' ? 0 : -70; // with a name under it, everything sits a little higher
+
+// night: deep blue-black, a few stars
+const g = ctx.createLinearGradient(0, 0, 0, S); g.addColorStop(0, '#0b1020'); g.addColorStop(1, '#1a2333');
+ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 70; i++) { ctx.globalAlpha = 0.25 + rnd() * 0.6; ctx.fillStyle = '#ffffff'; const s = 1.5 + rnd() * 2.5; ctx.fillRect(rnd() * S, rnd() * S * 0.8, s, s); }
+ctx.globalAlpha = 1;
+
+// the moon: big, gold, a soft glow round it
+const mx = 560, my = 470 + lift, mr = 300;
+const gl = ctx.createRadialGradient(mx, my, mr * 0.9, mx, my, mr * 1.5); gl.addColorStop(0, 'rgba(255,190,90,0.28)'); gl.addColorStop(1, 'rgba(255,190,90,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(mx, my, mr * 1.5, 0, 7); ctx.fill();
+const mg = ctx.createLinearGradient(mx, my - mr, mx, my + mr); mg.addColorStop(0, '#ffd27a'); mg.addColorStop(1, '#e88a2e'); ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 7); ctx.fill();
+ctx.fillStyle = 'rgba(160,80,20,0.18)'; for (const [x, y, r] of [[-0.35, -0.3, 0.16], [0.3, 0.1, 0.11], [-0.1, 0.42, 0.09], [0.42, -0.4, 0.07]]) { ctx.beginPath(); ctx.arc(mx + x * mr, my + y * mr, r * mr, 0, 7); ctx.fill(); }
+
+// two ledges: the one he leapt from, low on the left, and the one he is going for, high on the right
+const slab = (x, y, w, h) => { ctx.fillStyle = INK; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#2c3850'; ctx.fillRect(x, y, w, 6); };
+slab(-20, 780 + lift, 330, 400); slab(790, 500 + lift, 330, 700);
+
+// the freerunner, mid-leap, in silhouette; his scarf streams back, red
+ctx.save(); ctx.translate(540, 640 + lift); ctx.rotate(-0.12);
+ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+// the scarf first, so it trails out from behind his neck
+ctx.fillStyle = '#d8283c'; ctx.beginPath(); ctx.moveTo(22, -306); ctx.bezierCurveTo(-60, -340, -150, -280, -260, -330); ctx.bezierCurveTo(-205, -306, -180, -268, -280, -262); ctx.bezierCurveTo(-170, -232, -70, -292, 18, -284); ctx.closePath(); ctx.fill();
+// a limb or a body part: a capsule that narrows from one end to the other
+const seg = (x1, y1, x2, y2, w1, w2) => { w1 *= 1.32; w2 *= 1.32; const a = Math.atan2(y2 - y1, x2 - x1), n = a + Math.PI / 2, c = Math.cos(n), s2 = Math.sin(n);
+  ctx.fillStyle = INK; ctx.beginPath(); ctx.moveTo(x1 + c * w1 / 2, y1 + s2 * w1 / 2); ctx.lineTo(x2 + c * w2 / 2, y2 + s2 * w2 / 2); ctx.lineTo(x2 - c * w2 / 2, y2 - s2 * w2 / 2); ctx.lineTo(x1 - c * w1 / 2, y1 - s2 * w1 / 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x1, y1, w1 / 2, 0, 7); ctx.arc(x2, y2, w2 / 2, 0, 7); ctx.fill(); };
+seg(18, -278, -45, -238, 28, 22); seg(-45, -238, -108, -262, 22, 17); seg(-108, -262, -122, -268, 22, 22); // the back arm, flung out behind
+seg(-15, -168, -98, -112, 48, 34); seg(-98, -112, -178, -142, 32, 20); seg(-178, -142, -200, -178, 22, 15); // the back leg, knee bent, foot kicked up
+seg(-15, -168, 30, -286, 62, 82);                                                                        // the body, chest broad, leaning in
+seg(30, -300, 50, -330, 30, 30); ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(60, -356, 40, 0, 7); ctx.fill(); // neck and head
+seg(-15, -168, 82, -150, 48, 34); seg(82, -150, 62, -62, 32, 22); seg(62, -62, 110, -56, 20, 16);       // the front leg, knee driving up
+seg(42, -282, 108, -334, 30, 24); seg(108, -334, 160, -402, 24, 18); seg(160, -402, 168, -416, 22, 22); // the front arm, reaching for the ledge
+ctx.strokeStyle = '#d8283c'; ctx.lineWidth = 26; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(10, -302); ctx.quadraticCurveTo(36, -294, 58, -312); ctx.stroke(); // the scarf wound round his neck
+ctx.restore();
+
+// the name, plain and strong, when wanted
+if (TEXT !== 'none') {
+  const ckb = TEXT === 'ckb', s = ckb ? 'سەرکەوتنی درێژ' : 'LONG CLIMB';
+  ctx.fillStyle = '#d8283c'; ctx.fillRect(470, 860, 140, 6);
+  ctx.font = `800 ${ckb ? 92 : 96}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = ckb ? 'rtl' : 'ltr';
+  if (!ckb && 'letterSpacing' in ctx) ctx.letterSpacing = '14px';
+  ctx.fillStyle = '#f4f1ea'; ctx.fillText(s, 540 + (ckb ? 0 : 7), 940);
+}
+if (CIRCLE) { ctx.globalCompositeOperation = 'destination-in'; ctx.beginPath(); ctx.arc(540, 540, 540, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+</script>
+</body>
+</html>

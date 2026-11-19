@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- ultradevx's TikTok profile picture: dark, no characters, a developer's marks, flat: charcoal, off-white and one orange. ?v=mono | term | hex,
+     &circle=1 to see TikTok's round crop. 1080 x 1080. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ultradevx Profile</title>
+<style>
+  :root { --bg: #0a0c11; }
+  html, body { margin: 0; background: var(--bg); }
+  canvas { display: block; width: 1080px; height: 1080px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1080"></canvas>
+<script>
+const q = new URLSearchParams(location.search), V = q.get('v') || 'mono', CIRCLE = q.get('circle') === '1';
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), S = 1080, C = 540;
+const MONO = 'Consolas, "Cascadia Mono", "Courier New", monospace', SANS = '"Segoe UI", Arial, sans-serif';
+const CYAN = '#22e4ff', VIOLET = '#9b5cff';
+const neonGrad = (x0, y0, x1, y1) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, CYAN); g.addColorStop(1, VIOLET); return g; };
+function glowOn(c, b) { ctx.shadowColor = c; ctx.shadowBlur = b; } function glowOff() { ctx.shadowBlur = 0; }
+
+// the ground: flat charcoal with a fine grain, like print; no glow, no grid
+const INK = '#151515', PAPER = '#ece6d8', HOT = '#ff5a1f', DIM = '#8a857a';
+ctx.fillStyle = INK; ctx.fillRect(0, 0, S, S);
+let sd = 5; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 90000; i++) { const v = rnd(); ctx.fillStyle = v < 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.08)'; ctx.fillRect(rnd() * S, rnd() * S, 2, 2); }
+ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+const name = (y, size = 54) => { // the name, an orange underscore after it
+  ctx.font = `700 ${size}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillStyle = PAPER; const t = 'ultradevx', w = ctx.measureText(t).width;
+  ctx.fillText(t, C - size * 0.3, y); ctx.fillStyle = HOT; ctx.fillRect(C - size * 0.3 + w / 2 + 6, y - size * 0.12, size * 0.55, size * 0.14);
+};
+if (V === 'mono') { // UDX, heavy and tight, square brackets either side
+  ctx.font = `900 270px ${SANS}`; if ('letterSpacing' in ctx) ctx.letterSpacing = '-8px'; ctx.fillStyle = PAPER; ctx.fillText('UDX', C, 640); if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+  ctx.fillStyle = HOT; const bk = (x, d) => { ctx.fillRect(x, 400, 26, 280); ctx.fillRect(d > 0 ? x : x - 44, 400, 70, 26); ctx.fillRect(d > 0 ? x : x - 44, 654, 70, 26); }; bk(130, 1); bk(924, -1);
+  name(800, 48);
+} else if (V === 'term') { // a plain terminal: a title bar, a prompt, the name, a block cursor
+  const x = 160, y = 330, w = 760, h = 430;
+  ctx.fillStyle = '#1f1f1f'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = PAPER; ctx.lineWidth = 8; ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = PAPER; ctx.fillRect(x, y, w, 64); ctx.fillStyle = INK; ctx.font = `700 30px ${MONO}`; ctx.textAlign = 'left'; ctx.fillText('~/ultradevx', x + 28, y + 43);
+  for (let i = 0; i < 3; i++) { ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.strokeRect(x + w - 150 + i * 42, y + 20, 24, 24); }
+  ctx.font = `700 96px ${MONO}`; ctx.fillStyle = HOT; ctx.fillText('$', x + 60, y + 230); ctx.fillStyle = PAPER; ctx.fillText('dev', x + 150, y + 230);
+  ctx.fillStyle = DIM; ctx.font = `700 54px ${MONO}`; ctx.fillText('> building games', x + 60, y + 340);
+  ctx.fillStyle = HOT; ctx.fillRect(x + 60 + ctx.measureText('> building games').width + 14, y + 298, 30, 54);
+} else { // a hexagon, drawn flat and thick, </> inside, the slash in orange
+  const hex = r => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; ctx.lineTo(C + Math.cos(a) * r, 490 + Math.sin(a) * r); } ctx.closePath(); };
+  ctx.lineJoin = 'miter'; ctx.lineWidth = 30; ctx.strokeStyle = PAPER; hex(310); ctx.stroke();
+  ctx.lineCap = 'square'; ctx.lineJoin = 'miter'; ctx.lineWidth = 38; ctx.strokeStyle = PAPER;
+  ctx.beginPath(); ctx.moveTo(422, 398); ctx.lineTo(340, 490); ctx.lineTo(422, 582); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(658, 398); ctx.lineTo(740, 490); ctx.lineTo(658, 582); ctx.stroke();
+  ctx.strokeStyle = HOT; ctx.lineCap = 'butt'; ctx.beginPath(); ctx.moveTo(578, 375); ctx.lineTo(502, 605); ctx.stroke();
+  name(905, 62);
+}
+if (CIRCLE) { ctx.globalCompositeOperation = 'destination-in'; ctx.beginPath(); ctx.arc(C, C, C, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+</script>
+</body>
+</html>

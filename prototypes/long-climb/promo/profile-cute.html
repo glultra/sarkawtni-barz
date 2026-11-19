@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Long Climb's TikTok profile picture, the simple cute one: the climber, big, sitting with a
+     star, on one soft colour. ?bg=blue | pink | yellow, &circle=1 to see TikTok's round crop. 1080 x 1080. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Long Climb Cute</title>
+<style>
+  :root { --bg: #111318; }
+  html, body { margin: 0; background: var(--bg); }
+  canvas { display: block; width: 1080px; height: 1080px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1080"></canvas>
+<script>
+const q = new URLSearchParams(location.search), CIRCLE = q.get('circle') === '1';
+const BG = { blue: ['#cfeeff', '#9fd8ff'], pink: ['#ffe1ec', '#ffb8d2'], yellow: ['#fff4c9', '#ffdf86'] }[q.get('bg') || 'blue'];
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), S = 1080, OUT = '#3a2a24';
+function rr(x, y, w, h, r, fill, stroke, lw = 6) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+function sparkle(x, y, r, c = '#ffffff') { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y - r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.quadraticCurveTo(x, y, x, y + r); ctx.quadraticCurveTo(x, y, x - r, y); ctx.quadraticCurveTo(x, y, x, y - r); ctx.fill(); }
+function star(x, y, r, rot = 0) { ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, d = i % 2 ? r * 0.5 : r; ctx.lineTo(Math.cos(a) * d, Math.sin(a) * d); } ctx.closePath(); ctx.lineJoin = 'round'; ctx.fillStyle = '#ffd44f'; ctx.fill(); ctx.strokeStyle = '#c98a00'; ctx.lineWidth = r * 0.14; ctx.stroke(); ctx.restore(); }
+
+// one soft colour, a touch lighter in the middle
+const g = ctx.createRadialGradient(540, 470, 60, 540, 540, 760); g.addColorStop(0, BG[0]); g.addColorStop(1, BG[1]);
+ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+for (const [x, y, r] of [[230, 260, 34], [850, 300, 26], [190, 640, 20], [880, 690, 30], [760, 170, 16]]) sparkle(x, y, r);
+
+// a soft shadow where it sits
+ctx.fillStyle = 'rgba(40,60,90,0.16)'; ctx.beginPath(); ctx.ellipse(540, 830, 300, 40, 0, 0, 7); ctx.fill(); // a soft shadow under it
+
+// the climber, big and round, sitting
+const cx = 540, cy = 560, R = 250;
+ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(cx - 110, cy + R - 10, 74, 44, -0.15, 0, 7); ctx.ellipse(cx + 110, cy + R - 10, 74, 44, 0.15, 0, 7); ctx.fill(); // two feet over the edge
+ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 1.03, 0, 0, 7); ctx.fillStyle = '#fff6e4'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 22; ctx.stroke();
+// the red scarf, its end tucked to one side
+ctx.fillStyle = '#ee4058'; ctx.strokeStyle = '#5a1822'; ctx.lineWidth = 12; ctx.lineJoin = 'round';
+ctx.beginPath(); ctx.moveTo(cx + 120, cy + 70); ctx.quadraticCurveTo(cx + 260, cy + 110, cx + 300, cy + 230); ctx.lineTo(cx + 230, cy + 250); ctx.quadraticCurveTo(cx + 200, cy + 150, cx + 90, cy + 130); ctx.closePath(); ctx.fill(); ctx.stroke();
+ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, R - 11, R * 1.03 - 11, 0, 0, 7); ctx.clip(); rr(cx - R, cy + 50, 2 * R, 92, 40, '#ee4058', '#5a1822', 12); ctx.restore();
+// the face: big shiny eyes, rosy cheeks, a small smile
+for (const ex of [-82, 82]) { ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(cx + ex, cy - 60, 34, 46, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx + ex + 10, cy - 78, 13, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(cx + ex - 10, cy - 46, 6, 0, 7); ctx.fill(); }
+ctx.fillStyle = 'rgba(255,120,150,0.55)'; for (const ex of [-150, 150]) { ctx.beginPath(); ctx.ellipse(cx + ex, cy + 2, 40, 24, 0, 0, 7); ctx.fill(); }
+ctx.strokeStyle = OUT; ctx.lineWidth = 14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(cx, cy - 4, 34, 0.25 * Math.PI, 0.75 * Math.PI); ctx.stroke();
+// hugging a star, two little hands round it
+star(cx - 200, cy + 150, 92, -0.2);
+for (const [hx, hy] of [[cx - 268, cy + 128], [cx - 140, cy + 184]]) { ctx.beginPath(); ctx.arc(hx, hy, 30, 0, 7); ctx.fillStyle = '#fff6e4'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 12; ctx.stroke(); }
+sparkle(cx - 160, cy + 70, 22);
+
+if (CIRCLE) { ctx.globalCompositeOperation = 'destination-in'; ctx.beginPath(); ctx.arc(540, 540, 540, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+</script>
+</body>
+</html>
