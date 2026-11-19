@@ -26,7 +26,7 @@
 const params = new URLSearchParams(location.search);
 const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value }); // live: tune.speed is CONFIG.speed.value
 const STEP = 1 / 60;            // simulation step in seconds; motion is per second, never per frame
-const W = 720; let H = 1280;    // logical size: a phone held upright, as TikTok shows it (sideways on a phone, H is what fits: see fit)
+const W = 720, UI_H = 1280; let H = UI_H, SCALE = 1, MOFF = 0; // MOFF: how far a menu screen sits down on a phone taller than 9:16, so it is centred    // logical size: a phone held upright, as TikTok shows it (sideways on a phone, H is what fits: see fit)
 const FONT = '"Segoe UI", Tahoma, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif';
 const TITLE = 'Long Climb';
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 }; // a check may inject one
@@ -137,15 +137,15 @@ Object.assign(CKB, {
 });
 // Words of the Settings screen.
 EN.set = { title: 'Settings', tabs: ['Sound', 'Controls', 'Display', 'Game'], master: 'Master volume', music: 'Music', sfx: 'Sound effects', mute: 'Mute everything',
-  size: 'Button size', alpha: 'Button opacity', left: 'Left-handed layout', edit: 'Move the buttons', vib: 'Vibration', resetBtns: 'Reset the buttons',
+  size: 'Button size', alpha: 'Button opacity', left: 'Left-handed layout', edit: 'Move and resize the buttons', thisSize: 'Size', btnNames: ['Left', 'Right', 'Jump', 'Fire', 'Shove', 'Grab'], vib: 'Vibration', resetBtns: 'Reset the buttons',
   scenery: 'Scenery detail', low: 'Light', high: 'Painted', shake: 'Screen shake', little: 'A little', full: 'Full', particles: 'Dust and sparks', fps: 'Frame-rate counter',
   ghost: 'Ghost of your best climb', bubbles: 'Funny speech bubbles', resetAll: 'Reset all settings', resetSure: 'Press again to reset everything', resetDone: 'Settings reset',
-  keys: 'Up / Down: choose     Left / Right: change     Tab: next page     Esc: back', open: 'Settings', drag: 'Drag a button to where your thumb wants it', dragKeys: 'Tab: pick a button     arrows: move it', done: 'Done', reset: 'Put them back', phoneOnly: 'These are for the buttons on a phone or a tablet' };
+  keys: 'Up / Down: choose     Left / Right: change     Tab: next page     Esc: back', open: 'Settings', drag: 'Tap a button, drag it, pinch it to size it', dragKeys: 'Tab: pick a button     arrows: move it     + -: its size', done: 'Done', reset: 'Put them back', phoneOnly: 'These are for the buttons on a phone or a tablet' };
 CKB.set = { title: 'ڕێکخستنەکان', tabs: ['دەنگ', 'کۆنتڕۆڵ', 'پیشاندان', 'یاری'], master: 'دەنگی گشتی', music: 'مۆسیقا', sfx: 'دەنگی کارەکان', mute: 'بێدەنگکردنی هەموو شتێک',
-  size: 'قەبارەی دوگمەکان', alpha: 'ڕوونی دوگمەکان', left: 'ڕیزبەندی دەستی چەپ', edit: 'گواستنەوەی دوگمەکان', vib: 'لەرینەوە', resetBtns: 'دوگمەکان بگەڕێنەوە بۆ شوێنی خۆیان',
+  size: 'قەبارەی دوگمەکان', alpha: 'ڕوونی دوگمەکان', left: 'ڕیزبەندی دەستی چەپ', edit: 'گواستنەوە و قەبارەی دوگمەکان', thisSize: 'قەبارە', btnNames: ['چەپ', 'ڕاست', 'باز', 'تەقە', 'پاڵنان', 'گرتن'], vib: 'لەرینەوە', resetBtns: 'دوگمەکان بگەڕێنەوە بۆ شوێنی خۆیان',
   scenery: 'وردەکاری دیمەن', low: 'سووک', high: 'وێنەکێشراو', shake: 'لەرزینی شاشە', little: 'کەمێک', full: 'تەواو', particles: 'تەپوتۆز و پریشک', fps: 'ژمێرەری FPS',
   ghost: 'تارمایی باشترین سەرکەوتنت', bubbles: 'قسە خۆشەکان', resetAll: 'هەموو ڕێکخستنەکان بگەڕێنەوە', resetSure: 'دووبارە دایبگرە بۆ گەڕاندنەوەی هەمووی', resetDone: 'ڕێکخستنەکان گەڕێنرانەوە',
-  keys: 'سەرەوە / خوارەوە: هەڵبژاردن     چەپ / ڕاست: گۆڕین     Tab: پەڕەی دواتر     Esc: گەڕانەوە', open: 'ڕێکخستنەکان', drag: 'دوگمەیەک ڕابکێشە بۆ ئەو شوێنەی پەنجەت دەیەوێت', dragKeys: 'Tab: هەڵبژاردنی دوگمە     تیرەکان: جووڵاندنی', done: 'تەواو', reset: 'بیانگەڕێنەوە', phoneOnly: 'ئەمانە بۆ دوگمەکانی سەر مۆبایل یان تابلێتن' };
+  keys: 'سەرەوە / خوارەوە: هەڵبژاردن     چەپ / ڕاست: گۆڕین     Tab: پەڕەی دواتر     Esc: گەڕانەوە', open: 'ڕێکخستنەکان', drag: 'دوگمەیەک دابگرە، ڕایبکێشە، بە دوو پەنجە قەبارەکەی بگۆڕە', dragKeys: 'Tab: هەڵبژاردنی دوگمە     تیرەکان: جووڵاندنی     + -: قەبارەکەی', done: 'تەواو', reset: 'بیانگەڕێنەوە', phoneOnly: 'ئەمانە بۆ دوگمەکانی سەر مۆبایل یان تابلێتن' };
 
 // ---- Screen ---------------------------------------------------------------------------
 const canvas = document.getElementById('game');
@@ -164,8 +164,9 @@ function setStream(on) { STREAM = on; try { localStorage.setItem('long-climb-str
 function hudShift(fn) { if (!STREAM || LAND || touchSeen) { fn(); return; } ctx.save(); ctx.translate(0, SAFE_TOP); HUDY = SAFE_TOP; try { fn(); } finally { HUDY = 0; ctx.restore(); } }
 function fit() { // fills the window at any size and pixel ratio
   const iw = innerWidth, ih = innerHeight; LAND = phone && iw > ih * 1.15;
-  H = LAND ? clamp(Math.round(2 * W * ih / iw), 600, 1280) : 1280; CW = LAND ? Math.max(W, H * iw / ih) : W; OX = (CW - W) / 2;
+  H = LAND ? clamp(Math.round(2 * W * ih / iw), 600, UI_H) : phone ? clamp(Math.round(W * ih / iw), UI_H, 1760) : UI_H; CW = LAND ? Math.max(W, H * iw / ih) : W; OX = (CW - W) / 2; // upright on a tall phone, the whole screen: more of the tower above and below
   const k = LAND ? ih / H : Math.min(iw / W, ih / H), r = Math.max(k * (devicePixelRatio || 1), STREAM ? 1.5 : 0); // the TikTok view: never under 1080 x 1920
+  SCALE = k; // screen pixels (CSS) for one of the game's: the phone's buttons are sized by it
   canvas.width = Math.round(CW * r); canvas.height = Math.round(H * r);
   canvas.style.width = Math.round(CW * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
   canvas.style.marginTop = Math.max(0, Math.floor((ih - H * k) / 2)) + 'px';
@@ -204,6 +205,8 @@ function zone(x, y, w, h, fn, slide) { // slide: a slider's setter, given 0 to 1
   else y += HUDY; // a button of the HUD, brought down in the TikTok view
   zones.push({ x, y, w, h, fn, slide });
 }
+const lpts = new Map(); let pinch = null; // the button editor's fingers on the glass, and a pinch under way
+function setBtnSize(b, v, keep = true) { if (!b) return; const o = LAND ? 'l' : 'p'; prefs.size[o][b.code] = clamp(Math.round(v * 100) / 100, 0.5, 1.8); layoutBtns(); if (keep) savePrefs(); }
 let drag = null; // a slider held, or a phone button being placed: it follows the pointer until it lets go
 function dragTo(f) {
   if (!drag) return;
@@ -214,7 +217,8 @@ function dragEnd() {
   if (drag && drag.btn) { const b = drag.btn; prefs.pos[LAND ? 'l' : 'p'][b.code] = [(b.x + OX) / CW, b.y / H]; savePrefs(); }
   drag = null;
 }
-function dim(a) { if (PASS) return; ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, 0, W, H); }
+function dim(a) { if (PASS) return; ctx.fillStyle = `rgba(8,10,16,${a})`; ctx.fillRect(0, -MOFF, W, H + 2 * MOFF); }
+function full(fn) { if (!MOFF) { fn(); return; } const m = MOFF, h = H, hy = HUDY; ctx.save(); ctx.translate(0, -m); H = h + 2 * m; MOFF = 0; HUDY = 0; try { fn(); } finally { ctx.restore(); H = h; MOFF = m; HUDY = hy; } } // inside a centred menu: draw on the whole screen
 function pill(x, y, w, h, fill = UI.bg) { rr(x, y, w, h, Math.min(h / 2, 26), fill); }
 function dot(x, y, r, c) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = c; ctx.fill(); }
 function chevron(x, y, d, c = '#ffffff', s = 9) { ctx.strokeStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - d * s * 0.5, y - s); ctx.lineTo(x + d * s * 0.5, y); ctx.lineTo(x - d * s * 0.5, y + s); ctx.stroke(); }
@@ -239,17 +243,18 @@ function gear(x, y, r, c) { // a cog: the mark of the Settings
   ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i * PI / 8 - PI / 16, rr2 = i % 2 ? r : r * 1.32; ctx.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); ctx.lineTo(x + Math.cos(a + PI / 8) * rr2, y + Math.sin(a + PI / 8) * rr2); } ctx.closePath(); ctx.fill();
   ctx.fillStyle = UI.soft === c ? '#000' : 'rgba(30,34,46,1)'; ctx.beginPath(); ctx.arc(x, y, r * 0.42, 0, 7); ctx.fill();
 }
-function backBtn(x = 0) { if (PASS) { corner = 'back'; return; } pill(x + 14, 14, 52, 52); chevron(x + 38, 40, -1); zone(x, 0, 84, 84, () => hit.add('Escape')); }
+function backBtn(x = 0) { if (PASS) { corner = 'back'; return; } const t = -MOFF; pill(x + 14, t + 14, 52, 52); chevron(x + 38, t + 40, -1); zone(x, t, 84, 84, () => hit.add('Escape')); }
 function toastLine(y) { if (!(game.msgT > 0)) return; if (PASS) { wantToast = true; return; } ctx.font = `bold 21px ${FONT}`; const w = Math.min(W - 60, ctx.measureText(game.msg).width + 44); pill(W / 2 - w / 2, y - 22, w, 44, 'rgba(10,12,20,0.86)'); text(fitText(game.msg, w - 30, 21), W / 2, y + 1, 21, UI.gold, 'center', true); }
 
 // ---- Settings: the player's own choices, kept in this browser; config.js holds where they start ----
 const PREFS_KEY = 'long-climb-settings';
-const PREF0 = Object.assign({ btn_size: 1, btn_alpha: 0.85, left_handed: false, haptics: true, scenery: 1, shake: 2, particles: true, fps: false, ghost: true, bubbles: true }, CONFIG.prefs || {});
+const PREF0 = Object.assign({ btn_alpha: 0.85, left_handed: false, haptics: true, scenery: 1, shake: 2, particles: true, fps: false, ghost: true, bubbles: true }, CONFIG.prefs || {});
 const VOL0 = { volume: CONFIG.volume.value, music_volume: CONFIG.music_volume.value, sfx_volume: CONFIG.sfx_volume.value };
-let prefs = Object.assign({}, PREF0, { pos: { p: {}, l: {} } });
-try { const s = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); if (s && typeof s === 'object') { Object.assign(prefs, s); if (!prefs.pos || typeof prefs.pos !== 'object') prefs.pos = { p: {}, l: {} }; prefs.pos.p = prefs.pos.p || {}; prefs.pos.l = prefs.pos.l || {}; for (const k in VOL0) if (typeof s[k] === 'number') CONFIG[k].value = clamp(s[k], 0, 1); } } catch (e) {}
+let prefs = Object.assign({}, PREF0, { pos: { p: {}, l: {} }, size: { p: {}, l: {} } });
+try { const s = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); if (s && typeof s === 'object') { Object.assign(prefs, s); if (!prefs.pos || typeof prefs.pos !== 'object') prefs.pos = { p: {}, l: {} }; prefs.pos.p = prefs.pos.p || {}; prefs.pos.l = prefs.pos.l || {}; if (!prefs.size || typeof prefs.size !== 'object') prefs.size = {}; prefs.size.p = prefs.size.p || {}; prefs.size.l = prefs.size.l || {}; for (const k in VOL0) if (typeof s[k] === 'number') CONFIG[k].value = clamp(s[k], 0, 1); } } catch (e) {}
 function savePrefs() { try { const o = Object.assign({}, prefs); for (const k in VOL0) o[k] = CONFIG[k].value; localStorage.setItem(PREFS_KEY, JSON.stringify(o)); } catch (e) {} }
 function buzz(ms) { if (prefs.haptics && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
+const btnMult = b => clamp(((prefs.size || {})[LAND ? 'l' : 'p'] || {})[b.code] || 1, 0.5, 1.8); // one button's own size, as the player set it for this way of holding the phone
 const SHAKE = () => [0, 0.45, 1][prefs.shake] ?? 1; // how much of the shake the screen shows
 
 // ---- Input: keys by position (event.code), OS key repeat ignored; touch buttons on a phone ---
@@ -273,20 +278,30 @@ const BTN = [ // the phone's buttons: where they sit, the key each one holds dow
 const btnShown = b => !b.when || (b.when === 'gun' ? state.gun : game.kind !== 'solo');
 const fingers = new Map();
 if (phone) touchSeen = true; // a phone shows its buttons from the start
+const BTN_CSS = { ArrowLeft: 40, ArrowRight: 40, Space: 48, KeyF: 31, KeyE: 29, KeyQ: 28 }; // each button's radius in screen pixels (CSS): about 13 mm across for the arrows and 16 mm for the jump on a phone
+const ICON_R = { ArrowLeft: 76, ArrowRight: 76, Space: 90, KeyF: 58, KeyE: 54, KeyQ: 52 }; // the radius each button's mark was drawn for
 function btnHome() { // where each button sits before the player moves it: over the tower's foot upright, on the panels beside the tower sideways; mirrored for the left hand
-  const at = LAND ? [[-OX * 0.74, H - 150, 82], [-OX * 0.26, H - 150, 82], [W + OX * 0.66, H - 130, 92], [W + OX * 0.24, H - 110, 58], [W + OX * 0.76, H - 320, 56], [W + OX * 0.32, H - 290, 54]]
-    : [[104, H - 134, 76], [272, H - 134, 76], [W - 116, H - 140, 90], [W - 268, H - 262, 58], [W - 80, H - 312, 54], [W - 300, H - 112, 52]];
+  const s = 1 / Math.max(0.25, SCALE), R = (c, lo, hi) => clamp(BTN_CSS[c] * s, lo, hi), g = (v, lo, hi) => clamp(v * s, lo, hi);
+  let at;
+  if (LAND) at = [[-OX * 0.74, H - 150, 82], [-OX * 0.26, H - 150, 82], [W + OX * 0.66, H - 130, 92], [W + OX * 0.24, H - 110, 58], [W + OX * 0.76, H - 320, 56], [W + OX * 0.32, H - 290, 54]].map((a, i) => [a[0], a[1], Math.min(a[2], BTN_CSS[BTN[i].code] * s)]);
+  else { // upright: the arrows in the bottom-left corner, the jump in the bottom-right, fire up and to its left, shove above it, grab in the gap between
+    const ra = R('ArrowLeft', 50, 84), rj = R('Space', 60, 100), rf = R('KeyF', 38, 66), re = R('KeyE', 36, 62), rq = R('KeyQ', 34, 60), m = g(16, 16, 40), yb = H - g(26, 26, 64);
+    const L = [m + ra, yb - ra, ra], Rt = [m + 3 * ra + g(12, 12, 28), yb - ra, ra], J = [W - m - rj, yb - rj, rj];
+    const dF = rj + rf + g(10, 10, 22), dE = rj + re + g(12, 12, 24), F = [J[0] - dF * 0.8, J[1] - dF * 0.6, rf], E = [Math.min(J[0] + dE * 0.15, W - m - re), J[1] - dE, re];
+    const gap0 = Rt[0] + ra, gap1 = J[0] - rj, Q = gap1 - gap0 >= 2 * rq + g(16, 16, 30) ? [(gap0 + gap1) / 2, yb - rq, rq] : [Rt[0], Rt[1] - ra - rq - g(14, 14, 28), rq]; // no room between: above the right arrow
+    at = [L, Rt, J, F, E, Q];
+  }
   if (prefs.left_handed) { for (const a of at) a[0] = W - a[0]; [at[0], at[1]] = [at[1], at[0]]; } // the arrows keep left on the left
   return at;
 }
 function layoutBtns() { // the home spots, then wherever the player dragged a button to (kept as a share of the screen, per way the phone is held), at the chosen size
-  const at = btnHome(), mine = prefs.pos[LAND ? 'l' : 'p'] || {};
+  const at = btnHome(), o = LAND ? 'l' : 'p', mine = prefs.pos[o] || {};
   BTN.forEach((b, i) => {
-    const m = mine[b.code]; b.r0 = at[i][2]; b.r = at[i][2] * clamp(prefs.btn_size, 0.6, 1.5);
+    const m = mine[b.code]; b.r0 = ICON_R[b.code]; b.r = at[i][2] * btnMult(b);
     if (Array.isArray(m)) { b.x = m[0] * CW - OX; b.y = m[1] * H; } else { b.x = at[i][0]; b.y = at[i][1]; }
   });
 }
-addEventListener('resize', layoutBtns); layoutBtns();
+addEventListener('resize', layoutBtns); layoutBtns(); setTimeout(layoutBtns, 300); // again once the phone has settled its toolbars
 function fingerAt(e) { const b = canvas.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * CW - OX, y: (e.clientY - b.top) / b.height * H }; }
 function syncFingers() { // each finger holds the one button nearest it; a button with no finger on it is let go
   const held = new Set();
@@ -322,7 +337,9 @@ canvas.addEventListener('pointerdown', e => {
     const z = zones[i];
     if (f.x >= z.x && f.x < z.x + z.w && f.y >= z.y && f.y < z.y + z.h) { if (z.fn) taps.push(z.fn); if (z.slide) { drag = { slide: z.slide, x: z.x, w: z.w }; dragTo(f); } if (e.pointerType === 'touch') buzz(8); e.preventDefault(); return; }
   }
-  if (scene === 'layout') { // the button editor: pick up the nearest button under the finger
+  if (scene === 'layout') { // the button editor: one finger picks up the nearest button; a second finger pinches it bigger or smaller
+    lpts.set(e.pointerId, f);
+    if (lpts.size >= 2 && BTN[layoutSel]) { const [a, b] = [...lpts.values()]; pinch = { d0: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), s0: btnMult(BTN[layoutSel]) }; drag = null; e.preventDefault(); return; }
     let best = null, bd = 1.3; for (const b of BTN) { const d = Math.hypot(f.x - b.x, f.y - b.y) / b.r; if (d < bd) { best = b; bd = d; } }
     if (best) { drag = { btn: best }; layoutSel = BTN.indexOf(best); buzz(10); } e.preventDefault(); return;
   }
@@ -336,8 +353,8 @@ canvas.addEventListener('pointerdown', e => {
   } else if (scene === 'results') hit.add('Enter');
   e.preventDefault();
 });
-canvas.addEventListener('pointermove', e => { if (drag) dragTo(fingerAt(e)); if (fingers.has(e.pointerId)) { fingers.set(e.pointerId, fingerAt(e)); syncFingers(); } });
-for (const n of ['pointerup', 'pointercancel', 'pointerleave']) canvas.addEventListener(n, e => { down.delete('MouseL'); if (drag) dragEnd(); if (fingers.delete(e.pointerId)) syncFingers(); });
+canvas.addEventListener('pointermove', e => { if (lpts.has(e.pointerId)) { lpts.set(e.pointerId, fingerAt(e)); if (pinch && lpts.size >= 2) { const [a, b] = [...lpts.values()]; setBtnSize(BTN[layoutSel], pinch.s0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0, false); return; } } if (drag) dragTo(fingerAt(e)); if (fingers.has(e.pointerId)) { fingers.set(e.pointerId, fingerAt(e)); syncFingers(); } });
+for (const n of ['pointerup', 'pointercancel', 'pointerleave']) canvas.addEventListener(n, e => { down.delete('MouseL'); if (lpts.delete(e.pointerId) && pinch && lpts.size < 2) { pinch = null; savePrefs(); } if (drag) dragEnd(); if (fingers.delete(e.pointerId)) syncFingers(); });
 
 // ---- A controller (PS5, Xbox, or any standard pad): stick or d-pad to move, the face buttons for the rest ----
 const padHeld = new Set(); let padSeen = false;
@@ -1843,6 +1860,7 @@ function airLines(px, py, vy, t) { // lines of air streaming up past a climber f
 }
 function drawWorld() {
   if (PASS) return; // a slice of a tall screen: the tower is already drawn under it
+  if (MOFF) { full(drawWorld); return; } // under a centred menu, the tower fills the whole screen
   const t = state.t, vis = y => y > -70 && y < H + 70, live = scene === 'play' || scene === 'pause' || scene === 'board' || scene === 'watch';
   ctx.save();
   if (LAND) { ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); } // sideways, nothing of the tower spills onto the panels beside it
@@ -1902,7 +1920,7 @@ function drawWorld() {
 }
 
 // ---- What is on the screen over the tower: as little as the climb needs ------------------------
-function menuBtn(x = 0) { if (PASS) { corner = 'menu'; return; } pill(x + 14, 14, 52, 52); ctx.fillStyle = '#ffffff'; for (const yy of [31, 39, 47]) ctx.fillRect(x + 29, yy, 22, 3); zone(x, 0, 84, 84, () => hit.add('Escape')); } // the menu button: Esc, or a tap
+function menuBtn(x = 0) { if (PASS) { corner = 'menu'; return; } const t = -MOFF; pill(x + 14, t + 14, 52, 52); ctx.fillStyle = '#ffffff'; for (const yy of [31, 39, 47]) ctx.fillRect(x + 29, t + yy, 22, 3); zone(x, t, 84, 84, () => hit.add('Escape')); } // the menu button: Esc, or a tap
 function clockPill(sub) { pill(W / 2 - 116, 14, 232, 76); ltr(clockText(Math.floor(state.time * 100)), W / 2, 42, 32, '#ffffff'); text(sub, W / 2, 72, 17, UI.dim); }
 function heightBar(alt, color, ghostAlt = null) { // the whole tower by world, with every level marked, where you are and your best
   const bx = 6, by = 100, bh = H - by - 70 - HUDY, yOf = a => by + bh - clamp(a / SUMMIT, 0, 1) * bh, race = game.kind !== 'solo';
@@ -2051,12 +2069,11 @@ function settingRows() {
     { label: S.mute, kind: 'toggle', get: () => muted, set: v => setMuted(v) },
   ];
   if (setTab === 1) return [
-    { label: S.size, kind: 'slider', min: 0.6, max: 1.5, step: 0.05, fmt: pct, get: () => prefs.btn_size, set: v => { prefs.btn_size = v; layoutBtns(); savePrefs(); } },
     { label: S.alpha, kind: 'slider', min: 0.2, max: 1, step: 0.05, fmt: pct, get: () => prefs.btn_alpha, set: v => { prefs.btn_alpha = v; savePrefs(); } },
     { label: S.left, kind: 'toggle', get: () => !!prefs.left_handed, set: v => { if (v !== !!prefs.left_handed) mirrorPos(); prefs.left_handed = v; layoutBtns(); savePrefs(); } },
-    { label: S.edit, kind: 'action', run: () => { layoutSel = 2; scene = 'layout'; } },
+    { label: S.edit, kind: 'action', run: () => { layoutSel = 2; lpts.clear(); pinch = null; scene = 'layout'; } },
     Object.assign({ label: S.vib }, flip('haptics')),
-    { label: S.resetBtns, kind: 'action', run: () => { prefs.pos = { p: {}, l: {} }; for (const k of ['btn_size', 'btn_alpha', 'left_handed']) prefs[k] = PREF0[k]; layoutBtns(); savePrefs(); toast(S.resetDone); } },
+    { label: S.resetBtns, kind: 'action', run: () => { prefs.pos = { p: {}, l: {} }; prefs.size = { p: {}, l: {} }; for (const k of ['btn_alpha', 'left_handed']) prefs[k] = PREF0[k]; layoutBtns(); savePrefs(); toast(S.resetDone); } },
   ];
   if (setTab === 2) return [
     { label: K.lang, kind: 'choice', opts: [EN.langName, CKB.langName], get: () => lang === 'en' ? 0 : 1, set: i => setLang(i ? 'ckb' : 'en') },
@@ -2070,7 +2087,7 @@ function settingRows() {
     Object.assign({ label: S.ghost }, flip('ghost')), Object.assign({ label: S.bubbles }, flip('bubbles')),
     { label: resetArm > 0 ? S.resetSure : S.resetAll, kind: 'action', danger: true, run: () => { // asks once more before it wipes everything
       if (!(resetArm > 0)) { resetArm = 3; return; }
-      resetArm = 0; prefs = Object.assign({}, PREF0, { pos: { p: {}, l: {} } }); for (const k in VOL0) CONFIG[k].value = VOL0[k]; applyVolumes(); layoutBtns(); savePrefs(); toast(K.set.resetDone);
+      resetArm = 0; prefs = Object.assign({}, PREF0, { pos: { p: {}, l: {} }, size: { p: {}, l: {} } }); for (const k in VOL0) CONFIG[k].value = VOL0[k]; applyVolumes(); layoutBtns(); savePrefs(); toast(K.set.resetDone);
     } },
   ];
 }
@@ -2362,7 +2379,7 @@ const scenes = {
       hit.clear(); sfx.pick(); list[pauseSel][1]();
     },
     draw() {
-      if (!PASS) { scenes[pauseFrom].draw(); zones = []; } dim(0.78);
+      if (!PASS) { full(() => scenes[pauseFrom].draw()); zones = []; } dim(0.78);
       const r = net.room, list = this.items(); let y = r ? 150 : 330;
       text(r ? K.menuT : K.paused, W / 2, y, 46, '#ffffff', 'center', true); y += 62;
       if (r) { // the room's code and link, to send to whoever wants to come in or come back
@@ -2421,25 +2438,30 @@ const scenes = {
       toastLine(1180);
     },
   },
-  layout: { // move the phone's buttons: drag each to where the thumb wants it; the size and the way back at the top
+  layout: { // the phone's buttons, one at a time: tap to pick, drag to move, pinch or the slider to size; the way back at the top
     update(dt) {
       settingsTick(dt); if (scene !== 'layout') return;
-      if (pressed('Escape') || pressed('Enter')) { hit.clear(); sfx.type(); drag = null; scene = 'settings'; return; }
+      if (pressed('Escape') || pressed('Enter')) { hit.clear(); sfx.type(); drag = null; pinch = null; lpts.clear(); scene = 'settings'; return; }
       if (pressed('Tab')) { layoutSel = (layoutSel + 1) % BTN.length; sfx.type(); }
       const b = BTN[layoutSel], dx = (down.has('ArrowRight') ? 1 : 0) - (down.has('ArrowLeft') ? 1 : 0), dy = (down.has('ArrowDown') ? 1 : 0) - (down.has('ArrowUp') ? 1 : 0);
       if (b && (dx || dy)) { drag = { btn: b }; dragTo({ x: b.x + dx * 240 * dt, y: b.y + dy * 240 * dt }); dragEnd(); }
+      if (b && (pressed('Equal') || pressed('NumpadAdd'))) { setBtnSize(b, btnMult(b) + 0.1); sfx.type(); }
+      if (b && (pressed('Minus') || pressed('NumpadSubtract'))) { setBtnSize(b, btnMult(b) - 0.1); sfx.type(); }
     },
     draw() {
       drawWorld(); dim(0.45);
-      const S = K.set, top = Math.min(110, H * 0.09), sz = { min: 0.6, max: 1.5, step: 0.05, set: v => { prefs.btn_size = v; layoutBtns(); savePrefs(); } };
-      const f = clamp((prefs.btn_size - sz.min) / (sz.max - sz.min), 0, 1), bx = 150, bw = W - 300, by = top + 70;
-      text(S.drag, W / 2, top, 26, '#ffffff', 'center', true);
-      text(`${S.size}  ${pct(prefs.btn_size)}`, W / 2, top + 40, 18, UI.dim); rr(bx, by - 4, bw, 8, 4, 'rgba(255,255,255,0.2)'); rr(bx, by - 4, Math.max(8, bw * f), 8, 4, UI.gold); dot(bx + bw * f, by, 14, '#ffffff');
-      zone(bx - 30, by - 26, bw + 60, 52, null, v => sliderSet(sz, bx, bw, bx - 30, bw + 60, v));
-      button(S.done, W / 2 - 230, by + 40, 220, 60, true, () => hit.add('Escape'), { size: 24 });
-      button(S.reset, W / 2 + 10, by + 40, 220, 60, false, () => { prefs.pos[LAND ? 'l' : 'p'] = {}; layoutBtns(); savePrefs(); sfx.type(); }, { size: 22 });
-      if (!touchSeen) text(S.dragKeys, W / 2, by + 132, 17, UI.dim);
-      BTN.forEach((b, i) => drawPadBtn(b, Math.max(prefs.btn_alpha, 0.55), i === layoutSel));
+      const S = K.set, b = BTN[layoutSel], top = Math.min(100, H * 0.08), lo = 0.5, hi = 1.8, v = b ? btnMult(b) : 1, f = clamp((v - lo) / (hi - lo), 0, 1);
+      text(S.drag, W / 2, top, 21, '#ffffff', 'center', true);
+      text(`${S.thisSize}: ${b ? S.btnNames[layoutSel] : ''}`, W / 2, top + 42, 20, UI.gold, 'center', true);
+      const bx = 170, bw = W - 340, by = top + 92; // the picked button's size: minus, a slider, plus
+      button('−', 60, by - 30, 84, 60, false, () => { setBtnSize(b, v - 0.1); sfx.type(); }, { size: 34 });
+      button('+', W - 144, by - 30, 84, 60, false, () => { setBtnSize(b, v + 0.1); sfx.type(); }, { size: 34 });
+      rr(bx, by - 4, bw, 8, 4, 'rgba(255,255,255,0.2)'); rr(bx, by - 4, Math.max(8, bw * f), 8, 4, UI.gold); dot(bx + bw * f, by, 15, '#ffffff'); ltr(pct(v), bx + bw * f, by - 30, 17, '#ffffff');
+      zone(bx - 10, by - 28, bw + 20, 56, null, x => setBtnSize(b, lo + clamp(((bx - 10 + (bw + 20) * x) - bx) / bw, 0, 1) * (hi - lo)));
+      button(S.done, W / 2 - 230, by + 50, 220, 60, true, () => hit.add('Escape'), { size: 24 });
+      button(S.reset, W / 2 + 10, by + 50, 220, 60, false, () => { const o = LAND ? 'l' : 'p'; prefs.pos[o] = {}; prefs.size[o] = {}; layoutBtns(); savePrefs(); sfx.type(); }, { size: 22 });
+      if (!touchSeen) text(S.dragKeys, W / 2, by + 142, 17, UI.dim);
+      BTN.forEach((bb, i) => drawPadBtn(bb, Math.max(prefs.btn_alpha, 0.55), i === layoutSel));
     },
   },
   results: {
@@ -2990,10 +3012,13 @@ function splitDraw(sc) { // sideways, a tall screen is shown as its parts side b
   if (corner === 'back') backBtn(-OX); else if (corner === 'menu') menuBtn(-OX); // the way back sits in the screen's corner, not the tall screen's
   if (wantToast) toastLine(H - 44);
 }
+const FULLSCR = new Set(['play', 'watch', 'layout', 'figures', 'devmap']); // the screens that use a tall phone's whole height; every other one is a menu, centred
 function drawFrame() {
   zones = []; const sc = scenes[scene];
   ctx.save(); if (LAND) { ctx.fillStyle = '#0b0d14'; ctx.fillRect(0, 0, CW, H); ctx.translate(OX, 0); }
-  if (LAND && sc.cols) splitDraw(sc); else sc.draw();
+  if (LAND && sc.cols) splitDraw(sc);
+  else if (H > UI_H && !FULLSCR.has(scene)) { const h = H; MOFF = Math.floor((h - UI_H) / 2); HUDY = MOFF; H = UI_H; ctx.save(); ctx.translate(0, MOFF); try { sc.draw(); } finally { ctx.restore(); H = h; MOFF = 0; HUDY = 0; } } // a menu on a tall phone: centred
+  else sc.draw();
   if (dev.on && !con.open && scene === 'play') drawDevBadge();
   if (!con.open && (scene === 'play' || scene === 'watch')) hudShift(drawLive); // the falling likes, the gift feed and the buffs: yours, or those of the climber you watch
   if (con.open) drawConsole();

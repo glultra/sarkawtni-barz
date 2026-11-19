@@ -157,7 +157,6 @@ window.CONFIG = {
   sfx_volume: { value: 0.8, min: 0, max: 1, step: 0.05 },        // jumps, landings, falls and every other sound effect
   // What the Settings screen starts from on a first visit; the player's own choices are kept in the browser.
   prefs: {
-    btn_size: 1,          // the phone's buttons, this many times their size (0.6 to 1.5)
     btn_alpha: 0.85,      // how solid the phone's buttons look (0.2 to 1)
     left_handed: false,   // jump on the left, the arrows on the right
     haptics: true,        // a short buzz when a phone button is pressed
