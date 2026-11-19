@@ -152,7 +152,23 @@ window.CONFIG = {
     piano: ['پیانۆ؟! بەڕاستی؟', 'ئەی لە قەبری بام!', 'کێ پیانۆ فڕێ دەدات؟!', 'سەرم بوو بە دەهۆڵ'], // flattened by a gift's piano
   },
 
-  volume: { value: 0.5, min: 0, max: 1, step: 0.05 },
+  volume: { value: 0.5, min: 0, max: 1, step: 0.05 },            // everything: the Settings screen's "Master volume"
   music_volume: { value: 0.5, min: 0, max: 1, step: 0.05 },      // the built-in tunes and your songs
+  sfx_volume: { value: 0.8, min: 0, max: 1, step: 0.05 },        // jumps, landings, falls and every other sound effect
+  // What the Settings screen starts from on a first visit; the player's own choices are kept in the browser.
+  prefs: {
+    btn_size: 1,          // the phone's buttons, this many times their size (0.6 to 1.5)
+    btn_alpha: 0.85,      // how solid the phone's buttons look (0.2 to 1)
+    left_handed: false,   // jump on the left, the arrows on the right
+    haptics: true,        // a short buzz when a phone button is pressed
+    scenery: 1,           // 0: plain and light for a slow phone, 1: the painted layers
+    shake: 2,             // the screen's shake on a fall or a hit: 0 off, 1 a little, 2 full
+    particles: true,      // dust, sparks and confetti
+    fps: false,           // a frame-rate counter in the corner
+    ghost: true,          // the see-through ghost of your best climb
+    bubbles: true,        // the funny lines in a speech bubble
+  },
+  scenery_grain: { value: 0.07, min: 0, max: 0.2, step: 0.01 },  // the fine grain over the sky, so it reads painted rather than flat
+  scenery_light: { value: 0.12, min: 0, max: 0.3, step: 0.01 },  // how strongly each world's light tints everything
   music_tempo: { value: 72, min: 55, max: 110, step: 1 },        // beats a minute of the built-in tunes in the first world; each world after adds 1.5
 };

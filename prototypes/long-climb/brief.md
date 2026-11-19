@@ -84,6 +84,7 @@ After play: a Rose should be a disadvantage; the real TikTok gift pictures; afte
 After play: at least write each gift's name in the list
 
 After play: no rate limit for gifters; the recent activities take my entire screen
+After play: i need a full polishment and making the game more nice which doesn't look like ai generated textures stuffs please and backgrounds ! go with smth really nicefull and smooth and more natural ! then what i suggest to work on my game is adding menu more settings and options ! for example on mobile button position, size, .... etc and for other options look what the game needs as option !? like sound .... go with general options/settings
 
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
@@ -188,6 +189,8 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] A finish code with the time in it, and a screen to check a viewer's code against yours
 - [x] Phone touch buttons: two arrows, a jump, and fire
 - [x] Sound for jump, landing, footsteps, a long fall (a whistle, rushing air and a thud), each rest floor, the countdown, a shove and a grab
+- [x] Painted scenery in layers: rock walls lit at their edges in the deep, pines, hills and snowy mountains that fall away as you climb out of the ground, shaded clouds tinted by the hour, sun rays and floating dust, a haze of gas and two depths of stars in space, each world's light over everything, a fine grain over the sky; a shaded gold floor and clear ice
+- [x] A Settings screen (main menu and the Esc menu; O on the main menu): master, music and effects volume and mute; the phone buttons' size and opacity, a left-handed layout, dragging each button where you want it, vibration; language, scenery detail (light or painted), screen shake (off, a little, full), dust and sparks, the TikTok view, a frame-rate counter; the ghost and the speech bubbles on or off; reset everything. Kept in the browser; the first-visit values are in config.js (prefs)
 
 ## Your systems
 - parkour · in the slice
