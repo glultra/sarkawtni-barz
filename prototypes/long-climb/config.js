@@ -50,7 +50,8 @@ window.CONFIG = {
 
   // Hazards
   bounce_speed: { value: 1120, min: 800, max: 1500, step: 20 },  // a bouncer throws you up this fast
-  wind_speed: { value: 75, min: 0, max: 260, step: 5 },          // the wind carries you sideways in the air (it was 115: too strong); it eases in and out around each turn
+  flip_share: { value: 0.5, min: 0, max: 0.9, step: 0.05 },      // Sun and moon (world 6, and 0.7 of this in the last world): the share of plain ledges that are sun or moon; every jump swaps which is solid
+  wind_speed: { value: 75, min: 0, max: 260, step: 5 },          // the wind blows only on Hard (world 6 and the last world): it carries you sideways in the air (it was 115: too strong); it eases in and out around each turn
   wind_period: { value: 3.6, min: 1.5, max: 8, step: 0.1 },      // seconds before the wind turns
   crumble_delay: { value: 0.5, min: 0.15, max: 1.5, step: 0.05 },// seconds a crumbling ledge holds you
   crumble_back: { value: 1.2, min: 0.5, max: 8, step: 0.1 },       // seconds until it comes back
