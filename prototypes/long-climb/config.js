@@ -169,9 +169,6 @@ window.CONFIG = {
     bubbles: true,        // the funny lines in a speech bubble
   },
   scenery_grain: { value: 0.07, min: 0, max: 0.2, step: 0.01 },  // the fine grain over the sky, so it reads painted rather than flat
-  scenery_light: { value: 0.12, min: 0, max: 0.3, step: 0.01 },  // how strongly each world's light tints the backdrop (the ledges keep their own colours)
-  scenery_haze: { value: 0.14, min: 0, max: 0.4, step: 0.01 },   // a haze of the sky's own colour over the backdrop, so it steps back behind the tower
-  ledge_shadow: { value: 0.32, min: 0, max: 0.8, step: 0.02 },   // the soft shadow behind each ledge on a bright sky
-  ledge_glow: { value: 0.13, min: 0, max: 0.5, step: 0.02 },     // the faint glow behind each ledge on a dark sky (night, space, the cavern)
+  scenery_light: { value: 0.12, min: 0, max: 0.3, step: 0.01 },  // how strongly each world's light tints everything
   music_tempo: { value: 72, min: 55, max: 110, step: 1 },        // beats a minute of the built-in tunes in the first world; each world after adds 1.5
 };
