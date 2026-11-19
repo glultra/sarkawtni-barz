@@ -1303,10 +1303,12 @@ function backdrop(s, cave, t) { // one side of the ground's surface: the cavern 
   if (cave && rich) { const o = (cam * 0.2) % 512; ctx.save(); ctx.translate(0, o); ctx.fillStyle = rock(); ctx.fillRect(0, -o - 4, W, H + 8); ctx.restore(); } // the cavern's far wall
   if (!cave && rich) nebula(s, t);
   farDecor(t, cave); drawBodies(t, cave);
+  if (rich) beasts(s, t, cave, bot); // the world's giant, far off
   if (cave) { if (rich) caveWalls(s); return; }
   if (rich) sunRays(s, t);
   clouds(t, 0.28, 0.55, 0.62, c => c.k < 0.16); // far clouds: small and pale
   if (rich) panorama(s, bot);
+  if (rich) beasts(s, t, false, bot, true); // the flyers, over the far land
   clouds(t, 0.6, 1, 0.9, c => c.k >= 0.16 && c.k < 0.34); // near clouds
   if (rich) motes(s, t);
 }
@@ -1431,6 +1433,101 @@ function nebula(s, t) { // in space: a few great faint clouds of glowing gas, fa
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
 }
+// ---- Giants far off: one great thing per world, far behind the tower, slow and softly tinted like the scenery --------
+// Each lives at a height in its world. As you climb toward it, it rises from below the screen or drifts into view, and it
+// sinks or drifts away as you pass: nothing pops. At most one is near at a time, so the sky stays calm. Painted scenery only.
+const BEASTS = [
+  { k: 'leviathan', w: 0, at: 0.3, rise: 1 }, { k: 'titan', w: 1, at: 0.5, rise: 1 }, { k: 'worm', w: 2, at: 0.5, p: 0.32 },
+  { k: 'walker', w: 3, at: 0.3 }, { k: 'birds', w: 3, at: 0.75, p: 0.45 }, { k: 'whale', w: 4, at: 0.5, p: 0.3 }, { k: 'dragon', w: 5, at: 0.5, p: 0.3 },
+  { k: 'ufo', w: 6, at: 0.45, p: 0.3, s: 1, seed: 1 }, { k: 'ufo', w: 7, at: 0.25, p: 0.38, s: 0.75, seed: 2 }, { k: 'ufo', w: 7, at: 0.8, p: 0.26, s: 1.1, seed: 3 }, { k: 'ufo', w: 8, at: 0.55, p: 0.32, s: 0.9, seed: 4 },
+  { k: 'stargiant', w: 9, at: 0.5, rise: 1 },
+];
+const smooth01 = v => { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); };
+function beasts(s, t, cave, skyBot, front) { // front: the flyers, over the mountains; otherwise those of the deep and the walker behind the mountains
+  for (const b of BEASTS) {
+    const Wd = WORLDS[b.w]; if (Wd.base === undefined || (b.w <= 2) !== cave || (!cave && (b.k === 'walker') === !!front)) continue;
+    const alt = lerp(Wd.base, Wd.end, b.at), near = smooth01(1 - Math.abs(alt - cam) / 2600); if (near < 0.01) continue;
+    const L = LOOK[b.w], col = b.w <= 2 ? '#0a0403' : b.w >= 6 ? '#140c26' : b.k === 'walker' ? mixHex(L.far, skyBot, 0.4) : mixHex(L.near, skyBot, 0.3); // near-black against the glow of the deep; in the open sky a shade deeper than the sky, the walker hazy like the far mountains
+    ctx.save(); ctx.globalAlpha = near * (b.w <= 2 ? 0.92 : b.w >= 6 ? 0.85 : 0.8);
+    if (b.rise) BEAST[b.k](W / 2, H - 10 + (1 - near) * 440, t, col, L); // it rises from below the screen as you come near, and sinks again as you leave
+    else if (b.k === 'walker') { const sb = WORLDS[3].base; BEAST.walker(((t * 9) % (W + 900)) - 450, H * camY() - (sb - cam) * 0.085 + 40 - 120, t, col, L); } // on the far horizon, behind the mountains
+    else BEAST[b.k](0, H * camY() - (alt - cam) * b.p - (b.k === 'whale' ? 260 : b.k === 'dragon' ? 180 : 0), t, col, L, b); // the flyers keep high in the sky
+    ctx.restore();
+  }
+}
+const BEAST = {
+  leviathan(cx, y, t, col, L) { // a serpent of cooled rock swimming through the lava sea: three humps, then a neck and a head, cracks glowing along it
+    const sx = Math.sin(t * 0.25) * 40, glowC = L.rim;
+    for (let i = 0; i < 3; i++) { const hx = cx - 300 + i * 200 + sx, r = 95 - i * 10; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(hx, y, r, r * 0.8 + Math.sin(t * 0.6 + i) * 8, 0, PI, 0); ctx.fill();
+      ctx.beginPath(); for (let k = 0; k < 5; k++) { const a = PI + (k + 0.5) / 5 * PI, px = hx + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.8; ctx.moveTo(px - 10, py + 4); ctx.lineTo(px + Math.cos(a) * 26, py + Math.sin(a) * 26); ctx.lineTo(px + 10, py + 4); } ctx.fill(); // spines
+      ctx.strokeStyle = rgba(glowC, 0.7); ctx.lineWidth = 3.5; ctx.beginPath(); ctx.ellipse(hx, y, r * 0.7, r * 0.5, 0, PI * 1.15, PI * 1.85); ctx.stroke(); }
+    const hx = cx + 300 + sx, hy = y - 230 - Math.sin(t * 0.5) * 18; // the neck and the head
+    ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineWidth = 90; ctx.beginPath(); ctx.moveTo(cx + 180 + sx, y + 20); ctx.quadraticCurveTo(cx + 330 + sx, y - 60, hx - 20, hy + 30); ctx.stroke();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(hx, hy, 95, 58, -0.25, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(hx + 40, hy + 10); ctx.lineTo(hx + 150, hy + 30); ctx.lineTo(hx + 50, hy + 50); ctx.fill(); // the snout
+    ctx.beginPath(); ctx.moveTo(hx - 50, hy - 40); ctx.lineTo(hx - 110, hy - 110); ctx.lineTo(hx - 20, hy - 50); ctx.fill(); // a horn
+    const eo = 0.6 + 0.4 * Math.sin(t * 0.7); glow(hx + 40, hy - 8, 26, rgba(glowC, 0.55 * eo), rgba(glowC, 0)); dot(hx + 40, hy - 8, 6, rgba('#ffe2a8', 0.9 * eo));
+  },
+  titan(cx, y, t, col, L) { // a titan of stone asleep in the rock below: a great head and shoulders, cracks glowing, its eyes opening slowly now and then
+    const glowC = L.rim, br = Math.sin(t * 0.4) * 6, open = smooth01((Math.sin(t * 0.22) - 0.2) * 1.6);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx - 230, y - 40 + br, 230, 150, -0.2, 0, 7); ctx.ellipse(cx + 230, y - 40 + br, 230, 150, 0.2, 0, 7); ctx.fill(); // shoulders
+    ctx.beginPath(); ctx.moveTo(cx - 170, y - 60 + br); ctx.quadraticCurveTo(cx - 190, y - 420 + br, cx, y - 450 + br); ctx.quadraticCurveTo(cx + 190, y - 420 + br, cx + 170, y - 60 + br); ctx.closePath(); ctx.fill(); // the head
+    ctx.fillStyle = mixHex(col, '#000000', 0.35); ctx.fillRect(cx - 150, y - 330 + br, 300, 22); // the brow
+    for (const d of [-1, 1]) { const ex = cx + d * 70, ey = y - 290 + br; ctx.fillStyle = rgba(glowC, 0.25 + 0.6 * open); ctx.beginPath(); ctx.ellipse(ex, ey, 38, 3 + 13 * open, 0, 0, 7); ctx.fill(); if (open > 0.3) glow(ex, ey, 60, rgba(glowC, 0.25 * open), rgba(glowC, 0)); }
+    ctx.strokeStyle = rgba(glowC, 0.6); ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(cx - 40, y - 440 + br); ctx.lineTo(cx - 10, y - 380 + br); ctx.lineTo(cx - 30, y - 340 + br); ctx.moveTo(cx + 90, y - 230 + br); ctx.lineTo(cx + 120, y - 180 + br); ctx.lineTo(cx + 100, y - 120 + br); ctx.moveTo(cx - 330, y - 120 + br); ctx.lineTo(cx - 280, y - 90 + br); ctx.lineTo(cx - 300, y - 40 + br); ctx.stroke(); // its cracks
+  },
+  worm(x0, y, t, col, L) { // a giant worm passing through the rock, segment after segment, ringed and slow
+    const head = ((t * 22) % (W + 1400)) - 400, ring = mixHex(col, '#000000', 0.4);
+    for (let i = 26; i >= 0; i--) { const px = head - i * 44, py = y + Math.sin(t * 0.8 - i * 0.45) * 34, r = 58 - i * 1.2; if (px < -r || px > W + r) continue;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill(); ctx.strokeStyle = ring; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, r * 0.82, -1.2, 1.2); ctx.stroke(); }
+    const hy = y + Math.sin(t * 0.8) * 34; ctx.fillStyle = ring; ctx.beginPath(); ctx.arc(head + 30, hy, 34, 0, 7); ctx.fill(); // its mouth
+    ctx.fillStyle = rgba(L.rim, 0.8); for (let k = 0; k < 8; k++) { const a = k * PI / 4; ctx.beginPath(); ctx.arc(head + 30 + Math.cos(a) * 26, hy + Math.sin(a) * 26, 3, 0, 7); ctx.fill(); } // a ring of teeth catching the light
+  },
+  walker(x, base, t, col) { // a long-necked giant as tall as the hills, walking slowly along the horizon behind the mountains
+    const step = t * 0.7, by = base - 330 + Math.sin(step * 2) * 4; ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round';
+    ctx.lineWidth = 34; for (const [lx, ph] of [[-90, 0], [-60, PI], [80, PI], [110, 0]]) { const sw = Math.sin(step + ph) * 26; ctx.beginPath(); ctx.moveTo(x + lx, by + 30); ctx.lineTo(x + lx + sw, base); ctx.stroke(); } // four legs like pillars
+    ctx.beginPath(); ctx.ellipse(x, by, 170, 72, 0, 0, 7); ctx.fill(); // the body
+    ctx.lineWidth = 30; ctx.beginPath(); ctx.moveTo(x + 130, by - 20); ctx.quadraticCurveTo(x + 260, by - 120, x + 250 + Math.sin(t * 0.3) * 12, by - 300); ctx.stroke(); // the neck
+    ctx.beginPath(); ctx.ellipse(x + 262 + Math.sin(t * 0.3) * 12, by - 306, 34, 18, 0.2, 0, 7); ctx.fill(); // the head
+    ctx.lineWidth = 22; ctx.beginPath(); ctx.moveTo(x - 150, by); ctx.quadraticCurveTo(x - 280, by + 10, x - 360, by + 60 + Math.sin(t * 0.5) * 10); ctx.stroke(); // the tail
+    for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(x - 90 + k * 45, by - 66 - (k % 2) * 8, 14, 0, 7); ctx.fill(); } // trees growing on its back
+  },
+  birds(x0, y, t, col) { // a flock in a loose V, flapping, crossing the sky
+    const cx = ((t * 30) % (W + 500)) - 250; ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) { const side = i % 2 ? 1 : -1, row = Math.ceil(i / 2), bx = cx - row * 26, by = y + side * row * 14 + Math.sin(t * 2 + i) * 3, f = Math.sin(t * 7 + i * 1.3) * 5;
+      ctx.beginPath(); ctx.moveTo(bx - 9, by - f); ctx.quadraticCurveTo(bx - 4, by - 3, bx, by); ctx.quadraticCurveTo(bx + 4, by - 3, bx + 9, by - f); ctx.stroke(); }
+  },
+  whale(x0, y, t, col) { // a whale of the sky, gliding between the clouds, its tail beating slowly
+    const x = ((t * 14) % (W + 900)) - 450, tl = Math.sin(t * 0.9) * 18, belly = mixHex(col, '#ffffff', 0.18);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + 210, y); ctx.bezierCurveTo(x + 200, y - 70, x + 40, y - 85, x - 120, y - 40); ctx.quadraticCurveTo(x - 200, y - 18 + tl * 0.3, x - 250, y - 10 + tl); ctx.quadraticCurveTo(x - 190, y + 20 + tl * 0.3, x - 110, y + 30); ctx.bezierCurveTo(x + 20, y + 70, x + 180, y + 60, x + 210, y); ctx.fill(); // the body
+    ctx.beginPath(); ctx.moveTo(x - 245, y - 10 + tl); ctx.lineTo(x - 300, y - 50 + tl * 1.4); ctx.lineTo(x - 270, y - 6 + tl); ctx.lineTo(x - 300, y + 34 + tl * 1.4); ctx.closePath(); ctx.fill(); // the flukes
+    ctx.beginPath(); ctx.moveTo(x + 40, y + 40); ctx.quadraticCurveTo(x + 10, y + 95 + Math.sin(t * 0.9 + 1) * 10, x - 30, y + 90); ctx.quadraticCurveTo(x, y + 60, x + 20, y + 38); ctx.fill(); // a long fin
+    ctx.strokeStyle = belly; ctx.lineWidth = 3; ctx.beginPath(); for (let k = 0; k < 6; k++) { ctx.moveTo(x + 150 - k * 22, y + 30 - k * 0.5); ctx.lineTo(x + 140 - k * 22, y + 48 - k); } ctx.stroke(); // the grooves under its jaw
+    dot(x + 150, y - 14, 4, belly);
+  },
+  dragon(x0, y, t, col) { // a dragon far off, gliding across the night with slow beats of its wings
+    const x = W + 300 - ((t * 26) % (W + 700)), f = Math.sin(t * 1.3), d = -1; ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round';
+    ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(x + d * 70, y - 6); ctx.quadraticCurveTo(x, y + 6, x - d * 110, y + 10); ctx.quadraticCurveTo(x - d * 170, y + 14, x - d * 220, y - 10 + Math.sin(t) * 10); ctx.stroke(); // body and tail
+    ctx.beginPath(); ctx.ellipse(x + d * 84, y - 10, 20, 11, 0.2 * d, 0, 7); ctx.fill(); // the head
+    for (const sd of [-1, 1]) { const tip = y - 90 * f * sd - (sd < 0 ? 40 : -10); ctx.beginPath(); ctx.moveTo(x + d * 20, y - 4); ctx.lineTo(x - d * 10, tip); ctx.quadraticCurveTo(x - d * 50, tip + 30 * sd, x - d * 90, y + 2); ctx.quadraticCurveTo(x - d * 40, y - 10 * f * sd, x + d * 20, y - 4); ctx.fill(); } // two wings
+  },
+  ufo(x0, y, t, col, L, b) { // a saucer drifting and wobbling, its lights running round; now and then a faint beam below
+    const s = b.s, x = ((t * (16 + b.seed * 5) + b.seed * 230) % (W + 300)) - 150, yy = y + Math.sin(t * 1.4 + b.seed) * 10, tilt = Math.sin(t * 1.1 + b.seed) * 0.08;
+    const beam = smooth01((Math.sin(t * 0.35 + b.seed * 2) - 0.75) * 5);
+    if (beam > 0) { const g = ctx.createLinearGradient(0, yy, 0, yy + 220 * s); g.addColorStop(0, `rgba(160,255,220,${0.3 * beam})`); g.addColorStop(1, 'rgba(160,255,220,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - 14 * s, yy + 6 * s); ctx.lineTo(x + 14 * s, yy + 6 * s); ctx.lineTo(x + 60 * s, yy + 220 * s); ctx.lineTo(x - 60 * s, yy + 220 * s); ctx.closePath(); ctx.fill(); }
+    ctx.save(); ctx.translate(x, yy); ctx.rotate(tilt); ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(170,220,255,0.55)'; ctx.beginPath(); ctx.ellipse(0, -10, 22, 18, 0, PI, 0); ctx.fill(); // the glass dome
+    const g = ctx.createLinearGradient(0, -12, 0, 10); g.addColorStop(0, '#c9cfdb'); g.addColorStop(1, '#5a6070'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, 62, 13, 0, 0, 7); ctx.fill();
+    for (let k = 0; k < 7; k++) { const on = Math.floor(t * 6 + k) % 7 === 0; dot(-45 + k * 15, 3, on ? 3.2 : 2.2, on ? '#fff3a0' : '#ff8ad0'); } // lights running round
+    ctx.restore();
+  },
+  stargiant(cx, y, t, col) { // at the end of everything: a figure as big as the sky, made of dark and stars, rising slowly from below to watch you climb
+    const br = Math.sin(t * 0.3) * 10; ctx.fillStyle = 'rgba(20,10,40,0.55)';
+    ctx.beginPath(); ctx.ellipse(cx, y + 60 + br, 380, 230, 0, PI, 0); ctx.fill(); ctx.beginPath(); ctx.ellipse(cx, y - 300 + br, 150, 175, 0, 0, 7); ctx.fill(); // shoulders and head
+    const g = fixedRng(31337), pts = []; for (let i = 0; i < 70; i++) { const a = g() * PI * 2, inHead = i < 30, r = Math.sqrt(g()); const px = inHead ? cx + Math.cos(a) * r * 140 : cx + (g() - 0.5) * 700, py = inHead ? y - 300 + br + Math.sin(a) * r * 160 : y + br + 50 - g() * 180; pts.push([px, py]); const tw = 0.5 + 0.5 * Math.sin(t * 1.5 + i); dot(px, py, 1 + g() * 1.6, `rgba(220,230,255,${0.4 + 0.5 * tw})`); }
+    ctx.strokeStyle = 'rgba(200,210,255,0.18)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = 0; i < 12; i++) { const a = pts[i * 3], c = pts[i * 3 + 4]; ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); } ctx.stroke(); // a few lines between them, like a constellation
+    for (const d of [-1, 1]) { glow(cx + d * 55, y - 320 + br, 34, 'rgba(170,200,255,0.5)', 'rgba(170,200,255,0)'); dot(cx + d * 55, y - 320 + br, 5, '#eaf2ff'); } // its eyes, calm
+  },
+};
 function worldLight() { // one soft wash of the world's light over the tower: from the lava below in the deep, from above in the open; it turns over gently at the surface
   const a = tune.scenery_light; if (!(a > 0)) return;
   const sb = WORLDS[3].base, s = skyNow(), deep = sb === undefined ? 1 : clamp((sb - cam) / 900 + 0.5, 0, 1), c = deep > 0 && deep < 1 ? mixHex(LOOK[2].light, LOOK[3].light, 1 - deep) : looks('light', s), k = clamp(a * 3, 0, 1);
