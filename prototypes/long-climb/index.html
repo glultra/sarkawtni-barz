@@ -1303,12 +1303,28 @@ function backdrop(s, cave, t) { // one side of the ground's surface: the cavern 
   if (cave && rich) { const o = (cam * 0.2) % 512; ctx.save(); ctx.translate(0, o); ctx.fillStyle = rock(); ctx.fillRect(0, -o - 4, W, H + 8); ctx.restore(); } // the cavern's far wall
   if (!cave && rich) nebula(s, t);
   farDecor(t, cave); drawBodies(t, cave);
-  if (cave) { if (rich) caveWalls(s); return; }
+  if (cave) { if (rich) caveWalls(s); recede(top, bot); return; }
   if (rich) sunRays(s, t);
   clouds(t, 0.28, 0.55, 0.62, c => c.k < 0.16); // far clouds: small and pale
   if (rich) panorama(s, bot);
   clouds(t, 0.6, 1, 0.9, c => c.k >= 0.16 && c.k < 0.34); // near clouds
   if (rich) motes(s, t);
+  recede(top, bot);
+}
+function recede(top, bot) { // the backdrop steps back behind the tower: a thin haze of the sky's own colour softens its contrast, then the world's light
+  const mid = mixHex(top, bot, 0.5), [r, g, b] = hex3(mid); SKYLUM = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  if (tune.scenery_haze > 0) { ctx.fillStyle = rgba(mid, tune.scenery_haze); ctx.fillRect(0, 0, W, H); }
+  if (prefs.scenery) worldLight();
+}
+let SKYLUM = 0.5, HALO = null; // how bright the sky is behind the tower now (0 to 1); the soft halo, painted once
+function ledgeHalo(p, x, y) { // a soft patch behind a ledge, so it stands off the scenery: a shadow on a bright sky, a faint glow on a dark one
+  if (!HALO) { // painted once, white and black: soft edges from many rounded layers (no blur filter, which older iPhones lack)
+    HALO = ['#ffffff', '#0a0c14'].map(col => { const c = document.createElement('canvas'); c.width = 160; c.height = 80; const m = c.getContext('2d'); m.fillStyle = col; m.globalAlpha = 0.11;
+      for (let k = 0; k < 10; k++) { const e = 20 - k * 2; m.beginPath(); m.roundRect(22 - e, 22 - e, 116 + 2 * e, 36 + 2 * e, 18 + e); m.fill(); } return c; });
+  }
+  const dark = SKYLUM > 0.42, a = dark ? tune.ledge_shadow : tune.ledge_glow; if (!(a > 0)) return;
+  const tall = p.kind === 'c' ? 52 : 46, iw = p.w + 44, ih = tall + 40;
+  ctx.globalAlpha = a; ctx.drawImage(HALO[dark ? 1 : 0], x - 22, y - 16 + (dark ? 6 : 0), iw, ih); ctx.globalAlpha = 1;
 }
 const BGK = 0.5; let BGC = null; // the backdrop is soft: half the screen's resolution is plenty, and a quarter of the painting
 function drawSky() { // paints the backdrop on its own smaller canvas, then lays it over the screen at once
@@ -1933,6 +1949,7 @@ function drawWorld() {
     for (let i = 0; i < 14; i++) { const y = (i * 97 + 40) % H, x = ((i * 173 + t * 420 * state.wind) % (W + 200) + W + 200) % (W + 200) - 100; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - state.wind * (40 + (i % 3) * 20), y); ctx.stroke(); }
   }
   for (const g of gates) { const y = sy(g.alt); if (vis(y)) drawGate(g, y, t); }
+  if (prefs.scenery) for (const p of plats) { const y = sy(p.alt); if (vis(y) && p.kind !== 'r' && p.kind !== 'g' && !(p.gone > 0) && (p.ph === undefined || p.ph === (state.phase | 0))) ledgeHalo(p, p.x, y); } // first every ledge's halo, so none covers a neighbour
   for (const p of plats) { const y = sy(p.alt); if (!vis(y)) continue; if (p.temp && p.temp < 1.2 && Math.floor(t * 10) % 2) continue; /* a gift's piano blinks before it goes */ if (p.tilt) { const cx = p.x + p.w / 2; ctx.save(); ctx.translate(cx, y); ctx.rotate(-Math.atan(p.tilt)); ctx.translate(-cx, -y); drawLedge(p, p.x, y, t); ctx.restore(); } else drawLedge(p, p.x, y, t); } // a leaning ledge is drawn turned about its middle
   for (const tg of targets) { const y = sy(tg.alt + Math.sin(t * 2 + tg.phase) * tg.amp); if (vis(y)) drawTarget(tg.x, y, tg.hit); }
   for (const tr of turrets) { const y = sy(tr.alt); if (vis(y)) drawTurret(tr.x, y, tr.dir, tr.sleep > 0, t); }
@@ -1974,7 +1991,6 @@ function drawWorld() {
     else { ctx.fillStyle = q.color; ctx.beginPath(); ctx.ellipse(q.x, y, q.s, q.s * 0.8, 0, 0, 7); ctx.fill(); }
   }
   ctx.globalAlpha = 1;
-  if (prefs.scenery) worldLight(); // the world's own light over everything in it; the speech bubbles stay clean on top
   if (live && prefs.bubbles) for (const o of others.values()) { const y = sy(o.alt); if (vis(y)) drawSay(o.say, o.x, o.h ? y + 40 : y - 20); } // what the others said, over their heads (above the name)
   if (mine && prefs.bubbles) drawSay(P.say, P.x + PW / 2, sy(P.alt));
   ctx.restore();

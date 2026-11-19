@@ -89,6 +89,7 @@ After play: when i want to change the size of the buttons i have to manually res
 After play: on moving from level 8 to 9 or 9 to 10 idk which one and on other levels are well the game background disappears and anew background replaces why it is just like this!? i mean it is so disgussing ! i mean when ever we have this issue please fix it this will feel so boring ! and tbh with u the first main underground backgrounds i dont like it much idk why and same for the near galaxies idk why i think they feel too crowded !
 After play: why on mobile i have 30 fps damn!
 After play: the top levels with including the wind is a bit hard players can escape it so maybe we just have the wind in ultra or hard mode ! which we don't ultra mode yet we may add it later instead of the wind make it difficult a bit by one more thing ! or let's think of the game including some puzzle idea like twofold prototype · picked: every jump flips sun and moon
+After play: i just feel that the main furnitures and other things needs a bit more focused what do u say? like the color with its parents are very matched now hmm idk
 
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
@@ -199,6 +200,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] No background ever switches at once: the ground's surface is the line between the cavern and the sky (no soil sheet covering the screen, no cave turning blue), each world's sky blends over the last two fifths of it, and sun rays, dust, gas clouds, the setting sun and the mountains fade or sink away rather than vanish; the underground is a calm dark cavern (a far wall of rock, the core's heat as a soft glow, three faint seams of magma, faint layers and a few small crystals); space is quieter (smaller planets, fainter, less gas, fewer near stars)
 - [x] Smooth on phones: the backdrop is painted at half resolution on its own canvas and laid over the screen at once (the grass, lava and everything you stand on stay sharp); a phone draws at most 2 pixels per screen point instead of 3; the world's light is plain see-through paint, not a slow blend; when a phone still falls under about 45 frames a second from the game's own work, it quietly draws a step less sharp (never below 70%)
 - [x] Sun and moon (world 6, and some of the last world): some plain ledges are sun (gold) or moon (blue), and only one colour is solid at a time; every jump swaps them (the other shows as a faint dashed ghost); a plain ledge stays solid, so a hop on it sets the colour you need; two coloured ledges in a row always alternate, so the way up can always be climbed; a chip under the clock shows what is up now and after your next jump; the wind blows only on Hard
+- [x] The ledges stand out from the scenery: the world's light tints only the backdrop, so every ledge keeps its own colours; a thin haze of the sky's own colour pushes the backdrop back; a soft shadow behind each ledge on a bright sky and a faint glow on a dark one (night, space, the cavern)
 
 ## Your systems
 - parkour · in the slice
