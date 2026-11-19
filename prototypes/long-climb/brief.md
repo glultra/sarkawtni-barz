@@ -92,6 +92,7 @@ After play: the top levels with including the wind is a bit hard players can esc
 After play: i just feel that the main furnitures and other things needs a bit more focused what do u say? like the color with its parents are very matched now hmm idk
 After play: nah i don't like it much rollback please
 After play: adding ufos moving in the background, and from the bottom u show some beasts like in eldenring worlds smth huge yeah and for each other worlds u decide what are good things too add
+After play: i don't like it so much they are look so fake ish not realistics ! · picked: roll back
 
 **Pitch:** One tall tower, hard but fair, where a slip drops you back down; you climb it live while viewers race the same tower on their phones for your prize.
 
@@ -202,7 +203,6 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - [x] No background ever switches at once: the ground's surface is the line between the cavern and the sky (no soil sheet covering the screen, no cave turning blue), each world's sky blends over the last two fifths of it, and sun rays, dust, gas clouds, the setting sun and the mountains fade or sink away rather than vanish; the underground is a calm dark cavern (a far wall of rock, the core's heat as a soft glow, three faint seams of magma, faint layers and a few small crystals); space is quieter (smaller planets, fainter, less gas, fewer near stars)
 - [x] Smooth on phones: the backdrop is painted at half resolution on its own canvas and laid over the screen at once (the grass, lava and everything you stand on stay sharp); a phone draws at most 2 pixels per screen point instead of 3; the world's light is plain see-through paint, not a slow blend; when a phone still falls under about 45 frames a second from the game's own work, it quietly draws a step less sharp (never below 70%)
 - [x] Sun and moon (world 6, and some of the last world): some plain ledges are sun (gold) or moon (blue), and only one colour is solid at a time; every jump swaps them (the other shows as a faint dashed ghost); a plain ledge stays solid, so a hop on it sets the colour you need; two coloured ledges in a row always alternate, so the way up can always be climbed; a chip under the clock shows what is up now and after your next jump; the wind blows only on Hard
-- [x] A giant far off in each world, slow and tinted like the scenery, rising from below or drifting into view as you near it and sinking or drifting away as you pass: a magma leviathan in the lava (core), a stone titan in the rock with eyes that slowly open (mantle), a great worm passing through the rock (crust), a long-necked beast with trees on its back walking behind the far mountains and a flock of birds (day), a sky whale (sunset), a dragon gliding across the night, UFOs with running lights and now and then a faint beam (space), and a giant made of stars watching from below (the last world); painted scenery only
 
 ## Your systems
 - parkour · in the slice
@@ -229,6 +229,7 @@ You pick a difficulty and stand in a garden at the foot of the tower with the he
 - 2D with this idea will be perfect for me *(you said)*
 
 ## Avoid
+- Creatures and giants drawn in code in the background (a leviathan, a titan, a worm, a walker, a whale, a dragon, UFOs, a star giant: tried in iteration 36, "they are look so fake ish not realistics"); realistic creatures would need real painted art
 - A soft shadow or glow behind every ledge, a haze over the backdrop, and the world's light kept off the ledges (tried in iteration 34, "nah i don't like it much")
 - More fear and drama: fewer floors, a heartbeat, darkening edges, slow motion, big-fall banners, a taunting voice (tried, "not nice")
 - duel maybe not makes sense
